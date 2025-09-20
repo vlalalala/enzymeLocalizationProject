@@ -6,22 +6,39 @@ from typing import Tuple
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
-from auxFcts import Ratio
+from auxFcts import Ratio, define_ratio_from_string
 import pickle
+
+
+
+#%%
+# Get the absolute path to this script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Go up to the project root (one or more levels as needed)
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+
+# Access other folders relative to the root
+DATA_PATH = os.path.join(PROJECT_ROOT, "data", "case000")
 
 #%%
 def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
     """Reads the csv files and creates corresponding panda dataframes.
-    In case some column has "ratio" as a substring of the header, the values
+    In case some columns have "ratio" as a substring of the header, the values
     are converted to Ratio types.
     """
     dataframe = pd.read_csv(csv_file, encoding="utf-16")
-    # TODO make values in ratio column Ratio objects
+    ratio_cols = dataframe.columns[dataframe.columns.str.contains("ratio")]
+    for ratio_col in ratio_cols:
+        dataframe[ratio_col] = dataframe[ratio_col].apply(define_ratio_from_string)
     return dataframe
 
-enzymatic_reactions_data = create_pandas_dataframe_from_csv_file("enzymaticReactions_copy.csv")
-spontaneous_reactions_data = create_pandas_dataframe_from_csv_file("spontaneousReactions_copy.csv")
+enzymatic_reactions_data = create_pandas_dataframe_from_csv_file(os.path.join(DATA_PATH, "enzymaticReactions.csv"))
+spontaneous_reactions_data = create_pandas_dataframe_from_csv_file(os.path.join(DATA_PATH, "spontaneousReactions.csv"))
 
+#%%
+spontaneous_reactions_data["ratio_endtostart_species"][0].to_float()
+#%%
 def extract_species_from_reactions_data(
     enzymatic_reactions_df: pd.DataFrame, spontaneous_reactions_df: pd.DataFrame) -> npt.NDArray:
     """ Returns a numpy array with all the names of the involved species in the reactions defined."""
@@ -31,11 +48,13 @@ def extract_species_from_reactions_data(
     ]).unique()
     return unique_species
 
-def extract_species_from_species_data() -> npt.NDArray:
+def extract_species_from_species_data(species_df) -> npt.NDArray:
     """ Returns a numpy array of all the species defined in the species data
     (after checking that no fields are missing).
     """
-    return
+    species = species_df['']
+
+    return species
 
 def check_completeness_species_data() -> bool:
     """ Returns true or false for whether all the information about the species that take part in reactions

@@ -1,4 +1,9 @@
+
+from src.createCSsvFilesBase import * #################
 from src.defineReactionNetwork import generate_reaction_network
+
+
+
 
 rule generate_reaction_network:
     input: 
