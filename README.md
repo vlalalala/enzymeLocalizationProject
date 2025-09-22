@@ -1,0 +1,1 @@
+This is a piece of modular code for defining reaction networks, placing enzymes within a spherical object and computing the steady state spatial distribution of the reactants, intermediates, and products.
