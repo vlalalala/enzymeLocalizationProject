@@ -5,3 +5,6 @@ __pycache__/
 # Ignore editor VSCode/VSCodium settings
 .vscode/
 .history/
+
+# Ignore any .snakemake folders at any level
+**/.snakemake/

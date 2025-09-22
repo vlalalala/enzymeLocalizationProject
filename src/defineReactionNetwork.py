@@ -9,68 +9,6 @@ import pandas as pd
 from auxFcts import Ratio, define_ratio_from_string
 import pickle
 
-
-
-#%%
-# Get the absolute path to this script
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Go up to the project root (one or more levels as needed)
-PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-
-# Access other folders relative to the root
-DATA_PATH = os.path.join(PROJECT_ROOT, "data", "case000")
-
-#%%
-def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
-    """Reads the csv files and creates corresponding panda dataframes.
-    In case some columns have "ratio" as a substring of the header, the values
-    are converted to Ratio types.
-    """
-    dataframe = pd.read_csv(csv_file, encoding="utf-16")
-    ratio_cols = dataframe.columns[dataframe.columns.str.contains("ratio")]
-    for ratio_col in ratio_cols:
-        dataframe[ratio_col] = dataframe[ratio_col].apply(define_ratio_from_string)
-    return dataframe
-
-enzymatic_reactions_data = create_pandas_dataframe_from_csv_file(os.path.join(DATA_PATH, "enzymaticReactions.csv"))
-spontaneous_reactions_data = create_pandas_dataframe_from_csv_file(os.path.join(DATA_PATH, "spontaneousReactions.csv"))
-
-#%%
-spontaneous_reactions_data["ratio_endtostart_species"][0].to_float()
-#%%
-def extract_species_from_reactions_data(
-    enzymatic_reactions_df: pd.DataFrame, spontaneous_reactions_df: pd.DataFrame) -> npt.NDArray:
-    """ Returns a numpy array with all the names of the involved species in the reactions defined."""
-    unique_species = pd.concat([
-        enzymatic_reactions_df['start_species'], enzymatic_reactions_df['end_species'],
-        spontaneous_reactions_df['start_species'], spontaneous_reactions_df['end_species']
-    ]).unique()
-    return unique_species
-
-def extract_species_from_species_data(species_df) -> npt.NDArray:
-    """ Returns a numpy array of all the species defined in the species data
-    (after checking that no fields are missing).
-    """
-    species = species_df['']
-
-    return species
-
-def check_completeness_species_data() -> bool:
-    """ Returns true or false for whether all the information about the species that take part in reactions
-    is found within the species data. Combine with assert.
-    In case there is some species that is not involved in any reaction, prints an informing statement.
-    """
-    return
-
-def check_completeness_enzymes_data() -> bool:
-    """ Checks that for each enzymatic reaction we have all the information about the 
-    enzymes that catalyze the enzymatic reactions. Combine with assert.
-    In case there is some enzyme that is not involved in any reaction, prints an informing statement.
-    """
-
-extract_species_from_reactions_data(enzymatic_reactions_data, spontaneous_reactions_data)
-
 #%%
 
 class PairTuple:
