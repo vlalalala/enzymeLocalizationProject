@@ -36,9 +36,9 @@ def create_csv_files(case_directory, files_to_create_dict) -> None:
     with each column having headers as specified in the dictionary values.
     """
     for csv_file_name, header_list in files_to_create_dict.items():
-        csv_file_path = os.path.join(case_directory, f'{csv_file_name}_template.csv')
+        csv_file_path = os.path.join(case_directory, f'{csv_file_name}.csv')
         df = pd.DataFrame(columns=header_list)
         df.to_csv(csv_file_path, encoding='utf-8-sig', index=False)
-        print(f"{csv_file_name}_template.csv", "created")
+        print(f"{csv_file_name}.csv", "created")
 
 #%%

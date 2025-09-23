@@ -1,8 +1,10 @@
 import os
 import pandas as pd
+import pickle
 from src.auxFcts import (
-    Ratio, define_ratio_from_string, no_empty_cells,
-    checks_lack_of_repetitions, check_correct_type)
+    Ratio, define_ratio_from_string, no_empty_cells, no_repeated_rows,
+    checks_lack_of_repetitions, check_correct_type,
+    define_list_of_locationPairTuples_from_string)
 
 def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
     """Reads the csv files and creates corresponding panda dataframes.
@@ -15,12 +17,17 @@ def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
     string_cols = dataframe.columns[dataframe.columns.str.contains(r"species|enzyme|name")]
     assert check_correct_type(dataframe, string_cols, str)
     # Checks k, hill, constants
-    float_cols = dataframe.columns[dataframe.columns.str.contains(r"k|hill|constant")]
+    float_cols = dataframe.columns[dataframe.columns.str.contains(r"k|hill|constant|quantity")]
     assert check_correct_type(dataframe, float_cols, (float, int)) # both float and int are valid
     # Checks ratio
     ratio_cols = dataframe.columns[dataframe.columns.str.contains("ratio")]
     for ratio_col in ratio_cols:
         dataframe[ratio_col] = dataframe[ratio_col].apply(define_ratio_from_string)
+    # Checks location
+    location_cols = dataframe.columns[dataframe.columns.str.contains("location")]
+    for location_col in location_cols:
+        dataframe[location_col] = dataframe[location_col].apply(
+            define_list_of_locationPairTuples_from_string)
     return dataframe
 
 def extract_species_and_enzymes_from_reactions_data(
@@ -62,18 +69,19 @@ def check_validity_of_csv_files(case_directory: str, csv_file_names: list):
     2. Every enzyme mentioned in the reaction files (enzymaticReactions.csv and spontaneousReactions.csv)
        is defined (only once) in enzymes.csv. Inform of whether some enzyme is defined that does not catalyze
        any reaction.
-    If this is done, the _template in the name is removed
+    If this is done, the dataframes are stored as pickled dataframes
     """
     # Create dataframes from .csv files
     dataframes = {
         name: create_pandas_dataframe_from_csv_file(
-        os.path.join(case_directory, f"{name}_template.csv"))
+        os.path.join(case_directory, f"{name}.csv"))
         for name in csv_file_names
     }
     # Step 0
     for dataframe_name, dataframe_object in dataframes.items():
         assert no_empty_cells(dataframe_object), f"dataframe {dataframe_name} has empty cells"
-    
+        assert no_repeated_rows(dataframe_object)
+
     reaction_species, reaction_enzymes = extract_species_and_enzymes_from_reactions_data(dataframes["ENZYMATIC_REACTIONS"], dataframes["SPONTANEOUS_REACTIONS"])
     species, enzymes = extract_species_and_enzymes_from_characteristics_data(dataframes["SPECIES"], dataframes["ENZYMES"])
     
@@ -101,19 +109,13 @@ def check_validity_of_csv_files(case_directory: str, csv_file_names: list):
         if individual_enzymes not in reaction_enzymes]
     if len(enzymes_not_in_reaction) != 0:
         print("Enzymes", enzymes_not_in_reaction, "are defined but do not catalyze any reaction.")
-    print(f"{case_directory} has good inputs. Removing _template from name")
     
-    # Final step: rename files
-    for filename in os.listdir(case_directory):
-    # Check if '_template' is in the filename
-        if "_template" in filename:
-            # Create the new filename
-            new_filename = filename.replace("_template", "")
-            # Build full paths
-            old_path = os.path.join(case_directory, filename)
-            new_path = os.path.join(case_directory, new_filename)
-            # Rename the file
-            os.rename(old_path, new_path)
+    print(f"{case_directory} has good inputs. Pickling dataframes...")
+    
+    # Pickle dataframes separately
+    for filename, dataframe in dataframes.items():
+        with open(os.path.join(case_directory, f"{filename}_dataframe_pickle"), 'wb') as f:
+            pickle.dump(dataframe, f)
     print(f"{case_directory} is good to go!")
 
 #%%

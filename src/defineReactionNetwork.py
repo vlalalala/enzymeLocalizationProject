@@ -10,12 +10,6 @@ from auxFcts import Ratio, define_ratio_from_string
 import pickle
 
 #%%
-
-class PairTuple:
-    def __init__(self, element1: float, element2: float ):
-        self.pair = (min(element1, element2), max(element1, element2))
-
-#%%
 class Participant:
     def __init__(self, name: str) -> None:
         self.name = name
