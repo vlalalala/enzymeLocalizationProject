@@ -8,6 +8,7 @@ dependencies: # not tested yet. Just an example
   - matplotlib=3.10.6
   - pandas=2.1.4
   - networkx=3.4
+  - pygraphviz = ?
   - snakemake=8.10 # optional: if you run inside this environment
 
 # part of the standard library: os, sys, math, pickle

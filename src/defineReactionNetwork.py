@@ -183,10 +183,16 @@ class System:
     def draw_network(self, case_folder) -> None:
         # Uses simplified graph to plot
         plotting_network = self.create_simplified_network()
-        print_network_info(plotting_network)
         # Define plot size
-        fig, ax = plt.subplots(figsize=(10, 7))  # Width x Height in inches
-        pos = nx.spring_layout(plotting_network) # other layout options: shell, circular, kamada_kawai...
+        fig, ax = plt.subplots(figsize=(5, 5))  # Width x Height in inches
+        pos = graphviz_layout(plotting_network, prog="dot")
+        plotting_network.graph["graph"] = {"rankdir": "LR"}
+        #if nx.check_planarity(plotting_network)[0]:
+        #    pos = nx.planar_layout(plotting_network)
+        #else:
+        #    pos = nx.spring_layout(plotting_network, k=2.0, iterations=200, weight=None)
+        #pos = nx.kamada_kawai_layout(plotting_network, weight=None, scale = 100.0) # other layout options: shell, circular, kamada_kawai...
+        #pos = nx.spring_layout(plotting_network, k=2.0, iterations=100, weight=None, scale=6.0)
         # Draw nodes
         nx.draw_networkx_nodes(
             plotting_network,
@@ -206,13 +212,14 @@ class System:
         )
         # Draw edges
         nx.draw_networkx_edges(
-            plotting_network,
-            pos,
-            ax = ax,
-            width=[data['weight'] for u, v, data in plotting_network.edges(data=True)],  # Edge thickness by weight
-            arrowstyle='->',
-            arrowsize=20,             # Size of the arrow head
-            edge_color='gray'
+            plotting_network, pos,
+            ax=ax,
+            arrows=True,
+            arrowstyle='-|>',
+            arrowsize=20,
+            connectionstyle='arc3,rad=0.0',
+            min_source_margin=15,  # shifts arrow start away from node center
+            min_target_margin=15   # shifts arrow end before hitting node border
         )
         # Draw edge labels (like reaction names or weights)
         edge_labels = nx.get_edge_attributes(plotting_network, 'label')
@@ -337,3 +344,36 @@ def add_species(self, *species: Species) -> None:
     self.species += species
     self.network.add_nodes_from((s, vars(s)) for s in species)
 """
+import networkx as nx
+import matplotlib.pyplot as plt
+
+G = nx.DiGraph()
+# Add nodes and edges...
+
+if nx.check_planarity(G)[0]:
+    pos = nx.planar_layout(G)
+else:
+    pos = nx.spring_layout(G, k=2.0, iterations=200, weight=None)
+
+fig, ax = plt.subplots(figsize=(10, 8))
+
+nx.draw_networkx_nodes(G, pos, ax=ax, node_size=1000, node_color="skyblue", edgecolors="black")
+
+nx.draw_networkx_edges(
+    G, pos, ax=ax,
+    arrows=True,
+    arrowstyle='-|>',
+    arrowsize=20,
+    connectionstyle='arc3,rad=0.0',
+    min_source_margin=5,
+    min_target_margin=5
+)
+
+nx.draw_networkx_labels(G, pos, ax=ax)
+ax.set_axis_off()
+plt.tight_layout()
+fig.savefig("clean_network.png", dpi=300)
+plt.close(fig)
+
+
+
