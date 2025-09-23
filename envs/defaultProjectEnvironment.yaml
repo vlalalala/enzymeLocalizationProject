@@ -1,0 +1,14 @@
+name: enzymeLocationProject_default
+channels:
+  - conda-forge
+dependencies: # not tested yet. Just an example
+  - python=3.12
+  - numpy
+  - matplotlib
+  - pandas
+  - networkx
+  - pygraphviz
+
+# part of the standard library: os, sys, math, pickle
+
+

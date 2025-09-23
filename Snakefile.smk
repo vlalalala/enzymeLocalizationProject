@@ -29,21 +29,25 @@ files_to_create_dict = {
 
 csv_file_names = files_to_create_dict.keys()
 
-rule check_case_input_validity: # python -m snakemake -s Snakefile.smk check_case_input_validity --config case_number=0 --cores 1
+rule check_case_input_validity: # python -m snakemake -s Snakefile.smk check_case_input_validity --config case_number=0 --cores 1 --use-conda
     input:
         [os.path.join(case_folder, f"{name}.csv") for name in csv_file_names]
     output:
         [os.path.join(case_folder, *["intermediate_files", f"{name}_dataframe_pickle"]) for name in csv_file_names]
     run:
         check_validity_of_csv_files(case_folder, csv_file_names)
+    conda:
+        "envs/defaultProjectEnvironment.yaml"
 
-rule create_system_network:
+rule create_system_network: # python -m snakemake -s Snakefile.smk create_system_network --config case_number=0 --cores 1 --use-conda
     input:
         [os.path.join(case_folder, *["intermediate_files", f"{name}_dataframe_pickle"]) for name in csv_file_names]
     output:
         os.path.join(case_folder, *["intermediate_files", "NETWORK_system_pickle"]), os.path.join(case_folder,"network_graph.png")
     run:
         generate_reaction_network(case_folder, csv_file_names)
+    conda:
+        "envs/defaultProjectEnvironment.yaml"
 
 """
 rule generate_reaction_network:
