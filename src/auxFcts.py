@@ -1,6 +1,7 @@
 import numpy as np
 from math import gcd
 import pandas as pd
+import pickle
 import ast
 
 class Ratio:
@@ -90,4 +91,25 @@ def checks_lack_of_repetitions(array)-> bool:
         raise ValueError("There are repeated values:", repetitions_dict)
     else:
         return True
+
+def pickle_dump_binary(path, variable):
+    with open(path, 'wb') as f:
+        pickle.dump(variable, f)
+
+def pickle_load_binary(path):
+    with open(path, 'rb') as f:
+        loaded_variable = pickle.load(f)
+    return loaded_variable
+
+def print_network_info(graph):
+    """Prints all the graph info."""
+    print("NODES:")
+    for node in graph.nodes(data=True):
+        print(f"  - {node}")
+        print(f"    ↪ type: {type(node[0])}, attrs: {node[1]}")
+    print("\nEDGES:")
+    for u, v, attrs in graph.edges(data=True):
+        print(f"  - from {u} to {v}")
+        print(f"    ↪ types: {type(u)}, {type(v)}")
+        print(f"    ↪ attrs: {attrs}")
 

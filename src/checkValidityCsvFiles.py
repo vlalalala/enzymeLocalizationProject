@@ -4,7 +4,7 @@ import pickle
 from src.auxFcts import (
     Ratio, define_ratio_from_string, no_empty_cells, no_repeated_rows,
     checks_lack_of_repetitions, check_correct_type,
-    define_list_of_locationPairTuples_from_string)
+    define_list_of_locationPairTuples_from_string, pickle_dump_binary)
 
 def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
     """Reads the csv files and creates corresponding panda dataframes.
@@ -114,9 +114,6 @@ def check_validity_of_csv_files(case_directory: str, csv_file_names: list):
     
     # Pickle dataframes separately
     for filename, dataframe in dataframes.items():
-        with open(os.path.join(case_directory, f"{filename}_dataframe_pickle"), 'wb') as f:
-            pickle.dump(dataframe, f)
+        pickle_dump_binary(
+            os.path.join(case_directory, *["intermediate_files", f"{filename}_dataframe_pickle"]), dataframe)
     print(f"{case_directory} is good to go!")
-
-#%%
-# %%

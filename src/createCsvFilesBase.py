@@ -40,5 +40,3 @@ def create_csv_files(case_directory, files_to_create_dict) -> None:
         df = pd.DataFrame(columns=header_list)
         df.to_csv(csv_file_path, encoding='utf-8-sig', index=False)
         print(f"{csv_file_name}.csv", "created")
-
-#%%

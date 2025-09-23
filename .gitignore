@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# Ignore images that can be generated from the code
+*.png
+
 # Ignore editor VSCode/VSCodium settings
 .vscode/
 .history/
@@ -9,3 +12,6 @@ __pycache__/
 
 # Ignore any .snakemake folders at any level
 **/.snakemake/
+**/intermediate_files/
+
+

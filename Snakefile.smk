@@ -2,6 +2,7 @@ import os
 
 from src.createCsvFilesBase import find_new_case, create_csv_files
 from src.checkValidityCsvFiles import check_validity_of_csv_files
+from src.defineReactionNetwork import generate_reaction_network
 
 data_folder = "data"
 digits_case_numbers = 3
@@ -11,6 +12,7 @@ rule create_next_case: # python -m snakemake -s Snakefile.smk create_next_case -
         new_case_path = find_new_case(data_folder, digits_case_numbers, config['case_number'])
         os.mkdir(new_case_path)
         create_csv_files(new_case_path, files_to_create_dict)
+        os.mkdir(os.path.join(new_case_path, "intermediate_files"))
 
 case_folder = os.path.join(
     data_folder,
@@ -20,8 +22,8 @@ case_folder = os.path.join(
 files_to_create_dict = {
     "ENZYMATIC_REACTIONS": ["start_species", "end_species", "ratio_endtostart_species", "enzyme", "k_cat", "k_M", "hill"],
     "SPONTANEOUS_REACTIONS": ["start_species", "end_species", "ratio_endtostart_species", "k"],
-    "SPECIES": ["name", "diffusion_constant", "permeability_constant"],
     "ENZYMES": ["name", "quantity", "localization"],
+    "SPECIES": ["name", "diffusion_constant", "permeability_constant"],
     #"SIMULATION_CONFIG": ["radius"]
 }
 
@@ -31,10 +33,17 @@ rule check_case_input_validity: # python -m snakemake -s Snakefile.smk check_cas
     input:
         [os.path.join(case_folder, f"{name}.csv") for name in csv_file_names]
     output:
-        [os.path.join(case_folder, f"{name}_dataframe_pickle") for name in csv_file_names]
+        [os.path.join(case_folder, *["intermediate_files", f"{name}_dataframe_pickle"]) for name in csv_file_names]
     run:
         check_validity_of_csv_files(case_folder, csv_file_names)
 
+rule create_system_network:
+    input:
+        [os.path.join(case_folder, *["intermediate_files", f"{name}_dataframe_pickle"]) for name in csv_file_names]
+    output:
+        os.path.join(case_folder, *["intermediate_files", "NETWORK_system_pickle"]), os.path.join(case_folder,"network_graph.png")
+    run:
+        generate_reaction_network(case_folder, csv_file_names)
 
 """
 rule generate_reaction_network:
