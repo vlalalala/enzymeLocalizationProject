@@ -1,6 +1,7 @@
-name: enzymeLocationProject_default
+name: default_environment
 channels:
   - conda-forge
+  - defaults
 dependencies: # not tested yet. Just an example
   - python=3.12
   - numpy
