@@ -1,3 +1,4 @@
+#%%
 import os
 import pandas as pd
 import pickle
@@ -117,3 +118,5 @@ def check_validity_of_csv_files(case_directory: str, csv_file_names: list):
         pickle_dump_binary(
             os.path.join(case_directory, f".{filename}_dataframe_pickle"), dataframe)
     print(f"{case_directory} is good to go!")
+
+#%%
