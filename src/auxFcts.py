@@ -2,46 +2,12 @@ import numpy as np
 from math import gcd
 import pandas as pd
 import pickle
+import yaml
+from pathlib import Path
 import ast
 
-import ast
-
-def as_list(value, type_cast=str):
-    """
-    Converts various types of input into a list of elements of type `type_cast`.
-
-    Handles:
-    - Single values (e.g., 5 or "abc")
-    - Space-separated strings (e.g., "1 2 3")
-    - Real lists (e.g., [1, 2])
-    - Strings that represent Python lists (e.g., "[1, 2]")
-
-    Raises:
-        ValueError: If a string looks like a list (contains '[' or ']') but is invalid
-    """
-    if isinstance(value, list):
-        return [type_cast(v) for v in value]
-
-    elif isinstance(value, str):
-        val = value.strip()
-        # Case: string that looks like a list (e.g. "[1, 2]")
-        if "[" in val or "]" in val:
-            try:
-                parsed = ast.literal_eval(val)
-                if not isinstance(parsed, list):
-                    raise ValueError(f"Expected list-like string, got: {val}")
-                return [type_cast(v) for v in parsed]
-            except Exception as e:
-                raise ValueError(f"Invalid list syntax in string: {val!r}") from e
-
-        # Case: space-separated string
-        return [type_cast(v) for v in val.split()]
-
-    else:
-        # Single value (e.g. int or float)
-        return [type_cast(value)]
-
-
+def load_yaml_as_dict(yaml_file_path: str):
+    return yaml.safe_load(Path(yaml_file_path).read_text())
 
 class Ratio:
     """Auxiliary class. Defines a ratio of a:b """
@@ -100,13 +66,6 @@ def define_list_of_locationPairTuples_from_string(location_string: str):
         if list_of_location_tuples[idx].minMaxLoc[1] >= list_of_location_tuples[idx+1].minMaxLoc[0]:
             raise ValueError(f"There are issues in the location_string {location_string}")
     return list_of_location_tuples
-
-def create_csv_header_file(file_path, header_list) -> None:
-    """Takes the files_to_create variable and creates a csv file for each key,
-    with each column having headers as specified in the dictionary values.
-    """
-    df = pd.DataFrame(columns=header_list)
-    df.to_csv(file_path, encoding='utf-8-sig', index=False)
 
 def no_empty_cells(dataframe: pd.DataFrame):
     """Returns True if all the values in the cells exist. Else False. """
