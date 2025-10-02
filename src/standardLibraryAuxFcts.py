@@ -6,7 +6,9 @@ import ast
 import json
 
 def load_json(path):
-    print(path, "exists", os.path.isfile(path))
+    _, file_extension = os.path.splitext(os.path.basename(path))
+    if not os.path.isfile(path) or file_extension != ".json":
+        raise ValueError(f"The file {path} does not exist or is not a .json file.")
     with open(path, "r") as f:
         contents = json.load(f)
     return contents

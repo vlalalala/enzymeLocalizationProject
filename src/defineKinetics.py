@@ -1,6 +1,6 @@
 #%%
 import pickle
-from checkValidityCsvFiles import check_validity_of_csv_files
+from check_validity_chemical_network import check_validity_of_csv_files
 
 
 def pickle_load_binary(path):

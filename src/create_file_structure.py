@@ -23,6 +23,10 @@ if __name__ == "__main__":
     output_files = sys.argv[1:]
     # Create the csv files one by one
     for file_path in output_files:
+        # If the file already exists, do nothing
+        if os.path.isfile(file_path):
+            print(f"{file_path} already exists")
+            continue
         # Get which csv file is being created
         basename = os.path.basename(file_path).removesuffix(".csv")
         # Pass the path and headers required for that file

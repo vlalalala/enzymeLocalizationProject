@@ -22,6 +22,11 @@ geometry_info_dict = load_json("src/geometry_info.json")
 
 complete_info_dict = chemical_network_info_dict | geometry_info_dict # merge the two dictionaries
 
+"""
+Important: Snakemake reruns the entire rule if any output file is missing (aka will delete output files and remake them if any one of them is missing!)
+"""
+
+
 rule create_cases:
     # snakemake -s Snakefile.smk create_cases --cores 1
     output:
@@ -35,16 +40,32 @@ rule create_cases:
 rule check_chemical_network_data_validity:
     # snakemake -s Snakefile.smk check_chemical_network_data_validity  --cores 1 --use-conda
     input:
-        [expand("{df}/{bn}_{cn}/{cf}.csv",
-        df = data_folder, bn = base_name, cn = padded_case_numbers, cf = chemical_network_info_dict.keys())]
+        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{cf}.csv"
+                           for cf in chemical_network_info_dict.keys()]
+        #lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{cf}.csv" 
+        #                   for cf in chemical_network_info_dict.keys()]
+        #["{df}/{bn}_{cn}/{cf}.csv" for cf in chemical_network_info_dict.keys()]
+        #[expand("{df}/{bn}_{cn}/{cf}.csv",
+        #df = data_folder, bn = base_name, cn = padded_case_numbers, cf = chemical_network_info_dict.keys())]
     output:
-        [expand("{df}/{bn}_{cn}/.{cf}_dataframe_pickle",
-        df = data_folder, bn = base_name, cn = padded_case_numbers, cf = chemical_network_info_dict.keys())]
+        touch("{df}/{bn}_{cn}/.chemical_network_validated")
+        #lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.{cf}_dataframe_pickle"
+        #                   for cf in chemical_network_info_dict.keys()]
+        #["{df}/{bn}_{cn}/.{cf}_dataframe_pickle" for cf in chemical_network_info_dict.keys()]
+        #[expand("{df}/{bn}_{cn}/.{cf}_dataframe_pickle",
+        #df = data_folder, bn = base_name, cn = padded_case_numbers, cf = chemical_network_info_dict.keys())]
     conda:
         "config/environment.yaml"
     shell:
-        for df, bn, cn in product(data_folder, base_name, padded_case_numbers):
-            check_validity_of_csv_files(f"{df}/{bn}_{cn}/", chemical_network_info_dict.keys())
+        "python src/check_validity_chemical_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        #    check_validity_of_csv_files(f"{df}/{bn}_{cn}/", chemical_network_info_dict.keys())
+
+rule all:
+    # snakemake -s Snakefile.smk data/case_00/.chemical_network_validated --cores 1 --use-conda
+    input:
+        expand("data/{bn}_{cn}/.chemical_network_validated",
+               bn=["case"],
+               cn=["00"])
 
 rule create_system_network:
     # snakemake -s Snakefile create_system_network --config case_number=0 --cores 1 --use-conda

@@ -1,8 +1,10 @@
 #%%
+import sys
 import os
 import pandas as pd
 import pickle
-from src.auxFcts import (
+from standardLibraryAuxFcts import load_json
+from auxFcts import (
     Ratio, define_ratio_from_string, no_empty_cells, no_repeated_rows,
     checks_lack_of_repetitions, check_correct_type,
     define_list_of_locationPairTuples_from_string, pickle_dump_binary)
@@ -55,7 +57,7 @@ def extract_species_and_enzymes_from_characteristics_data(
     
     return list(species), list(enzymes)
 
-def check_validity_of_csv_files(case_directory: str, csv_file_names: list):
+def check_validity_chemical_network_info(case_directory: str, csv_file_names: list):
     """
     case_directory: relative or absolute path to caseNNN
     csv_file_names: names of csv files without .csv
@@ -119,4 +121,7 @@ def check_validity_of_csv_files(case_directory: str, csv_file_names: list):
             os.path.join(case_directory, f".{filename}_dataframe_pickle"), dataframe)
     print(f"{case_directory} is good to go!")
 
-#%%
+if __name__ == "__main__":
+    folder_to_check_validity = sys.argv[1]
+    chemical_network_info_file_names = load_json("src/chemical_network_info.json").keys()
+    check_validity_chemical_network_info(folder_to_check_validity, chemical_network_info_file_names)
