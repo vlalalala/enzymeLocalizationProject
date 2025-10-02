@@ -6,7 +6,7 @@ from src.standardLibraryAuxFcts import as_list, load_json
 
 ### Setup import of inputs ###
 
-configfile: "config/config.yaml"
+configfile: "config/config.json"
 
 data_folder = config["data_folder"]
 base_name = config["base_name"]
@@ -22,39 +22,14 @@ geometry_info_dict = load_json("src/geometry_info.json")
 
 complete_info_dict = chemical_network_info_dict | geometry_info_dict # merge the two dictionaries
 
-"""
-Important: Snakemake reruns the entire rule if any output file is missing (aka will delete output files and remake them if any one of them is missing!)
-"""
-
-
-rule create_cases:
-    # snakemake -s Snakefile.smk create_cases --cores 1
-    output:
-        [expand("{df}/{bn}_{cn}/{cf}.csv",
-        df = data_folder, bn = base_name, cn = padded_case_numbers, cf = complete_info_dict.keys())]
-    conda:
-        "config/environment.yaml"
-    shell:
-        "python src/create_file_structure.py {output}"
 
 rule check_chemical_network_data_validity:
     # snakemake -s Snakefile.smk check_chemical_network_data_validity  --cores 1 --use-conda
     input:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{cf}.csv"
                            for cf in chemical_network_info_dict.keys()]
-        #lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{cf}.csv" 
-        #                   for cf in chemical_network_info_dict.keys()]
-        #["{df}/{bn}_{cn}/{cf}.csv" for cf in chemical_network_info_dict.keys()]
-        #[expand("{df}/{bn}_{cn}/{cf}.csv",
-        #df = data_folder, bn = base_name, cn = padded_case_numbers, cf = chemical_network_info_dict.keys())]
     output:
         touch("{df}/{bn}_{cn}/.chemical_network_validated")
-        #lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.{cf}_dataframe_pickle"
-        #                   for cf in chemical_network_info_dict.keys()]
-        #["{df}/{bn}_{cn}/.{cf}_dataframe_pickle" for cf in chemical_network_info_dict.keys()]
-        #[expand("{df}/{bn}_{cn}/.{cf}_dataframe_pickle",
-        #df = data_folder, bn = base_name, cn = padded_case_numbers, cf = chemical_network_info_dict.keys())]
-    conda:
         "config/environment.yaml"
     shell:
         "python src/check_validity_chemical_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
