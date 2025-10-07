@@ -1,16 +1,17 @@
 #%% Imports
 import os
+import pickle
 import numpy as np
 import numpy.typing as npt
-
 from typing import Tuple
 import networkx as nx
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
-from src.auxFcts import Ratio, define_ratio_from_string, pickle_load_binary, pickle_dump_binary, print_network_info
-import pickle
+
+from standardLibraryAuxFcts import load_json
+from auxFcts import Ratio, define_ratio_from_string, pickle_load_binary, pickle_dump_binary, print_network_info
 
 import sys
 # path of enzymeLocalizationProject
@@ -297,6 +298,10 @@ def generate_reaction_network(case_folder, csv_file_names):
     system.draw_network(case_folder)
     pickle_dump_binary(os.path.join(case_folder, ".NETWORK_system_pickle"), system)
 
+if __name__ == "__main__":
+    folder_to_check_validity = sys.argv[1]
+    chemical_network_info_file_names = load_json("src/chemical_network_info.json").keys()
+    generate_reaction_network(folder_to_check_validity, chemical_network_info_file_names)
 #%%
 #"""
 #root = os.path.dirname(os.getcwd())

@@ -1,3 +1,5 @@
+# conda activate snakemake-runner
+
 ### Import libraries from Python standard libraries ###
 
 import os
@@ -22,58 +24,34 @@ geometry_info_dict = load_json("src/geometry_info.json")
 
 complete_info_dict = chemical_network_info_dict | geometry_info_dict # merge the two dictionaries
 
+### Define rules to run. The templates must already have been created and all data filled in. ###
+# Create the template files through
+# python src/create_file_structure.py
 
 rule check_chemical_network_data_validity:
-    # snakemake -s Snakefile.smk check_chemical_network_data_validity  --cores 1 --use-conda
+    # snakemake -s Snakefile.smk data/violacein_0/.chemical_network_validated --cores 1 --use-conda
     input:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{cf}.csv"
                            for cf in chemical_network_info_dict.keys()]
     output:
         touch("{df}/{bn}_{cn}/.chemical_network_validated")
+    conda:
         "config/environment.yaml"
     shell:
         "python src/check_validity_chemical_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
-        #    check_validity_of_csv_files(f"{df}/{bn}_{cn}/", chemical_network_info_dict.keys())
-
-rule all:
-    # snakemake -s Snakefile.smk data/case_00/.chemical_network_validated --cores 1 --use-conda
-    input:
-        expand("data/{bn}_{cn}/.chemical_network_validated",
-               bn=["case"],
-               cn=["00"])
 
 rule create_system_network:
-    # snakemake -s Snakefile create_system_network --config case_number=0 --cores 1 --use-conda
+    # snakemake -s Snakefile.smk data/violacein_0/network_graph.png --cores 1 --use-conda
     input:
-        [expand("{df}/{bn}_{cn}/.{cf}_dataframe_pickle",
-        df = data_folder, bn = base_name, cn = padded_case_numbers, cf = chemical_network_info_dict.keys())]
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.chemical_network_validated"
     output:
-        outputs = [file for suffix in [".NETWORK_system_pickle", "network_graph.png"]
-                for file in expand("{df}/{bn}_{cn}/" + suffix,
-                    df=data_folder, bn=base_name, cn=padded_case_numbers)]
+        ["{df}/{bn}_{cn}/.NETWORK_system_pickle", "{df}/{bn}_{cn}/network_graph.png", ]
     conda:
         "config/environment.yaml"
-    run:
-        from src.defineReactionNetwork import generate_reaction_network
-        for df, bn, cn in product(data_folder, base_name, padded_case_numbers):
-            generate_reaction_network(f"{df}/{bn}_{cn}/", chemical_network_csv_file_names.keys())
-
-rule test_conda_with_output:
-    # To run shell giving the output: e.g.
-    # snakemake -s Snakefile.smk Alice.txt --cores 1 --use-conda
-    conda:
-        "config/environment.yaml"
-    params:
-        exclamation_mark = "True"
-    output:
-        "{name}.txt" # name is a wildcard
     shell:
-        "python helloworld.py {wildcards.name} {params.exclamation_mark}"
+        "python src/define_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-rule all_tests:
-    # snakemake -s Snakefile.smk --cores 1 --use-conda
-    input:
-        "Bob.txt", "Alice.txt"
+
 
 
 """
@@ -93,7 +71,15 @@ case_folder = os.path.join(
 )
 
 """
-        
+
+"""
+rule all:
+    # snakemake -s Snakefile.smk data/case_00/.chemical_network_validated --cores 1 --use-conda
+    input:
+        expand("data/{bn}_{cn}/.chemical_network_validated",
+               bn=["case"],
+               cn=["00"])
+"""    
 
 
 #chemical_network_csv_file_names = chemical_network_dict.keys()

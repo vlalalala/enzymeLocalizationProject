@@ -1,18 +1,4 @@
 #%%
-<<<<<<< HEAD
-import os
-from src.auxFcts import pickle_load_binary, pickle_dump_binary, print_network_info
-
-
-
-
-
-def define_kinetics(case_folder):
-    system = pickle_load_binary(os.path.join(case_folder, ".NETWORK_system_pickle"))
-
-#%%
-
-=======
 import pickle
 from check_validity_chemical_network import check_validity_of_csv_files
 
@@ -41,4 +27,3 @@ def define_differential_equations(case_folder):
 define_differential_equations(violacein_folder)
 
 # %%
->>>>>>> 2f2caac158b1273a643f31305098913ac6ba8990
