@@ -1,8 +1,0 @@
-# config/config.yaml
-
-data_folders: "data"
-base_names: "violacein"
-digits_case_numbers: 1
-case_numbers: 0
-# "Config file config\config.yaml is extended by additional config specified via the command line." is printed if the command line includes e.g. --config case_number=0.
-# If config is passed on the command line, it redefines the config key
