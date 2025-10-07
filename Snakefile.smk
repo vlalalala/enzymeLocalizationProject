@@ -60,7 +60,7 @@ rule define_kinetics_in_reaction_network:
     conda:
         "config/environment.yaml"
     shell:
-        "python src/"
+        "python src/define_kinetics_in_reaction_network {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 
 

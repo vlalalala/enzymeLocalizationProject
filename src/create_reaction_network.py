@@ -236,7 +236,7 @@ class System:
         ax.set_axis_off()
         # Show the plot
         fig.tight_layout()
-        fig.savefig(os.path.join(case_folder,"network_graph.png"), dpi = 300)
+        fig.savefig(os.path.join(case_folder,"network_graph.png"), dpi = 300, bbox_inches='tight')
         plt.close(fig)
 
 #%%
@@ -315,71 +315,4 @@ if __name__ == "__main__":
 
 #%%
 #"""
-"""
-1. Extract data from .csv files
-2. Define all reaction and participant objects.
-3. Add the different reactions to the system object.
-    With each reaction, add to the list of the attribute the species object and the enzyme object (in case not already there).
-    Update the attribute of the species as_reactant_in, as_product_in
-4. Check that when I modify an object defined outside of system, the object in the attribute of system also changes.
-5. Construct the differential equations
-
-The question is whether it is passing the object itself or a copy
-"""
-
-# %%
-"""
-def add_reaction(self, reaction: Reaction) -> None:
-    Adds one edge that represents the reaction. The attributes of the
-    reaction are saved in a dictionary.
-    Access through:
-        for u, v, edge_data in self.network.edges(data=True):    print(f"Edge from {u} to {v}; Edge attributes dict: {edge_data}")
-    
-    selnetwork.add_edge(
-        reaction.start_species, reaction.end_species,
-        **vars(reaction)
-    )
-    # TODO: when I add a reaction, it should modify the species' attribute first derivative terms
-    # Calls add_species
-
-def add_species(self, *species: Species) -> None:
-    Add species to the system. Put any number of them as parameters.
-    As attributes of the network node we put the attributes of the object as a dict.
-    
-    self.species += species
-    self.network.add_nodes_from((s, vars(s)) for s in species)
-"""
-"""
-import networkx as nx
-import matplotlib.pyplot as plt
-
-G = nx.DiGraph()
-# Add nodes and edges...
-
-if nx.check_planarity(G)[0]:
-    pos = nx.planar_layout(G)
-else:
-    pos = nx.spring_layout(G, k=2.0, iterations=200, weight=None)
-
-fig, ax = plt.subplots(figsize=(10, 8))
-
-nx.draw_networkx_nodes(G, pos, ax=ax, node_size=1000, node_color="skyblue", edgecolors="black")
-
-nx.draw_networkx_edges(
-    G, pos, ax=ax,
-    arrows=True,
-    arrowstyle='-|>',
-    arrowsize=20,
-    connectionstyle='arc3,rad=0.0',
-    min_source_margin=5,
-    min_target_margin=5
-)
-
-nx.draw_networkx_labels(G, pos, ax=ax)
-ax.set_axis_off()
-plt.tight_layout()
-fig.savefig("clean_network.png", dpi=300)
-plt.close(fig)
-
-"""
 

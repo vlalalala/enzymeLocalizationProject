@@ -1,8 +1,9 @@
+
 #%%
 import pickle
 from check_validity_chemical_network import check_validity_of_csv_files
 
-
+#%%
 def pickle_load_binary(path):
     with open(path, 'rb') as f:
         loaded_variable = pickle.load(f)
