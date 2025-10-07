@@ -151,6 +151,7 @@ class System:
             reaction.end_species.as_product_in.append(reaction)
 
     def fill_network(self):
+        """Adds all necessary information inside the networkx graph."""
         self.network.add_nodes_from((s, vars(s)) for s in self.species)
         for reaction in self.enzymatic_reactions + self.spontaneous_reactions:
             self.network.add_edge(reaction.start_species, reaction.end_species, **vars(reaction))

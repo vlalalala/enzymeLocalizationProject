@@ -17,16 +17,24 @@ case_numbers = as_list(config["case_numbers"], int)
 digits_case_numbers = int(config["digits_case_numbers"])
 padded_case_numbers = [str(n).zfill(digits_case_numbers) for n in case_numbers]
 
-### Get template for information from input files ###
+### Get template for input files about chemical network ###
 
 chemical_network_info_dict = load_json("src/chemical_network_info.json")
-geometry_info_dict = load_json("src/geometry_info.json")
-
-complete_info_dict = chemical_network_info_dict | geometry_info_dict # merge the two dictionaries
 
 ### Define rules to run. The templates must already have been created and all data filled in. ###
 # Create the template files through
 # python src/create_file_structure.py
+
+rule check_system_geometry_data_validity:
+    # snakemake -s Snakefile.smk data/violacein_0/.chemical_network_validated --cores 1 --use-conda
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json"
+    output:
+        touch("{df}/{bn}_{cn}/.system_network_validated")
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/check_validity_system_geometry.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 rule check_chemical_network_data_validity:
     # snakemake -s Snakefile.smk data/violacein_0/.chemical_network_validated --cores 1 --use-conda

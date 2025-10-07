@@ -13,6 +13,10 @@ def load_json(path):
         contents = json.load(f)
     return contents
 
+def dump_json(dump_directory: str, file_basename: str, dict_to_dump: dict):
+    with open(os.path.join(dump_directory, f"{file_basename}.json"), "w") as f:
+        json.dump(dict_to_dump, f, indent=4)
+
 def as_list(value, type_cast=str):
     """
     Converts various types of input into a list of elements of type `type_cast`.

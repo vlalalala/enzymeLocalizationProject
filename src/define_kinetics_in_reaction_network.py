@@ -1,8 +1,10 @@
 
 #%%
 import pickle
-from check_validity_chemical_network import check_validity_of_csv_files
+import os
 
+#%%
+from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 #%%
 def pickle_load_binary(path):
     with open(path, 'rb') as f:
@@ -21,8 +23,34 @@ violacein_folder = os.path.join(
 )
 
 #%%
+
+
+#%% Open .Network system
+system_network = pickle_load_binary(os.path.join(violacein_folder, *[".NETWORK_system_pickle"]))
+#%%
+
+#%%
+for species in system_network:
+    species.concentration = 
+#%%
+system_network.species["Trp"].as_reactant_in
+
+#%%
+for species in system_network.species:
+    for reaction in species.as_reactant_in + species.as_product_in:
+        if isinstance(reaction, SpontaneousReaction):
+            term = reaction.k * reaction.start_species #################################
+        elif isinstance(reaction, EnzymaticReaction):
+            term = reaction.k_cat * reaction.enzyme * reaction.start_species / (reaction.k_M + reaction.start_species)
+        if reaction in species.as_reactant_in: # if acts as reactant, concentration diminishes
+            term *= -1
+        species.first_time_derivative_terms.append(term)
+
+
+
+#%%
 def define_differential_equations(case_folder):
-    system = pickle_load_binary(os.path.join(case_folder, ))
+    system = pickle_load_binary(os.path.join(case_folder, ".NETWORK_system_pickle"))
 
 #%%
 define_differential_equations(violacein_folder)
