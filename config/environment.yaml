@@ -1,7 +1,7 @@
-name: default_environment
+name: enzymeLocalizationProject3
 channels:
   - conda-forge
-  - defaults
+  #- defaults
 dependencies: # not tested yet. Just an example
   - python=3.12
   - numpy
@@ -11,5 +11,7 @@ dependencies: # not tested yet. Just an example
   - pygraphviz
 
 # part of the standard library: os, sys, math, pickle
+
+# conda install -n snakemake-runner -c conda-forge mambay
 
 

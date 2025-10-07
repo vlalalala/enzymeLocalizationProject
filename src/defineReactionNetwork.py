@@ -185,12 +185,12 @@ class System:
         plotting_network = self.create_simplified_network()
         # Define plot size
         fig, ax = plt.subplots(figsize=(5, 5))  # Width x Height in inches
-        pos = graphviz_layout(plotting_network, prog="dot")
+        pos = nx.nx_agraph.graphviz_layout(plotting_network, prog="dot")
         plotting_network.graph["graph"] = {"rankdir": "LR"}
         #if nx.check_planarity(plotting_network)[0]:
         #    pos = nx.planar_layout(plotting_network)
         #else:
-        #    pos = nx.spring_layout(plotting_network, k=2.0, iterations=200, weight=None)
+        #pos = nx.spring_layout(plotting_network, k=2.0, iterations=200, weight=None)
         #pos = nx.kamada_kawai_layout(plotting_network, weight=None, scale = 100.0) # other layout options: shell, circular, kamada_kawai...
         #pos = nx.spring_layout(plotting_network, k=2.0, iterations=100, weight=None, scale=6.0)
         # Draw nodes
@@ -344,6 +344,7 @@ def add_species(self, *species: Species) -> None:
     self.species += species
     self.network.add_nodes_from((s, vars(s)) for s in species)
 """
+"""
 import networkx as nx
 import matplotlib.pyplot as plt
 
@@ -375,5 +376,5 @@ plt.tight_layout()
 fig.savefig("clean_network.png", dpi=300)
 plt.close(fig)
 
-
+"""
 

@@ -1,0 +1,12 @@
+name: snakemake-runnerAlso
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - snakemake
+  - conda-forge::networkx
+  - conda-forge::pygraphviz
+  - conda-forge::matplotlib
+  - mamba
+  - anaconda::ipykernel
+prefix: C:\Users\valeria\miniconda3\envs\snakemake-runner
