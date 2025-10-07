@@ -2,12 +2,8 @@ import numpy as np
 from math import gcd
 import pandas as pd
 import pickle
-#import yaml
 from pathlib import Path
 import ast
-
-#def load_yaml_as_dict(yaml_file_path: str):
-#    return yaml.safe_load(Path(yaml_file_path).read_text())
 
 class Ratio:
     """Auxiliary class. Defines a ratio of a:b """

@@ -8,7 +8,7 @@ import os
 import pandas as pd
 from itertools import product
 from pathlib import Path
-from standardLibraryAuxFcts import load_json, as_list
+from auxiliary_functions_using_standard_libraries import load_json, as_list
 
 def create_csv_header_file(file_path, header_list):
     """Takes the files_to_create variable and creates a csv file for each key,

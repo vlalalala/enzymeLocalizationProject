@@ -4,7 +4,7 @@
 
 import os
 from itertools import product
-from src.standardLibraryAuxFcts import as_list, load_json
+from src.auxiliary_functions_using_standard_library import as_list, load_json
 
 ### Setup import of inputs ###
 
@@ -40,17 +40,27 @@ rule check_chemical_network_data_validity:
     shell:
         "python src/check_validity_chemical_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-rule create_system_network:
+rule create_reaction_network:
     # snakemake -s Snakefile.smk data/violacein_0/network_graph.png --cores 1 --use-conda
     input:
         lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.chemical_network_validated"
     output:
-        ["{df}/{bn}_{cn}/.NETWORK_system_pickle", "{df}/{bn}_{cn}/network_graph.png", ]
+        ["{df}/{bn}_{cn}/.NETWORK_system_pickle", "{df}/{bn}_{cn}/network_graph.png"]
     conda:
         "config/environment.yaml"
     shell:
-        "python src/define_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/create_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
+rule define_kinetics_in_reaction_network:
+    # snakemake -s Snakefile.smk data/violacein_0/.kinetics_defined --cores 1 --use-conda
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.NETWORK_system_pickle"
+    output:
+        touch("{df}/{bn}_{cn}/.chemical_network_completed")
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/"
 
 
 

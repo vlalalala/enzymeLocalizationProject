@@ -10,8 +10,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from standardLibraryAuxFcts import load_json
-from auxFcts import Ratio, define_ratio_from_string, pickle_load_binary, pickle_dump_binary, print_network_info
+from auxiliary_functions_using_standard_library import load_json
+from auxiliary_functions import Ratio, define_ratio_from_string, pickle_load_binary, pickle_dump_binary, print_network_info
 
 import sys
 # path of enzymeLocalizationProject

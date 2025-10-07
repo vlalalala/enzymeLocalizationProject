@@ -3,8 +3,8 @@ import sys
 import os
 import pandas as pd
 import pickle
-from standardLibraryAuxFcts import load_json
-from auxFcts import (
+from auxiliary_functions_using_standard_library import load_json
+from auxiliary_functions import (
     Ratio, define_ratio_from_string, no_empty_cells, no_repeated_rows,
     checks_lack_of_repetitions, check_correct_type,
     define_list_of_locationPairTuples_from_string, pickle_dump_binary)
