@@ -2,7 +2,15 @@
 #%%
 import pickle
 import os
-
+#%%
+import json
+def load_json(path):
+    _, file_extension = os.path.splitext(os.path.basename(path))
+    if not os.path.isfile(path) or file_extension != ".json":
+        raise ValueError(f"The file {path} does not exist or is not a .json file.")
+    with open(path, "r") as f:
+        contents = json.load(f)
+    return contents
 #%%
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 #%%
@@ -22,13 +30,10 @@ violacein_folder = os.path.join(
     PROJECT_ROOT, *["data", "violacein_0"]
 )
 
-#%%
-
-
 #%% Open .Network system
 system_network = pickle_load_binary(os.path.join(violacein_folder, *[".NETWORK_system_pickle"]))
 #%%
-
+system_geometry_dict = load_json(os.path.join())
 #%%
 for species in system_network:
     species.concentration = 

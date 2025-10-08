@@ -57,7 +57,7 @@ def extract_species_and_enzymes_from_characteristics_data(
     
     return list(species), list(enzymes)
 
-def check_validity_chemical_network_info(case_directory: str, csv_file_names: list):
+def check_validity_reaction_network_info(case_directory: str, csv_file_names: list):
     """
     case_directory: relative or absolute path to caseNNN
     csv_file_names: names of csv files without .csv
@@ -123,5 +123,5 @@ def check_validity_chemical_network_info(case_directory: str, csv_file_names: li
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
-    chemical_network_info_file_names = load_json("src/chemical_network_info.json").keys()
-    check_validity_chemical_network_info(folder_to_check_validity, chemical_network_info_file_names)
+    reaction_network_info_file_names = load_json("src/reaction_network_info.json").keys()
+    check_validity_reaction_network_info(folder_to_check_validity, reaction_network_info_file_names)

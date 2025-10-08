@@ -29,6 +29,8 @@ def check_validity_system_geometry_info(case_directory):
             # Rule 4: if anything is not yet programmed, raise NotImplementedError
             if section=="GEOMETRY_CONFIG" and key=="num_dimensions" and value!=3:
                 raise NotImplementedError("Only 3-dimensional systems are implemented to date.")
+        
+        
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]

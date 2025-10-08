@@ -237,11 +237,11 @@ class System:
         ax.set_axis_off()
         # Show the plot
         fig.tight_layout()
-        fig.savefig(os.path.join(case_folder,"network_graph.png"), dpi = 300, bbox_inches='tight')
+        fig.savefig(os.path.join(case_folder,"reaction_network_graph.png"), dpi = 300, bbox_inches='tight')
         plt.close(fig)
 
 #%%
-def generate_reaction_network(case_folder, csv_file_names):
+def create_reaction_network(case_folder, csv_file_names):
     """
     """
     # Step 0: initialize object where all the information will be saved
@@ -297,23 +297,9 @@ def generate_reaction_network(case_folder, csv_file_names):
 
     # Step 5: draw the network graph and save a png file of it
     system.draw_network(case_folder)
-    pickle_dump_binary(os.path.join(case_folder, ".NETWORK_system_pickle"), system)
+    pickle_dump_binary(os.path.join(case_folder, ".REACTION_NETWORK_pickle"), system)
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
-    chemical_network_info_file_names = load_json("src/chemical_network_info.json").keys()
-    generate_reaction_network(folder_to_check_validity, chemical_network_info_file_names)
-#%%
-#"""
-#root = os.path.dirname(os.getcwd())
-#path = os.path.join(root, *["data", "case000"])
-#%%
-#%%
-#generateReactionNetwork(
-#    path,
-#    ["ENZYMATIC_REACTIONS", "SPONTANEOUS_REACTIONS", "ENZYMES", "SPECIES"])
-
-
-#%%
-#"""
-
+    reaction_network_info_file_names = load_json("src/reaction_network_info.json").keys()
+    create_reaction_network(folder_to_check_validity, reaction_network_info_file_names)
