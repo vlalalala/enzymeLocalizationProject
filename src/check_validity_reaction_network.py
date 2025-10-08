@@ -84,7 +84,6 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     }
     # Step 0
     for dataframe_name, dataframe_object in dataframes.items():
-        print(dataframe_name)
         assert no_empty_cells(dataframe_object), f"dataframe {dataframe_name} has empty cells"
 
     reaction_species, reaction_enzymes = extract_species_and_enzymes_from_reactions_data(dataframes["ENZYMATIC_REACTIONS"], dataframes["SPONTANEOUS_REACTIONS"])

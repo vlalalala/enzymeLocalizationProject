@@ -47,6 +47,12 @@ class LocationTuple:
             raise TypeError(
                 f"The location information from {element1} and {element2} are not valid.")
         self.minMaxLoc = (element1, element2)
+    
+    def return_within_tuple(self, number):
+        if self.minMaxLoc[0] <= number <= self.minMaxLoc[1]:
+            return True
+        else:
+            return False
 
 def define_tuple_of_locationPairTuples_from_string(location_string: str):
     list_of_location_tuples = ast.literal_eval(location_string)
