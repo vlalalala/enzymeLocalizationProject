@@ -2,12 +2,11 @@
 import sys
 import os
 import pandas as pd
-import pickle
-from auxiliary_functions_using_standard_library import load_json
+from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary
 from auxiliary_functions import (
-    Ratio, define_ratio_from_string, no_empty_cells, no_repeated_rows,
+    define_ratio_from_string, no_empty_cells, no_repeated_rows_in_csv_file,
     checks_lack_of_repetitions, check_correct_type,
-    define_list_of_locationPairTuples_from_string, pickle_dump_binary)
+    define_tuple_of_locationPairTuples_from_string)
 
 def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
     """Reads the csv files and creates corresponding panda dataframes.
@@ -15,22 +14,25 @@ def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
     are converted to Ratio types (or an error is raised if that is not possible).
     The types for each entry in each column are checked.
     """
+    assert no_repeated_rows_in_csv_file(csv_file)
     dataframe = pd.read_csv(csv_file, encoding='utf-8-sig')
     # Checks species and enzymes
     string_cols = dataframe.columns[dataframe.columns.str.contains(r"species|enzyme|name")]
     assert check_correct_type(dataframe, string_cols, str)
     # Checks k, hill, constants
-    float_cols = dataframe.columns[dataframe.columns.str.contains(r"k|hill|constant|quantity")]
+    float_cols = dataframe.columns[dataframe.columns.str.contains(r"k|hill|constant|quantity|concentration")]
     assert check_correct_type(dataframe, float_cols, (float, int)) # both float and int are valid
     # Checks ratio
-    ratio_cols = dataframe.columns[dataframe.columns.str.contains("ratio")]
+    ratio_cols = dataframe.columns[
+        dataframe.columns.str.contains("ratio", case=False) &
+        ~dataframe.columns.str.contains("concentration", case=False)] # anything that contains the substring ratio and not the substring concentration (ratio within concentration)
     for ratio_col in ratio_cols:
         dataframe[ratio_col] = dataframe[ratio_col].apply(define_ratio_from_string)
     # Checks location
-    location_cols = dataframe.columns[dataframe.columns.str.contains("location")]
+    location_cols = dataframe.columns[dataframe.columns.str.contains("loca")]
     for location_col in location_cols:
         dataframe[location_col] = dataframe[location_col].apply(
-            define_list_of_locationPairTuples_from_string)
+            define_tuple_of_locationPairTuples_from_string)
     return dataframe
 
 def extract_species_and_enzymes_from_reactions_data(
@@ -74,7 +76,7 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
        any reaction.
     If this is done, the dataframes are stored as pickled dataframes
     """
-    # Create dataframes from .csv files
+    # Create dataframes from .csv files (checks whether rows are duplicated)
     dataframes = {
         name: create_pandas_dataframe_from_csv_file(
         os.path.join(case_directory, f"{name}.csv"))
@@ -82,8 +84,8 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     }
     # Step 0
     for dataframe_name, dataframe_object in dataframes.items():
+        print(dataframe_name)
         assert no_empty_cells(dataframe_object), f"dataframe {dataframe_name} has empty cells"
-        assert no_repeated_rows(dataframe_object)
 
     reaction_species, reaction_enzymes = extract_species_and_enzymes_from_reactions_data(dataframes["ENZYMATIC_REACTIONS"], dataframes["SPONTANEOUS_REACTIONS"])
     species, enzymes = extract_species_and_enzymes_from_characteristics_data(dataframes["SPECIES"], dataframes["ENZYMES"])

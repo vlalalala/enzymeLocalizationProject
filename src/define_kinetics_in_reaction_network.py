@@ -11,6 +11,11 @@ def load_json(path):
     with open(path, "r") as f:
         contents = json.load(f)
     return contents
+
+def pickle_load_binary(path):
+    with open(path, 'rb') as f:
+        loaded_variable = pickle.load(f)
+    return loaded_variable
 #%%
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 #%%
@@ -31,17 +36,21 @@ violacein_folder = os.path.join(
 )
 
 #%% Open .Network system
-system_network = pickle_load_binary(os.path.join(violacein_folder, *[".NETWORK_system_pickle"]))
+reaction_network = pickle_load_binary(os.path.join(violacein_folder, *[".REACTION_NETWORK_pickle"]))
 #%%
-system_geometry_dict = load_json(os.path.join())
+system_geometry_dict = pickle_load_binary(os.path.join(violacein_folder, ".SYSTEM_GEOMETRY_pickle"))
 #%%
-for species in system_network:
-    species.concentration = 
-#%%
-system_network.species["Trp"].as_reactant_in
+system_geometry_dict
+
 
 #%%
-for species in system_network.species:
+for species in reaction_network:
+    species.concentration = np.zeros(system_geometry_dict["GEOMETRY_CONFIG"]["num_mesh_points"])
+#%%
+reaction_network.species["Trp"].as_reactant_in
+
+#%%
+for species in reaction_network.species:
     for reaction in species.as_reactant_in + species.as_product_in:
         if isinstance(reaction, SpontaneousReaction):
             term = reaction.k * reaction.start_species #################################

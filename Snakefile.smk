@@ -30,7 +30,7 @@ rule check_system_geometry_data_validity:
     input:
         lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json"
     output:
-        touch("{df}/{bn}_{cn}/.system_geometry_validated")
+        [touch("{df}/{bn}_{cn}/.system_geometry_validated"), "{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle"]
     conda:
         "config/environment.yaml"
     shell:

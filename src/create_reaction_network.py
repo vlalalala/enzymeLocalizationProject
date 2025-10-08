@@ -10,8 +10,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from auxiliary_functions_using_standard_library import load_json
-from auxiliary_functions import Ratio, define_ratio_from_string, pickle_load_binary, pickle_dump_binary, print_network_info
+from auxiliary_functions_using_standard_library import load_json, pickle_load_binary, pickle_dump_binary
+from auxiliary_functions import Ratio, define_ratio_from_string, print_network_info
 
 import sys
 # path of enzymeLocalizationProject
@@ -44,10 +44,12 @@ class Enzyme(Participant):
 class Species(Participant):
     def __init__(self, name: str,
                  diffusion_constant: float,
-                 permeability_constant: float) -> None:
+                 permeability_constant: float,
+                 external_concentration) -> None:
         super().__init__(name)
         self.diffusion_constant = diffusion_constant
         self.permeability_constant = permeability_constant
+        self.external_concentration = external_concentration
         self.as_reactant_in = []
         self.as_product_in = []
         self.first_time_derivative_terms = []
