@@ -22,6 +22,14 @@ radius = system_geometry_dict["GEOMETRY_CONFIG"]["radius"]
 num_mesh_points = system_geometry_dict["GEOMETRY_CONFIG"]["num_mesh_points"]
 
 #%%
+
+
+#%%
+for enzyme in reaction_network.enzymes:
+    volume_terms = []
+    for localization_tuple in enzyme.localization
+
+#%%
 reaction_network.enzymes["VioA"].localization
 #%%
 enzyme_localized_concentrations = { # initialize with uniform enzyme concentration within range
