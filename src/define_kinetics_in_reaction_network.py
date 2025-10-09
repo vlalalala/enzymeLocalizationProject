@@ -25,6 +25,19 @@ num_mesh_points = system_geometry_dict["GEOMETRY_CONFIG"]["num_mesh_points"]
 r_mesh = np.linspace(1e-6, radius, num = num_mesh_points) #nm # doesn't work within singularity
 
 #%%
+a = [1,2,3]
+b = [4,5,6]
+c = [7,8,9]
+np.vstack((a,b,c))
+#%%
+
+
+
+
+
+
+
+#%%
 for enzyme in reaction_network.enzymes:
     enzyme_mesh_occupied_bool_dict = {r: False for r in r_mesh} # Initialize whether mesh points have enzyme
     total_occupied_volume = 0
@@ -43,14 +56,55 @@ for enzyme in reaction_network.enzymes:
 #%% SPECIES VARIABLES
 reaction_network.species
 #%%
-species_variables = [[f"{s}_1stDer", f"{s}_2ndDer"] for s in reaction_network.species]
+species_variables = [[f"{s}_prim", f"{s}_1stDer"] for s in reaction_network.species]
 species_variables = list(itertools.chain.from_iterable(species_variables))
 species_variables
 #%%
-initial_values_species_guess = np.zeros((len(species_variables), r_mesh.size))
-
+reaction_network.species[0].diffusion_constant
 #%%
+type(species_variables[0])
+#%%
+initial_values_species_guess = np.zeros((len(species_variables), r_mesh.size))
+print(initial_values_species_guess.shape, "is (n,m); see documentation of solve_bvp" )
+#%%
+#%%
+def reaction_diffusion_system_1(r_mesh, values):
+    """ Right hand side.
+    Return array with shape (n,m), n = number of variables, m = number of nodes
+    r_mesh has shape (m,)
+    value has shape (n, m) # for each substance n at each node m a specific value (float)
+    """
+    c = {substance: values[sub_idx[substance]] for substance in substances}
+    e = {key: None for key in enzyme_total_concentrations.keys()}
+    for key, total_concentration in enzyme_total_concentrations.items():
+        nonnormalized_values = np.array([enzyme_localized_concentrations[key](r)
+                        for r in r_mesh])
+        e[key] = nonnormalized_values * total_concentration / np.sum(nonnormalized_values)
+    #for key in e.keys():
+    #    print(key, np.sum(e[key]), e[key])
+    #print(e["VioA"])
+    # TRP
+    der_Trp = values[sub_idx["l-Trp_1"]]
+    #print(len(e["VioA"]), len(c["l-Trp"]))
+    F_Trp = -k_cat["VioA"] * e["VioA"] * c["l-Trp"] / (K_m["VioA"] + c["l-Trp"] )
+    der_Trp_1 = (-F_Trp) / D - 2 * values[sub_idx["l-Trp_1"]] / r_mesh
+    # Imine
+    der_imine = values[sub_idx["IPA_imine_1"]]
+    F_imine = (k_cat["VioA"] * e["VioA"] * c["l-Trp"] / (K_m["VioA"] + c["l-Trp"]) # process from reaction by VioA 
+            - 2 * k_cat["VioB"] *  e["VioB"] * c["IPA_imine"]**hill["VioB"] / (K_m["VioB"]**hill["VioB"] + c["IPA_imine"]**hill["VioB"]))
+    der_imine_1 = (-F_imine) / D - 2 * values[sub_idx["IPA_imine_1"]] / r_mesh
+    # Dimer
+    der_dimer = values[sub_idx["IPA_imine_dimer_1"]]
+    F_dimer = (k_cat["VioB"] *  e["VioB"] * c["IPA_imine"]**hill["VioB"] / (K_m["VioB"]**hill["VioB"] + c["IPA_imine"]**hill["VioB"]) # process from reaction by VioB
+        - k_n["IPA_imine_dimer->CPA"] * c["IPA_imine_dimer"] # spontaneous reaction to CPA
+        - k_cat["VioE"] * e["VioE"] * c["IPA_imine_dimer"] / (K_m["VioE"] + c["IPA_imine_dimer"])) # from reaction from VioE
+    der_dimer_1 = (-F_dimer) / D - 2 * values[sub_idx["IPA_imine_dimer_1"]] / r_mesh
 
+    return np.vstack(
+        (der_Trp, der_Trp_1,
+         der_imine, der_imine_1,
+         der_dimer, der_dimer_1,
+         ))
 
 
 
