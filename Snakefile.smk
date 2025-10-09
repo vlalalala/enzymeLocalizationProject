@@ -71,7 +71,6 @@ rule define_kinetics_in_reaction_network:
         "python src/define_kinetics_in_reaction_network {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 
-
 """
 # Get the absolute path to this script
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
