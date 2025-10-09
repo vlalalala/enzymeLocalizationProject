@@ -67,13 +67,14 @@ def enzyme_concentration(r_mesh):
             for r_key in enzyme_mesh_occupied_bool_dict.keys():
                 if locTuple.return_within_tuple(r_key):
                     enzyme_mesh_occupied_bool_dict[r_key] = True
-        enzyme_total_volume = total_occupied_volume    
         enzyme_concentration = [
-            enzyme.quantity/enzyme_total_volume 
+            enzyme.quantity/total_occupied_volume 
             if enzyme_mesh_occupied_bool_dict[r] == True else 0
             for r in r_mesh
         ]################################ not really correct... but will work for now
         enzyme_conc[enzyme] = np.array(enzyme_concentration)
+        # save enzyme.concentration
+        enzyme.concentration = enzyme.quantity/total_occupied_volume
     return enzyme_conc
 
 #%%
@@ -161,11 +162,120 @@ def boundary_conditions(y_a, y_b):
 res_a = solve_bvp(reaction_diffusion_system, boundary_conditions,
                   r_mesh, initial_values_2d_array)
 #%%
+for enzyme_idx, enzyme in enumerate(reaction_network.enzymes):
+    print(enzyme.name)
+    print(enzyme.localization)
+    print(enzyme.concentration)
+#%%
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+from scipy import integrate
+
+final_mesh = res_a.x
+solution_values_at_mesh = res_a.y
+solution_derivatives_at_mesh = res_a.yp
+
+success = res_a.success
+
+integrals = {species.name: 0 for species in reaction_network.species}
+x_values = np.linspace(0, radius, num = 100)
+num_enzymes = len(reaction_network.enzymes)
+
+enzyme_max_concentration = max([enzyme.concentration for enzyme in reaction_network.enzymes])
+
+norm = mcolors.Normalize(vmin=0, vmax=enzyme_max_concentration)
+cmap = cm.get_cmap('Oranges')
+scalar_map = cm.ScalarMappable(norm=norm, cmap=cmap)
+
+fig, ax = plt.subplots(num_enzymes + 1,1, figsize = (5,3), sharex = True, constrained_layout=True,
+                       gridspec_kw={'height_ratios': [1]*num_enzymes + [num_enzymes]})
+ax[0].set_title(f"steady state distribution, computed with {len(res_a.x)} nodes")
+
+for enzyme_idx, enzyme in enumerate(reaction_network.enzymes):
+    ax[enzyme_idx].set_ylabel(enzyme.name, rotation=0, labelpad=20)
+    color = scalar_map.to_rgba(enzyme.concentration)
+    for localizationTuple in enzyme.localization:
+        min_range = localizationTuple.minMaxLoc[0]
+        max_range = localizationTuple.minMaxLoc[1]
+        ax[enzyme_idx].fill_between(
+            x_values, 0, 1, where=(x_values >= min_range) & (x_values <= max_range),
+            color=color)
+    ax[enzyme_idx].set_yticks([])
+for species in reaction_network.species:
+    sol = res_a.sol(x_values)[species_variable_indices[species]["prim"]] 
+        # Found solution for y as scipy.interpolate.PPoly instance, a C1 continuous
+        # cubic spline.
+    integral = integrate.quad(lambda r: res_a.sol(r)[species_variable_indices[species]["prim"]] * 4 * np.pi * r**2, 0, radius)
+    integrals[species.name] = integral[0] # [0] is value [1] is error
+    ax[-1].plot(x_values, sol, label=f"{species.name}: {int(np.round(integral[0]))} nM")
+for node_x in res_a.x:
+    ax[-1].axvline(node_x, ymin = 0.95, ymax = 1, c = "k", linewidth = 1)
+
+ax[-1].set_xlabel("radius")
+ax[-1].set_xlim([0, radius])
+cbar = fig.colorbar(scalar_map, ax=ax[:num_enzymes], orientation='vertical', fraction=0.02, pad=0.04)
+cbar.set_label("concentration")
+
+species_integral_sum = np.sum([
+    integrals[species.name]
+    for species in reaction_network.species])
+
+#annotation_list = [
+#    f"{species.name}: {int(np.round(integrals[species.name]/species_integral_sum * 100))}%"
+#    for species in reaction_network.species]
+#annotation = ", ".join(annotation_list)
+
+#ax[-1].annotate(annotation, (0.05, 0.9), xycoords = "axes fraction", va = "top", ha = "left", fontsize = 9)
+ax[-1].set_xlabel("r / nm")
+ax[-1].set_ylabel("nM / nm")
+
+fig.savefig(os.path.join(violacein_folder, "test.png"), dpi = 300,
+    bbox_inches = "tight")
+
+# Assume scalar_map is your ScalarMappable (from cmap and norm)
+fig_colorbar = plt.figure(figsize=(2, 4))  # tall figure for vertical bar
+
+# Add axes for colorbar (full figure area)
+cbar_ax = fig_colorbar.add_axes([0.2, 0.05, 0.3, 0.9])  # [left, bottom, width, height]
+
+# Create the colorbar
+cbar = fig_colorbar.colorbar(scalar_map, cax=cbar_ax, orientation='vertical')
+cbar.set_label("Enzyme concentration")
+
+# Save the colorbar figure
+fig_colorbar.savefig("colorbar_only.png", bbox_inches='tight')
+plt.close(fig_colorbar)
+
+fig_legend = plt.figure(figsize=(3, 2))
+ax_legend = fig_legend.add_subplot(111)
+ax_legend.axis('off')
+
+# Example dummy patches
+red_patch = mpatches.Patch(color='red', label='Class A')
+blue_patch = mpatches.Patch(color='blue', label='Class B')
+
+legend = ax_legend.legend(handles=[red_patch, blue_patch], loc='center')
+fig_legend.savefig('legend_only.png', bbox_inches='tight')
+plt.close(fig_legend)
 
 
 
+#ax[-1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.35), ncol = 3)
 
+# Create legend fig separate
+handles, labels = ax[-1].get_legend_handles_labels()
+# Create a new figure just for the legend
+fig_legend, ax_legend = plt.subplots(1,1, figsize = (3,2))
 
+# Hide the axes frame and ticks
+ax_legend.axis('off')
+# Create the legend on this new axes
+legend = ax_legend.legend(handles, labels, loc='center')
+
+# Save the legend figure
+fig_legend.savefig(os.path.join(violacein_folder, "test_legend.png"), dpi = 300,
+    bbox_inches = "tight")
 
 #%%
 if __name__ == "__main__":
