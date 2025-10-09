@@ -25,16 +25,25 @@ num_mesh_points = system_geometry_dict["GEOMETRY_CONFIG"]["num_mesh_points"]
 r_mesh = np.linspace(1e-6, radius, num = num_mesh_points) #nm # doesn't work within singularity
 
 #%%
-a = [1,2,3]
-b = [4,5,6]
-c = [7,8,9]
-np.vstack((a,b,c))
+species_variables = [[f"{s}_prim", f"{s}_1stDer"] for s in reaction_network.species]
+species_variables = list(itertools.chain.from_iterable(species_variables))
+
 #%%
+species_variable_indices = {
+    species.name: {"prim": species_variables.index(f"{species.name}_prim"),
+                   "1stDer": species_variables.index(f"{species.name}_1stDer")}
+    for species in reaction_network.species
+}
 
+#%%
+species_variables_inital_values_dict = {
+    species_variable: np.zeros(r_mesh.size)
+    for species_variable in species_variables
+}
+species_variables_inital_values_dict["Trp_prim"] = np.ones()
 
-
-
-
+#%%
+initial_values_array = np.stack(list(species_variables_inital_values_dict.values()))
 
 
 #%%
@@ -53,12 +62,18 @@ for enzyme in reaction_network.enzymes:
         if enzyme_mesh_occupied_bool_dict[r] == True else 0
     ]################################ not really correct... but will work for now
 
-#%% SPECIES VARIABLES
-reaction_network.species
+
 #%%
-species_variables = [[f"{s}_prim", f"{s}_1stDer"] for s in reaction_network.species]
-species_variables = list(itertools.chain.from_iterable(species_variables))
-species_variables
+species_variable_indices
+#%%
+"""
+I need some function that takes as input the substance and whether the primitive or 1st derivative
+is needed and return the value of values.
+"""
+
+np.shape(initial_values_array)
+#%%
+species_variables_inital_values_dict
 #%%
 reaction_network.species[0].diffusion_constant
 #%%
@@ -67,14 +82,24 @@ type(species_variables[0])
 initial_values_species_guess = np.zeros((len(species_variables), r_mesh.size))
 print(initial_values_species_guess.shape, "is (n,m); see documentation of solve_bvp" )
 #%%
+def michaelis_menten_term(k_cat, k_M, c_enzyme, c_substrate, hill=1):
+    return k_cat * c_enzyme * c_substrate**hill / (k_M**hill + c_substrate**hill)
+
+def spontaneous_reaction_term(k, c_reactant):
+    return k*c_reactant
+
+
 #%%
 def reaction_diffusion_system_1(r_mesh, values):
     """ Right hand side.
     Return array with shape (n,m), n = number of variables, m = number of nodes
     r_mesh has shape (m,)
     value has shape (n, m) # for each substance n at each node m a specific value (float)
+
+    THE VALUES IN R_MESH CAN CHANGE, so the enzymes concentration per mesh
+    point have to be reevaluated each time according to the r_mesh being used...
     """
-    c = {substance: values[sub_idx[substance]] for substance in substances}
+    concentration = {substance: values[sub_idx[substance]] for substance in substances}
     e = {key: None for key in enzyme_total_concentrations.keys()}
     for key, total_concentration in enzyme_total_concentrations.items():
         nonnormalized_values = np.array([enzyme_localized_concentrations[key](r)
@@ -127,8 +152,12 @@ def reaction_diffusion_system_1(r_mesh, values):
     Return array with shape (n,m), n = number of variables, m = number of nodes
     r_mesh has shape (m,)
     value has shape (n, m) # for each substance n at each node m a specific value (float)
+    
+    THE VALUES IN R_MESH CAN CHANGE, so the enzymes concentration per mesh
+    point have to be reevaluated each time according to the r_mesh being used...
+    
     """
-    concentration = {substance: values[sub_idx[substance]] for substance in substances}
+    c = {substance: values[sub_idx[substance]] for substance in substances}
     e = {key: None for key in enzyme_total_concentrations.keys()}
     for key, total_concentration in enzyme_total_concentrations.items():
         nonnormalized_values = np.array([enzyme_localized_concentrations[key](r)
