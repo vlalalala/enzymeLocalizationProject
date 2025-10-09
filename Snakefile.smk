@@ -59,16 +59,18 @@ rule create_reaction_network:
     shell:
         "python src/create_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-rule define_kinetics_in_reaction_network:
-    # snakemake -s Snakefile.smk data/violacein_0/.kinetics_defined --cores 1 --use-conda
+rule solve_boundary_value_problem:
+    # snakemake -s Snakefile.smk data/violacein_0/.BOUNDARY_VALUE_PROBLEM_RESULT_pickle --cores 1 --use-conda
     input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.NETWORK_system_pickle"
+        lambda wildcards: [
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle"]
     output:
-        touch("{df}/{bn}_{cn}/.reaction_network_completed")
+        "{df}/{bn}_{cn}/.BOUNDARY_VALUE_PROBLEM_RESULT_pickle"
     conda:
         "config/environment.yaml"
     shell:
-        "python src/define_kinetics_in_reaction_network {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/solve_boundary_value_problem.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 
 """
