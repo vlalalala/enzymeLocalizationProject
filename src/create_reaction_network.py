@@ -52,8 +52,6 @@ class Species(Participant):
         self.external_concentration = external_concentration
         self.as_reactant_in = []
         self.as_product_in = []
-        self.first_time_derivative_terms = []
-        self.second_time_derivative_terms = []
 
     def __str__(self):
         return super().__str__()
