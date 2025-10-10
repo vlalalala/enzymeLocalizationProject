@@ -21,7 +21,7 @@ import scipy
 import matplotlib.pyplot as plt
 from scipy import integrate
 import sys
-from tqdm import tqdm
+#from tqdm import tqdm
 import itertools
 from scipy.integrate import solve_bvp
 import heapq
@@ -146,7 +146,7 @@ enzyme_ranges = {
 #}
 # DENSITY ON 1D
 enzyme_localized_concentrations = { # initialize with uniform enzyme concentration within range
-    key: (lambda r, key = key, value=value: 3 * value / (enzyme_ranges[key][1]**3 - enzyme_ranges[key][0]**3) * r**2
+    key: (lambda r, key = key, value=value: 3 * value / (enzyme_ranges[key][1]**3 - enzyme_ranges[key][0]**3) #* r**2 #########################################
     if (r>=enzyme_ranges[key][0] and r<=enzyme_ranges[key][1]) else 0)
     for key, value in enzyme_total_concentrations.items()
 }
@@ -199,6 +199,8 @@ def reaction_diffusion_system_1(r_mesh, values):
         nonnormalized_values = np.array([enzyme_localized_concentrations[key](r)
                         for r in r_mesh])
         e[key] = nonnormalized_values * total_concentration / np.sum(nonnormalized_values)
+    print("Trp", c["l-Trp"])
+    print("VioA", e["VioA"])
     #for key in e.keys():
     #    print(key, np.sum(e[key]), e[key])
     #print(e["VioA"])
@@ -262,6 +264,7 @@ def reaction_diffusion_system_1(r_mesh, values):
     F_violacein = k_n["VA->violacein"] * c["VA"]
     der_violacein_1 = (-F_violacein) / D - 2 * values[sub_idx["violacein_1"]] / r_mesh
 
+
     return np.vstack(
         (der_Trp, der_Trp_1,
          der_imine, der_imine_1,
@@ -324,7 +327,7 @@ violacein_percentage = int(np.round(integrals["violacein"]/final_products_integr
 annotation = f"CPA: {CPA_percentage}%, PDV: {PDV_percentage}%, DV: {DV_percentage}%\nPV: {PV_percentage}%, violacein: {violacein_percentage}%"
 ax[-1].annotate(annotation, (0.05, 0.9), xycoords = "axes fraction", va = "top", ha = "left", fontsize = 9)
 ax[-1].set_xlabel("r / nm")
-ax[-1].set_ylabel("nM / nm")
+ax[-1].set_ylabel("concentration / nM ")
 ax[-1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.35), ncol = 3)
 plt.subplots_adjust(hspace=0)
 fig.savefig(os.path.join(FOLDER_WITH_DATA,

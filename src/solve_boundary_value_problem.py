@@ -72,7 +72,7 @@ def reaction_diffusion_system(r_mesh, variable_values_2d_array):
 
     system_right_hand_side = { # includes no reaction terms here
         species: {"prim": species_conc_der[species.name],
-                       "1stDer": -2/r_mesh * species_conc_der[species.name]}
+                  "1stDer": -2/r_mesh * species_conc_der[species.name]}
         for species in reaction_network.species
     }
 
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     # Step 1: Define all geometry variables
     radius = system_geometry_dict["GEOMETRY_CONFIG"]["radius"]
     num_mesh_points = system_geometry_dict["GEOMETRY_CONFIG"]["num_mesh_points"]
-    initial_r_mesh = np.linspace(1e-6, radius, num = num_mesh_points) #nm # doesn't work within singularity
+    initial_r_mesh = np.linspace(0.01, radius, num = num_mesh_points) #nm # doesn't work within singularity
 
     # Step 2: Do preliminary work to make reaction diffusion system solvable
     """We need to define 2*n variables, where n is the number of species, since we

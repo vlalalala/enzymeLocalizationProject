@@ -54,20 +54,18 @@ def create_bvp_result_plots(bvp_result, bvp_variable_indices, reaction_network):
     # Main plot species concentration
     for species in reaction_network.species:
         sol = bvp_result.sol(x_values)[bvp_variable_indices[species]["prim"]]
-        print(species, sol)
         # Found solution for y as scipy.interpolate.PPoly instance, a C1 continuous
         # cubic spline.
         integral = integrate.quad(lambda r: bvp_result.sol(r)[bvp_variable_indices[species]["prim"]] * 4 * np.pi * r**2, 0, max(bvp_result.x))
         integrals[species.name] = integral[0] # [0] is value [1] is error
-        ax[-1].plot(x_values, sol, label=f"{species.name}: {int(np.round(integral[0]))} nM")
+        ax[-1].plot(x_values/max(x_values), sol, label=f"{species.name}: {int(np.round(integral[0]))} nM")
     # Main plot mesh points visualization
     for node_x in bvp_result.x:
         ax[-1].axvline(node_x, ymin = 0.95, ymax = 1, c = "k", linewidth = 1)
     # Main plot labels
-    ax[-1].set_xlabel("radius")
-    ax[-1].set_xlabel("distance to origin")
+    ax[-1].set_xlabel("r/R")
     ax[-1].set_xlim([0, max(bvp_result.x)])
-    ax[-1].set_ylabel("concentration")
+    ax[-1].set_ylabel("concentration / nM")
 
     # ENZYME CONCENTRATION COLORBAR
     # Assume scalar_map is your ScalarMappable (from cmap and norm)

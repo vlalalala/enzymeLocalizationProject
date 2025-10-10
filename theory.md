@@ -35,4 +35,6 @@ $$ \frac{du}{dr}(R) = [u_\mathrm{ext} − u(R)] \cdot \frac{p_\mathrm{u}}{D_\mat
 
 with $p_\mathrm{u}$ the permeability to the outer membrane.
 
+# Typical values
+
 
