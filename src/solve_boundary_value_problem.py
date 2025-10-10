@@ -6,41 +6,6 @@ from auxiliary_functions_using_standard_library import pickle_load_binary, pickl
 from auxiliary_functions import LocationTuple
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 
-# Define function to get enzyme concentration at each node
-def enzyme_concentration(reaction_network, r_mesh):
-    enzyme_conc = {}
-
-    for enzyme in reaction_network.enzymes:
-        total_occupied_volume = 0
-        occupied_regions = []
-
-        # Step 1: Compute total occupied volume
-        for locTuple in enzyme.localization:
-            r1 = locTuple.minMaxLoc[0] * max(r_mesh)
-            r2 = locTuple.minMaxLoc[1] * max(r_mesh)
-            V = (4/3) * np.pi * (r2**3 - r1**3)
-            total_occupied_volume += V
-            occupied_regions.append((r1, r2))
-
-        if total_occupied_volume == 0:
-            raise ValueError(f"Enzyme '{enzyme}' has zero localization volume.")
-
-        # Step 2: Compute uniform concentration in volume
-        uniform_conc = enzyme.quantity / total_occupied_volume
-        enzyme.concentration = uniform_conc  # Save scalar concentration
-
-        # Step 3: Assign pointwise concentrations on r_mesh
-        enzyme_conc_profile = np.zeros_like(r_mesh)
-        for i, r in enumerate(r_mesh):
-            for r1, r2 in occupied_regions:
-                if r1 <= r <= r2:
-                    enzyme_conc_profile[i] = uniform_conc
-                    break  # Stop checking other regions
-
-        enzyme_conc[enzyme] = enzyme_conc_profile
-
-    return enzyme_conc, reaction_network
-
 def michaelis_menten_term(k_cat, k_M, c_enzyme, c_substrate, hill=1):
     return k_cat * c_enzyme * c_substrate**hill / (k_M**hill + c_substrate**hill)
 
@@ -68,7 +33,16 @@ def reaction_diffusion_system(r_mesh, variable_values_2d_array):
     }
 
     # Get the concentration of enzymes at the r_mesh nodes
-    enzyme_conc, _ = enzyme_concentration(reaction_network, r_mesh)
+    enzyme_conc = {enzyme: np.zeros(len(r_mesh))
+        for enzyme in reaction_network.enzymes
+    }
+    for enzyme in reaction_network.enzymes:
+        for locTuple in enzyme.localization:
+            r1 = locTuple.minMaxLoc[0] * max(r_mesh)
+            r2 = locTuple.minMaxLoc[1] * max(r_mesh)
+            for index, radius in enumerate(r_mesh):
+                if r1 <= radius <= r2:
+                    enzyme_conc[enzyme][index] = enzyme.concentration
 
     system_right_hand_side = { # includes no reaction terms here
         species: {"prim": species_conc_der[species.name],
@@ -133,7 +107,7 @@ if __name__ == "__main__":
     # Step 1: Define all geometry variables
     radius = system_geometry_dict["GEOMETRY_CONFIG"]["radius"]
     num_mesh_points = system_geometry_dict["GEOMETRY_CONFIG"]["num_mesh_points"]
-    initial_r_mesh = np.linspace(0.01, radius, num = num_mesh_points) #nm # doesn't work within singularity
+    initial_r_mesh = np.linspace(radius*1e-4, radius, num = num_mesh_points) #nm # doesn't work within singularity
 
     # Step 2: Do preliminary work to make reaction diffusion system solvable
     """We need to define 2*n variables, where n is the number of species, since we

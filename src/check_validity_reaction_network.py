@@ -20,7 +20,7 @@ def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
     string_cols = dataframe.columns[dataframe.columns.str.contains(r"species|enzyme|name")]
     assert check_correct_type(dataframe, string_cols, str)
     # Checks k, hill, constants
-    float_cols = dataframe.columns[dataframe.columns.str.contains(r"k|hill|constant|quantity|concentration")]
+    float_cols = dataframe.columns[dataframe.columns.str.contains(r"k|hill|constant|concentration")]
     assert check_correct_type(dataframe, float_cols, (float, int)) # both float and int are valid
     # Checks ratio
     ratio_cols = dataframe.columns[

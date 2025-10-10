@@ -10,13 +10,11 @@ import matplotlib.colors as mcolors
 from scipy import integrate
 from auxiliary_functions_using_standard_library import pickle_load_binary
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-from solve_boundary_value_problem import enzyme_concentration 
 
 def create_bvp_result_plots(bvp_result, bvp_variable_indices, reaction_network):
-    _, reaction_network = enzyme_concentration(reaction_network, bvp_result.x)
     
     x_values = np.linspace(0, max(bvp_result.x), num = 100)
-    integrals = {species.name: 0 for species in reaction_network.species}
+    integrals = {}
     num_enzymes = len(reaction_network.enzymes)
 
     enzyme_max_concentration = max(enzyme.concentration for enzyme in reaction_network.enzymes)
@@ -45,27 +43,46 @@ def create_bvp_result_plots(bvp_result, bvp_variable_indices, reaction_network):
             min_range = localizationTuple.minMaxLoc[0]
             max_range = localizationTuple.minMaxLoc[1]
             ax[enzyme_idx].fill_between(
-                x_values, 0, 1, where=(
-                    x_values >= min_range*max(bvp_result.x))
-                    & (x_values <= max_range*max(bvp_result.x)),
+                x_values/max(x_values), 0, 1, where=(
+                    x_values/max(x_values) >= min_range)
+                    & (x_values/max(x_values) <= max_range),
                 color=color)
         ax[enzyme_idx].set_yticks([])
     
     # Main plot species concentration
     for species in reaction_network.species:
-        sol = bvp_result.sol(x_values)[bvp_variable_indices[species]["prim"]]
-        # Found solution for y as scipy.interpolate.PPoly instance, a C1 continuous
+        # bvp_result.sol is the found solution for y as scipy.interpolate.PPoly instance, a C1 continuous
         # cubic spline.
-        integral = integrate.quad(lambda r: bvp_result.sol(r)[bvp_variable_indices[species]["prim"]] * 4 * np.pi * r**2, 0, max(bvp_result.x))
-        integrals[species.name] = integral[0] # [0] is value [1] is error
-        ax[-1].plot(x_values/max(x_values), sol, label=f"{species.name}: {int(np.round(integral[0]))} nM")
+        integrand = lambda r: bvp_result.sol(r)[bvp_variable_indices[species]["prim"]]* 10**3 * 4 * np.pi * r**2
+        integral, _ = integrate.quad(integrand, 0, max(bvp_result.x))
+        integrals[species.name] = integral
+    
+    # Find smallest exponent (in base 10) across all values
+    if integrals:
+        min_exp = min(int(np.floor(np.log10(abs(val)))) if val != 0 else 0 for val in integrals.values())
+    else:
+        min_exp = 0  # fallback
+
+    # Format legend labels
+    labels_with_integrals = {}
+    for species in reaction_network.species:
+        val = integrals[species.name]
+        scaled_val = val / (10 ** min_exp)  # Adjust to common exponent
+        label = f"{species.name}: {scaled_val:.0f}e{min_exp} mol"
+        labels_with_integrals[species.name] = label
+    
+    # Plot and assign labels
+    for species in reaction_network.species:    
+        solution_y_values_to_plot = bvp_result.sol(x_values)[bvp_variable_indices[species]["prim"]]
+        ax[-1].plot(x_values/max(x_values), solution_y_values_to_plot, label=labels_with_integrals[species.name])
+    
     # Main plot mesh points visualization
     for node_x in bvp_result.x:
-        ax[-1].axvline(node_x, ymin = 0.95, ymax = 1, c = "k", linewidth = 1)
+        ax[-1].axvline(node_x/max(x_values), ymin = 0.95, ymax = 1, c = "k", linewidth = 1)
     # Main plot labels
     ax[-1].set_xlabel("r/R")
-    ax[-1].set_xlim([0, max(bvp_result.x)])
-    ax[-1].set_ylabel("concentration / nM")
+    ax[-1].set_xlim([0, 1])
+    ax[-1].set_ylabel("concentration / M")
 
     # ENZYME CONCENTRATION COLORBAR
     # Assume scalar_map is your ScalarMappable (from cmap and norm)
@@ -75,7 +92,6 @@ def create_bvp_result_plots(bvp_result, bvp_variable_indices, reaction_network):
     # Create the colorbar
     cbar = fig_colorbar.colorbar(scalar_map, cax=cbar_ax, orientation='vertical')
     cbar.set_label("enzyme concentration")
-
     # SPECIES CONCENTRATION LEGEND
     fig_legend = plt.figure(figsize=(3, 2))
     ax_legend = fig_legend.add_subplot(111)
@@ -85,8 +101,6 @@ def create_bvp_result_plots(bvp_result, bvp_variable_indices, reaction_network):
 
     return fig, fig_colorbar, fig_legend
 
-
-
 #%%
 if __name__ == "__main__":
     # Load all the information
@@ -94,6 +108,7 @@ if __name__ == "__main__":
     solved_reaction_network = pickle_load_binary(os.path.join(folder_to_plot, ".REACTION_NETWORK_pickle"))
     boundary_value_problem_result = pickle_load_binary(os.path.join(folder_to_plot, ".BOUNDARY_VALUE_PROBLEM_RESULT_pickle"))
     boundary_value_problem_variable_indices = pickle_load_binary(os.path.join(folder_to_plot, ".BOUNDARY_VALUE_PROBLEM_VARIABLE_INDICES_pickle"))
+
 
     # Run
     success = boundary_value_problem_result.success

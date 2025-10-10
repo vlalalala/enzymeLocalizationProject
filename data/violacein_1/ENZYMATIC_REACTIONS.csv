@@ -1,7 +1,7 @@
 ﻿start_species,end_species,ratio_endtostart_species,enzyme,k_cat,k_M,hill
-Trp,IPA_imine,1:1,VioA,45,125e3,1
-IPA_imine,IPA_imine_dimer,1:2,VioB,45,125e3,1
-IPA_imine_dimer,PDVA,1:1,VioE,45,125e3,1
-PDVA,DVA,1:1,VioC,45,125e3,1
-PDVA,PVA,1:1,VioD,45,125e3,1
-PVA,VA,1:1,VioC,45,125e3,1
+Trp,IPA_imine,1:1,VioA,0.75,1.25e-4,1
+IPA_imine,IPA_imine_dimer,1:2,VioB,0.75,1.25e-4,1
+IPA_imine_dimer,PDVA,1:1,VioE,0.75,1.25e-4,1
+PDVA,DVA,1:1,VioC,0.75,1.25e-4,1
+PDVA,PVA,1:1,VioD,0.75,1.25e-4,1
+PVA,VA,1:1,VioC,0.75,1.25e-4,1
