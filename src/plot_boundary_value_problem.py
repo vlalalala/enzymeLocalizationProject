@@ -1,92 +1,122 @@
 
 #%%
-import matplotlib.pyplot as plt
+import sys
+import os
+import numpy as np
+import matplotlib
 import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from scipy import integrate
+from auxiliary_functions_using_standard_library import pickle_load_binary
+from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
+from solve_boundary_value_problem import enzyme_concentration 
 
-final_mesh = res_a.x
-solution_values_at_mesh = res_a.y
-solution_derivatives_at_mesh = res_a.yp
+def create_bvp_result_plots(bvp_result, bvp_variable_indices, reaction_network):
+    _, reaction_network = enzyme_concentration(reaction_network, bvp_result.x)
+    
+    x_values = np.linspace(0, max(bvp_result.x), num = 100)
+    integrals = {species.name: 0 for species in reaction_network.species}
+    num_enzymes = len(reaction_network.enzymes)
 
-success = res_a.success
+    enzyme_max_concentration = max(enzyme.concentration for enzyme in reaction_network.enzymes)
+    norm = mcolors.Normalize(vmin=0, vmax=enzyme_max_concentration)
+    cmap = matplotlib.colormaps['Oranges']
+    scalar_map = cm.ScalarMappable(norm=norm, cmap=cmap)
 
-integrals = {species.name: 0 for species in reaction_network.species}
-x_values = np.linspace(0, radius, num = 100)
-num_enzymes = len(reaction_network.enzymes)
+    # MAIN PLOT
+    fig, ax = plt.subplots(num_enzymes + 1,1, figsize = (5,3), sharex = True,
+                        gridspec_kw={'height_ratios': [1]*num_enzymes + [num_enzymes*2]})
+    fig.subplots_adjust(hspace=0)
+    ax[0].set_title(f"steady state distribution, computed with {len(bvp_result.x)} nodes")
+    # Main plot enzyme concentration
+    for enzyme_idx, enzyme in enumerate(reaction_network.enzymes):
+        ax[enzyme_idx].set_ylabel(enzyme.name, rotation=0, labelpad=20)
+        # Get the label Text object and adjust its position
+        label = ax[enzyme_idx].yaxis.get_label()
+        # Move it vertically to center (around 0.5 in axes coords) and keep horizontal offset from labelpad
+        label.set_verticalalignment('center')  # ensure vertical alignment
+        # Manually set position: x controls horizontal offset, y controls vertical position (0 bottom, 0.5 center, 1 top)
+        label.set_position((label.get_position()[0], 0.5))
+        # Colorbar color
+        color = scalar_map.to_rgba(enzyme.concentration)
+        # Fill x-ranges where enzymes are at
+        for localizationTuple in enzyme.localization:
+            min_range = localizationTuple.minMaxLoc[0]
+            max_range = localizationTuple.minMaxLoc[1]
+            ax[enzyme_idx].fill_between(
+                x_values, 0, 1, where=(
+                    x_values >= min_range*max(bvp_result.x))
+                    & (x_values <= max_range*max(bvp_result.x)),
+                color=color)
+        ax[enzyme_idx].set_yticks([])
+    
+    # Main plot species concentration
+    for species in reaction_network.species:
+        sol = bvp_result.sol(x_values)[bvp_variable_indices[species]["prim"]]
+        print(species, sol)
+        # Found solution for y as scipy.interpolate.PPoly instance, a C1 continuous
+        # cubic spline.
+        integral = integrate.quad(lambda r: bvp_result.sol(r)[bvp_variable_indices[species]["prim"]] * 4 * np.pi * r**2, 0, max(bvp_result.x))
+        integrals[species.name] = integral[0] # [0] is value [1] is error
+        ax[-1].plot(x_values, sol, label=f"{species.name}: {int(np.round(integral[0]))} nM")
+    # Main plot mesh points visualization
+    for node_x in bvp_result.x:
+        ax[-1].axvline(node_x, ymin = 0.95, ymax = 1, c = "k", linewidth = 1)
+    # Main plot labels
+    ax[-1].set_xlabel("radius")
+    ax[-1].set_xlabel("distance to origin")
+    ax[-1].set_xlim([0, max(bvp_result.x)])
+    ax[-1].set_ylabel("concentration")
 
-enzyme_max_concentration = max(enzyme.concentration for enzyme in reaction_network.enzymes)
+    # ENZYME CONCENTRATION COLORBAR
+    # Assume scalar_map is your ScalarMappable (from cmap and norm)
+    fig_colorbar = plt.figure(figsize=(2, 4))  # tall figure for vertical bar
+    # Add axes for colorbar (full figure area)
+    cbar_ax = fig_colorbar.add_axes([0.2, 0.05, 0.3, 0.9])  # [left, bottom, width, height]
+    # Create the colorbar
+    cbar = fig_colorbar.colorbar(scalar_map, cax=cbar_ax, orientation='vertical')
+    cbar.set_label("enzyme concentration")
 
-norm = mcolors.Normalize(vmin=0, vmax=enzyme_max_concentration)
-cmap = cm.get_cmap('Oranges')
-scalar_map = cm.ScalarMappable(norm=norm, cmap=cmap)
+    # SPECIES CONCENTRATION LEGEND
+    fig_legend = plt.figure(figsize=(3, 2))
+    ax_legend = fig_legend.add_subplot(111)
+    ax_legend.axis('off')
+    handles, labels = ax[-1].get_legend_handles_labels()
+    ax_legend.legend(handles, labels, loc='center')
 
-fig, ax = plt.subplots(num_enzymes + 1,1, figsize = (5,3), sharex = True,
-                       gridspec_kw={'height_ratios': [1]*num_enzymes + [num_enzymes*2]})
-fig.subplots_adjust(hspace=0)
-ax[0].set_title(f"steady state distribution, computed with {len(res_a.x)} nodes")
-
-for enzyme_idx, enzyme in enumerate(reaction_network.enzymes):
-    ax[enzyme_idx].set_ylabel(enzyme.name, rotation=0, labelpad=20)
-    # Get the label Text object and adjust its position
-    label = ax[enzyme_idx].yaxis.get_label()
-    # Move it vertically to center (around 0.5 in axes coords) and keep horizontal offset from labelpad
-    label.set_verticalalignment('center')  # ensure vertical alignment
-    # Manually set position: x controls horizontal offset, y controls vertical position (0 bottom, 0.5 center, 1 top)
-    label.set_position((label.get_position()[0], 0.5))
-    # Colorbar color
-    color = scalar_map.to_rgba(enzyme.concentration)
-    for localizationTuple in enzyme.localization:
-        min_range = localizationTuple.minMaxLoc[0]
-        max_range = localizationTuple.minMaxLoc[1]
-        ax[enzyme_idx].fill_between(
-            x_values, 0, 1, where=(x_values >= min_range) & (x_values <= max_range),
-            color=color)
-    ax[enzyme_idx].set_yticks([])
-
-for species in reaction_network.species:
-    sol = res_a.sol(x_values)[species_variable_indices[species]["prim"]]
-    # Found solution for y as scipy.interpolate.PPoly instance, a C1 continuous
-    # cubic spline.
-    integral = integrate.quad(lambda r: res_a.sol(r)[species_variable_indices[species]["prim"]] * 4 * np.pi * r**2, 0, radius)
-    integrals[species.name] = integral[0] # [0] is value [1] is error
-    ax[-1].plot(x_values, sol, label=f"{species.name}: {int(np.round(integral[0]))} nM")
-
-for node_x in res_a.x:
-    ax[-1].axvline(node_x, ymin = 0.95, ymax = 1, c = "k", linewidth = 1)
-
-ax[-1].set_xlabel("radius")
-ax[-1].set_xlabel("distance to origin")
-ax[-1].set_xlim([0, radius])
-ax[-1].set_ylabel("concentration")
-
-fig.savefig(os.path.join(violacein_folder, "test.png"), dpi = 300,
-    bbox_inches = "tight")
-
-
-# Assume scalar_map is your ScalarMappable (from cmap and norm)
-fig_colorbar = plt.figure(figsize=(2, 4))  # tall figure for vertical bar
-# Add axes for colorbar (full figure area)
-cbar_ax = fig_colorbar.add_axes([0.2, 0.05, 0.3, 0.9])  # [left, bottom, width, height]
-# Create the colorbar
-cbar = fig_colorbar.colorbar(scalar_map, cax=cbar_ax, orientation='vertical')
-cbar.set_label("enzyme concentration")
-# Save the colorbar figure
-fig_colorbar.savefig(os.path.join(violacein_folder, "test_colorbar.png"), bbox_inches='tight', dpi= 300)
-
-
-fig_legend = plt.figure(figsize=(3, 2))
-ax_legend = fig_legend.add_subplot(111)
-ax_legend.axis('off')
-
-handles, labels = ax[-1].get_legend_handles_labels()
-legend = ax_legend.legend(handles, labels, loc='center')
-
-fig_legend.savefig(os.path.join(violacein_folder, "test_colorbar.png"), bbox_inches='tight', dpi= 300)
+    return fig, fig_colorbar, fig_legend
 
 
 
 #%%
+if __name__ == "__main__":
+    # Load all the information
+    folder_to_plot = sys.argv[1]
+    solved_reaction_network = pickle_load_binary(os.path.join(folder_to_plot, ".REACTION_NETWORK_pickle"))
+    boundary_value_problem_result = pickle_load_binary(os.path.join(folder_to_plot, ".BOUNDARY_VALUE_PROBLEM_RESULT_pickle"))
+    boundary_value_problem_variable_indices = pickle_load_binary(os.path.join(folder_to_plot, ".BOUNDARY_VALUE_PROBLEM_VARIABLE_INDICES_pickle"))
+
+    # Run
+    success = boundary_value_problem_result.success
+    #print("success", success)
+    #if not success:
+    #    raise ImportError(f"The imported result for the bvp in folder {folder_to_plot} was not successful.")
+    
+    main_fig, enzyme_concentration_colorbar_fig, species_legend_fig =  create_bvp_result_plots(
+        boundary_value_problem_result, boundary_value_problem_variable_indices,
+        solved_reaction_network
+    )
+
+    # Save plots
+    main_fig.savefig(os.path.join(folder_to_plot, "bvp_result.png"), dpi = 300,
+        bbox_inches = "tight")
+    enzyme_concentration_colorbar_fig.savefig(
+        os.path.join(folder_to_plot, "bvp_enzyme_colorbar.png"), bbox_inches='tight', dpi= 300)
+    species_legend_fig.savefig(
+        os.path.join(folder_to_plot, "bvp_species_legend.png"), bbox_inches='tight',
+        dpi= 300
+    )
 
 
 #%%

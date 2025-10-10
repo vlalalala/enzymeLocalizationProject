@@ -58,6 +58,12 @@ class Species(Participant):
     
     def __repr__(self):
         return f"species {super().__repr__()}"
+    
+    def __eq__(self, other): # to be able to use object as key in dictionary, when the dictionary has been pickled and unpicklend
+        return isinstance(other, Species) and self.name == other.name
+
+    def __hash__(self):
+        return hash(self.name)
 
 class Reaction:
     """ Base class that defines reactions. """

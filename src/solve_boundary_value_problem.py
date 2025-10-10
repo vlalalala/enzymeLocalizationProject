@@ -1,4 +1,3 @@
-#%%
 import sys
 import os
 import numpy as np
@@ -7,31 +6,40 @@ from auxiliary_functions_using_standard_library import pickle_load_binary, pickl
 from auxiliary_functions import LocationTuple
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 
-#%% Define function to get enzyme concentration at each node
-def enzyme_concentration(r_mesh):
-    enzyme_conc = {
-        enzyme: []
-        for enzyme in reaction_network.enzymes
-    }
-    # Get the enzyme concentration for each mesh node PUT THIS IN A FUNCTION THAT TAKES R_MESH
+# Define function to get enzyme concentration at each node
+def enzyme_concentration(reaction_network, r_mesh):
+    enzyme_conc = {}
+
     for enzyme in reaction_network.enzymes:
-        enzyme_mesh_occupied_bool_dict = {r: False for r in r_mesh} # Initialize whether mesh points have enzyme
         total_occupied_volume = 0
+        occupied_regions = []
+
+        # Step 1: Compute total occupied volume
         for locTuple in enzyme.localization:
-            volume_part = 4/3 * np.pi * ((locTuple.minMaxLoc[1] * radius)**3 - (locTuple.minMaxLoc[0] * radius)**3)
-            total_occupied_volume += volume_part
-            for r_key in enzyme_mesh_occupied_bool_dict.keys():
-                if locTuple.return_within_tuple(r_key):
-                    enzyme_mesh_occupied_bool_dict[r_key] = True
-        enzyme_concentration = [
-            enzyme.quantity/total_occupied_volume 
-            if enzyme_mesh_occupied_bool_dict[r] == True else 0
-            for r in r_mesh
-        ]################################ not really correct... but will work for now
-        enzyme_conc[enzyme] = np.array(enzyme_concentration)
-        # save enzyme.concentration
-        enzyme.concentration = enzyme.quantity/total_occupied_volume
-    return enzyme_conc
+            r1 = locTuple.minMaxLoc[0] * max(r_mesh)
+            r2 = locTuple.minMaxLoc[1] * max(r_mesh)
+            V = (4/3) * np.pi * (r2**3 - r1**3)
+            total_occupied_volume += V
+            occupied_regions.append((r1, r2))
+
+        if total_occupied_volume == 0:
+            raise ValueError(f"Enzyme '{enzyme}' has zero localization volume.")
+
+        # Step 2: Compute uniform concentration in volume
+        uniform_conc = enzyme.quantity / total_occupied_volume
+        enzyme.concentration = uniform_conc  # Save scalar concentration
+
+        # Step 3: Assign pointwise concentrations on r_mesh
+        enzyme_conc_profile = np.zeros_like(r_mesh)
+        for i, r in enumerate(r_mesh):
+            for r1, r2 in occupied_regions:
+                if r1 <= r <= r2:
+                    enzyme_conc_profile[i] = uniform_conc
+                    break  # Stop checking other regions
+
+        enzyme_conc[enzyme] = enzyme_conc_profile
+
+    return enzyme_conc, reaction_network
 
 def michaelis_menten_term(k_cat, k_M, c_enzyme, c_substrate, hill=1):
     return k_cat * c_enzyme * c_substrate**hill / (k_M**hill + c_substrate**hill)
@@ -60,7 +68,7 @@ def reaction_diffusion_system(r_mesh, variable_values_2d_array):
     }
 
     # Get the concentration of enzymes at the r_mesh nodes
-    enzyme_conc = enzyme_concentration(r_mesh)
+    enzyme_conc, _ = enzyme_concentration(reaction_network, r_mesh)
 
     system_right_hand_side = { # includes no reaction terms here
         species: {"prim": species_conc_der[species.name],
@@ -70,7 +78,7 @@ def reaction_diffusion_system(r_mesh, variable_values_2d_array):
 
     # Calculate the reaction terms
     for species in reaction_network.species:
-        reaction_term_sum = 0
+        reaction_term_sum = np.zeros(len(r_mesh))
         for reaction in species.as_reactant_in + species.as_product_in:
             if isinstance(reaction, SpontaneousReaction):
                 term = reaction.k * species_conc[reaction.start_species.name] #################################
@@ -81,7 +89,7 @@ def reaction_diffusion_system(r_mesh, variable_values_2d_array):
             reaction_term_sum += term
         # Add reaction term to diffusion term
         system_right_hand_side[species]["1stDer"] += -1/species.diffusion_constant * reaction_term_sum
-    
+
     # Create the right-hand side 2d array
     values_2d_array = np.zeros((2*len(reaction_network.species), len(r_mesh)))
     for species in reaction_network.species:
@@ -95,6 +103,11 @@ def boundary_conditions(y_a, y_b):
     """ At origin a we have reflexion, so the derivative variable is 0.
     At r = R a flux is given.
     y_a and y_b are the vectors with shape (n, ) (n=2*num_species)
+    def bc(ya, yb):
+        return np.array([
+            ya[0] - 1,  # y0(a) = 1
+            yb[1] - 0   # y1(b) = 0
+        ])
     """
     # origin
     origin_conditions = [
@@ -110,7 +123,7 @@ def boundary_conditions(y_a, y_b):
     ]
     conditions = np.array(origin_conditions + border_conditions)
     return conditions
-    
+
 if __name__ == "__main__":
     # Load all the information
     folder_to_solve = sys.argv[1]
@@ -147,11 +160,20 @@ if __name__ == "__main__":
             initial_values_2d_array[species_variable_indices[species][variable_type]] = species_variables_inital_values_dict[species][variable_type]
 
     # Step 3: run solver
+    print(f"Solving bvp in {folder_to_solve}")
     bvp_result = solve_bvp(reaction_diffusion_system, boundary_conditions,
-                    initial_r_mesh, initial_values_2d_array)
+                    initial_r_mesh, initial_values_2d_array,
+                    max_nodes=1000)
+    print(f"Solved bvp in {folder_to_solve}")
     
     # Step 4: pickle
     pickle_dump_binary(
         os.path.join(folder_to_solve, ".BOUNDARY_VALUE_PROBLEM_RESULT_pickle"),
         bvp_result
     )
+    pickle_dump_binary(
+        os.path.join(folder_to_solve, ".BOUNDARY_VALUE_PROBLEM_VARIABLE_INDICES_pickle"),
+        species_variable_indices
+    )
+
+    

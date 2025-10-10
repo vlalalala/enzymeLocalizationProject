@@ -36,12 +36,3 @@ $$ \frac{du}{dr}(R) = [u_\mathrm{ext} − u(R)] \cdot \frac{p_\mathrm{u}}{D_\mat
 with $p_\mathrm{u}$ the permeability to the outer membrane.
 
 
-
-For the boundary conditions
-```python
-def bc(ya, yb):
-    return np.array([
-        ya[0] - 1,  # y0(a) = 1
-        yb[1] - 0   # y1(b) = 0
-    ])
-```

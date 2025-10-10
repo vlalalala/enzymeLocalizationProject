@@ -66,11 +66,30 @@ rule solve_boundary_value_problem:
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle"]
     output:
-        "{df}/{bn}_{cn}/.BOUNDARY_VALUE_PROBLEM_RESULT_pickle"
+        ["{df}/{bn}_{cn}/.BOUNDARY_VALUE_PROBLEM_RESULT_pickle",
+        "{df}/{bn}_{cn}/.BOUNDARY_VALUE_PROBLEM_VARIABLE_INDICES_pickle"]
     conda:
         "config/environment.yaml"
     shell:
         "python src/solve_boundary_value_problem.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+
+rule plot_boundary_value_problem:
+    # snakemake -s Snakefile.smk data/violacein_0/bvp_result.png --cores 1 --use-conda
+    input:
+        lambda wildcards: [
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.BOUNDARY_VALUE_PROBLEM_RESULT_pickle",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.BOUNDARY_VALUE_PROBLEM_VARIABLE_INDICES_pickle",
+        ]
+    output:
+        ["{df}/{bn}_{cn}/bvp_result.png",
+         "{df}/{bn}_{cn}/bvp_enzyme_colorbar.png",
+         "{df}/{bn}_{cn}/bvp_species_legend.png",
+        ]
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/plot_boundary_value_problem.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 
 """
