@@ -1,0 +1,6 @@
+﻿start_species,end_species,ratio_endtostart_species,k
+IPA_imine_dimer,CPA,1:1,1e-3
+PDVA,PDV,1:1,1e-3
+DVA,DV,1:1,1e-3
+PVA,PV,1:1,1e-3
+VA,Violacein,1:1,1e-3

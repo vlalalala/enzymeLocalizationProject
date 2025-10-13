@@ -1,3 +1,9 @@
 {
-"GEOMETRY_CONFIG": ["radius", "num_mesh_points", "num_dimensions"],
+"GEOMETRY_CONFIG": [
+    "internal_membrane_relative_radii",
+    "outer_membrane_radius",
+    "num_mesh_points",
+    "num_dimensions",
+    "inner_mesh_radius_relative_to_smallest_membrane"
+]
 }

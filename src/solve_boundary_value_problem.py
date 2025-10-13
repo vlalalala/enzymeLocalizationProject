@@ -105,9 +105,9 @@ if __name__ == "__main__":
     system_geometry_dict = pickle_load_binary(os.path.join(folder_to_solve, ".SYSTEM_GEOMETRY_pickle"))
 
     # Step 1: Define all geometry variables
-    radius = system_geometry_dict["GEOMETRY_CONFIG"]["radius"]
+    membrane_radii = system_geometry_dict["GEOMETRY_CONFIG"]["membrane_radii"]
     num_mesh_points = system_geometry_dict["GEOMETRY_CONFIG"]["num_mesh_points"]
-    initial_r_mesh = np.linspace(radius*1e-4, radius, num = num_mesh_points) #nm # doesn't work within singularity
+    initial_r_mesh = np.linspace(min(membrane_radii)*1e-3, max(membrane_radii), num = num_mesh_points) #nm # doesn't work within singularity
 
     # Step 2: Do preliminary work to make reaction diffusion system solvable
     """We need to define 2*n variables, where n is the number of species, since we

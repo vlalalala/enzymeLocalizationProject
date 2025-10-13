@@ -41,14 +41,14 @@ if __name__ == "__main__":
     padded_case_numbers = [str(n).zfill(digits_case_numbers) for n in case_numbers]
 
     # Get information about .csv files to create
-    chemical_network_info_dict = load_json("src/chemical_network_info.json")
+    reaction_network_info_dict = load_json("src/reaction_network_info.json")
     # Create all necessary files in which to fill in specific system data
     for df, bn, cn in product(data_folder, base_name, padded_case_numbers):
-        for file_name in chemical_network_info_dict.keys():
+        for file_name in reaction_network_info_dict.keys():
             file_path = f"{df}/{bn}_{cn}/{file_name}.csv"
             if os.path.isfile(file_path):
                 continue
-            create_csv_header_file(file_path, chemical_network_info_dict[file_name])
+            create_csv_header_file(file_path, reaction_network_info_dict[file_name])
         create_data_json_file(
             "src/geometry_info.json", f"{df}/{bn}_{cn}", "SYSTEM_GEOMETRY")
 

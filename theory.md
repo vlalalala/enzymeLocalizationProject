@@ -37,7 +37,7 @@ with $p_\mathrm{u}$ the permeability to the outer membrane.
 
 Flux through the membrane using the permeability law
 
-$$J_\mathrm{membrane} = p \cdot (u_R - u_L)
+$$J_\mathrm{membrane} = p \cdot (u_R - u_L) $$
 
 ## With multiple regions
 
@@ -49,89 +49,7 @@ $$ D_k \, \frac{\mathrm{d}u_k}{\mathrm{d}r} \big|_{r = R_k^-}
 = D_{k+1} \, \frac{\mathrm{d}u_{k+1}}{\mathrm{d}r} \big|_{r = R_k^+}
 = p_k \left( u_{k+1}(R_k^+) - u_k(R_k^-) \right)$$
 
-```python
-import numpy as np
-from scipy.integrate import solve_bvp
-import matplotlib.pyplot as plt
 
-# --- Parameters ---
-R1 = 1.0     # membrane radius
-R2 = 2.0     # outer radius
-D1 = 1.0     # diffusion in region 1
-D2 = 0.5     # diffusion in region 2
-p = 0.3      # permeability at membrane
-u_ext = 1.0  # concentration outside
-
-# --- Define mesh ---
-r1 = np.linspace(1e-6, R1, 100)        # avoid r = 0
-r2 = np.linspace(R1, R2, 100)
-r = np.concatenate((r1, r2))
-regions = np.concatenate((np.zeros_like(r1), np.ones_like(r2)))  # 0 for inner, 1 for outer
-
-# --- Define ODE system ---
-def fun(r, y):
-    dydr = np.zeros_like(y)
-    dydr[0] = y[1]                            # y = u, z = du/dr
-    dydr[1] = -2 * y[1] / r                   # from spherical coordinates
-    return dydr
-
-# --- Apply different D in regions ---
-def wrapped_fun(r, y):
-    dydr = fun(r, y)
-    D = np.where(r <= R1, D1, D2)
-    dydr[0] /= D
-    dydr[1] /= D
-    return dydr
-
-# --- Boundary conditions ---
-def bc(ya, yb):
-    bc_vals = np.zeros(4)
-    # ya: values at r = r[0] ~ 0 (inner)
-    # yb: values at r = r[-1] = R2 (outer)
-    # inner symmetry, outer boundary, flux continuity at the membrane from the left, flux continuity at the membrane from the right
-    
-    # At r=0: symmetry → du/dr = 0
-    bc_vals[0] = ya[1] # du/dr (at r=0) = 0
-    
-    # At r=R2: Dirichlet condition
-    bc_vals[1] = yb[0] - u_ext
-
-    # Find index of the mesh point closest to membrane R1
-    idx = np.where(np.isclose(r, R1))[0][0]
-    
-    # Interface condition: flux continuity
-    u_L, du_L = sol.sol(R1 - 1e-6)  # left limit
-    u_R, du_R = sol.sol(R1 + 1e-6)  # right limit
-    # Gets the values of the solution just to the left and right of the membrane
-    # Flux through the membrane using the permeability law
-    J_membrane = p * (u_R - u_L)
-    
-    # Flux balance at membrane
-    bc_vals[2] = D1 * du_L - J_membrane
-    bc_vals[3] = D2 * du_R - J_membrane
-    # Enforce that fluxes on both sides of the membrane equal the membrane flux
-
-    return bc_vals
-
-# --- Initial guess: linear profile ---
-y_init = np.zeros((2, r.size))
-y_init[0] = np.linspace(0, u_ext, r.size)
-
-# --- Solve ---
-sol = solve_bvp(wrapped_fun, bc, r, y_init)
-
-# --- Plot solution ---
-if sol.success:
-    plt.plot(sol.x, sol.y[0], label="u(r)")
-    plt.xlabel("r")
-    plt.ylabel("Concentration u")
-    plt.title("Spherical diffusion with a membrane at r = R1")
-    plt.grid()
-    plt.legend()
-    plt.show()
-else:
-    print("Solution failed:", sol.message)
-```
 
 Correct:?:
 ```python
@@ -354,3 +272,27 @@ $$
 n = \int_0^R C(r) \cdot 10^{3}\cdot 4\pi r^2 \mathrm{d}r
 $$
 with n in moles and C(r) in M.
+
+Numerical methods:
+- Galerkin methods
+- Quasilinearization
+- Overlapping meshes
+
+
+A multi-point boundary value problem (BVP).
+is a type of mathematical problem that involves solving a system of ordinary differential equations (ODEs) with conditions specified at multiple points, not just at the start and end of an interval.
+
+MATLAB has built-in functions, such as bvp4c.
+https://www.mathworks.com/help/matlab/math/solve-bvp-with-multiple-boundary-conditions.html
+
+A multi-point BVP is one where you specify conditions not just at the ends of the domain (like in standard two-point BVPs), but also at interior points
+
+
+Implement multi-point constraints? Finite differences, collocation/spectral methods
+
+pybvp
+
+scikit-fem (finite element method)
+
+
+https://dl.acm.org/doi/pdf/10.1145/1878537.1878636
