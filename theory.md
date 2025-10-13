@@ -327,7 +327,6 @@ if sol.success:
     plt.show()
 else:
     print("Solver failed:", sol.message)
-
 ```
 
 # Typical values
