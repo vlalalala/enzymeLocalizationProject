@@ -29,15 +29,67 @@ At $r=0$ we use reflection
 
 $$\frac{du}{dr}(0) = 0$$
 
+(such that
+
+$$ (\frac{dy_0}{dr}(0) = )\ \  y_1(0) = 0 $$
+
+)
+
 and at $r=R$ we have
 
-$$ \frac{du}{dr}(R) = [u_\mathrm{ext} − u(R)] \cdot \frac{p_\mathrm{u}}{D_\mathrm{u}}$$
+$$ \frac{du}{dr}(R) = [u_\mathrm{ext} − u(R)] \cdot \frac{p}{D}$$
+
+(such that
+$$
+y_1(R) = (u_{ext} - y_0(R)) \cdot \frac{p}{D}
+$$
+)
 
 with $p_\mathrm{u}$ the permeability to the outer membrane.
 
 Flux through the membrane using the permeability law
 
 $$J_\mathrm{membrane} = p \cdot (u_R - u_L) $$
+
+
+WRITE GENERAL:
+
+- $m$ species
+- $n$ compartments i.e. $n-1$ inner membranes at $r_i$ with $i \in \{1,2,...,n-1\} $
+- $m \cdot [2 + (n-1)\cdot 2] = 2mn$ boundary conditions (for each species: one BC at r=0, one BC at r=R, one BC at each side of each inner membrane)
+
+
+Define $2\cdot m\cdot n$ variables, with $k\in \{0, 1, ..., n-1\}$
+
+$$v_k^{(m)} = u_k^{(m)}$$
+$$ w_k^{(m)} = \frac{\mathrm{d}u_k^{(m)}}{\mathrm{d}r} $$
+
+with 
+
+$$ \frac{\mathrm{d}v_k^{(m)}}{\mathrm{d}r} = w_k^{(m)}$$
+$$ \frac{\mathrm{d}w_k^{(m)}}{\mathrm{d}r} = -\frac{2}{r} w_k^{(m)}-\frac{1}{D}R(v_k^{(m)})$$
+
+Boundary conditions are given by
+
+$$ w^{(m)}(0) = 0 $$
+
+$$ w^{(m)}(R) = \left(u_\mathrm{ext} - v^{(m)}(R)\right) \cdot \frac{p^{(m)}}{D} $$
+
+$$w_i^{(m)}(r_i^+) =  \frac{p^{(m)}}{D} \cdot \left( v_{i}^{(m)}(r_i^+) - v_{i-1}^{(m)}(r_i^-)\right)$$
+
+$$ w_{i-1}^{(m)}(r_i^-) =  \frac{p^{(m)}}{D} \cdot \left( v_{i}^{(m)}(r_i^+) - v_{i-1}^{(m)}(r_i^-)\right)$$
+
+The concentration is not continuous at the membranes! But the flux is continuous!
+
+![alt text](compartments.png)
+
+Differenzenquotienten:
+
+$$f'(x_i) = \frac{1}{2h}(f_{i+1}-f_{i-1}) + O(h^2)$$
+
+$$f''(x_i) \approx \frac{1}{h^2}(f_{i+1}-2f_i + 
+f_{i-1}) + O(h^2)$$
+
 
 ## With multiple regions
 
@@ -296,3 +348,12 @@ scikit-fem (finite element method)
 
 
 https://dl.acm.org/doi/pdf/10.1145/1878537.1878636
+
+
+$$
+f'(x_i) = \frac{1}{2h}(f_{i+1}-f_{i-1}) + O(h^2)
+$$
+
+$$
+f''(x_i) = \frac{1}{h^2}(f_{i+1}-2f_i+f_{i-1})
+$$
