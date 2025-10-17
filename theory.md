@@ -67,13 +67,17 @@ $$ w_k^{(m)} = \frac{\mathrm{d}u_k^{(m)}}{\mathrm{d}r} $$
 with 
 
 $$ \frac{\mathrm{d}v_k^{(m)}}{\mathrm{d}r} = w_k^{(m)}$$
-$$ \frac{\mathrm{d}w_k^{(m)}}{\mathrm{d}r} = -\frac{2}{r} w_k^{(m)}-\frac{1}{D}R(v_k^{(m)})$$
+$$ \frac{\mathrm{d}w_k^{(m)}}{\mathrm{d}r} = -\frac{2}{r} w_k^{(m)}-\frac{1}{D}R(\vec{v}_k)$$
 
 Boundary conditions are given by
 
 $$ w^{(m)}(0) = 0 $$
 
+(Neumann no-flux BC)
+
 $$ w^{(m)}(R) = \left(u_\mathrm{ext} - v^{(m)}(R)\right) \cdot \frac{p^{(m)}}{D} $$
+
+(Robin BC)
 
 $$w_i^{(m)}(r_i^+) =  \frac{p^{(m)}}{D} \cdot \left( v_{i}^{(m)}(r_i^+) - v_{i-1}^{(m)}(r_i^-)\right)$$
 
@@ -88,7 +92,12 @@ Differenzenquotienten:
 $$f'(x_i) = \frac{1}{2h}(f_{i+1}-f_{i-1}) + O(h^2)$$
 
 $$f''(x_i) \approx \frac{1}{h^2}(f_{i+1}-2f_i + 
-f_{i-1}) + O(h^2)$$
+f_{i-1})$$
+
+
+
+https://reference.wolfram.com/language/tutorial/NDSolveBVP.html
+The solver can solve multipoint boundary value problems of linear systems of equations. (Note that each boundary equation must be at one specific value of t.)
 
 
 ## With multiple regions
