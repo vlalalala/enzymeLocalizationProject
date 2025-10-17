@@ -1,0 +1,8 @@
+{
+    "GEOMETRY_CONFIG": {
+        "internal_membrane_relative_radii": null,
+        "outer_membrane_radius": null,
+        "num_mesh_points": null,
+        "num_dimensions": null
+    }
+}

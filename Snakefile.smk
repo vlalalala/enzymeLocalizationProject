@@ -91,6 +91,14 @@ rule plot_boundary_value_problem:
     shell:
         "python src/plot_boundary_value_problem.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
+rule run_mathematica_bvp_solver:
+    # snakemake -s Snakefile.smk data/mathematica_test_0/mathematica_solver_result.csv --cores 1
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/mathematica_solver.wl",
+    output:
+        "{df}/{bn}_{cn}/mathematica_solver_result.csv",
+    shell:
+        "wolframscript -file {wildcards.df}/{wildcards.bn}_{wildcards.cn}/mathematica_solver.wl"
 
 """
 # Get the absolute path to this script
@@ -119,9 +127,3 @@ rule all:
                cn=["00"])
 """    
 
-
-#chemical_network_csv_file_names = chemical_network_dict.keys()
-#system_parameters_csv_file_names = system_parameters_dict.keys()
-
-
-#complete_file_names = complete_file_headers_dict.keys()

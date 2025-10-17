@@ -4,6 +4,8 @@ __pycache__/
 
 # Ignore images that can be generated from the code
 *.png
+# Ignore all pdf files
+*.pdf
 
 # Ignore editor VSCode/VSCodium settings
 .vscode/
