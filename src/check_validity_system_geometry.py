@@ -1,7 +1,7 @@
 import sys
 import os
 import numpy as np
-from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary
+from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary, closest_value
 
 def check_validity_system_geometry_info(case_directory):
     
@@ -55,7 +55,32 @@ def check_validity_system_geometry_info(case_directory):
     #if (system_geometry_nested_dict["GEOMETRY_CONFIG"]["inner_mesh_radius_relative_to_smallest_membrane"]
     #    >= system_geometry_nested_dict["GEOMETRY_CONFIG"]["inner_mesh_radius_relative_to_smallest_membrane"]):
 
-    pickle_dump_binary(os.path.join(case_directory, ".SYSTEM_GEOMETRY_pickle"), system_geometry_nested_dict)    
+    R = system_geometry_nested_dict["GEOMETRY_CONFIG"]["outer_membrane_radius"]
+    MEMBRANE_INPUT_RADII = [relative * R for relative in system_geometry_nested_dict["GEOMETRY_CONFIG"]["internal_membrane_relative_radii"] + [1]]
+    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MEMBRANE_INPUT_RADII"] = MEMBRANE_INPUT_RADII
+    MESH_POINTS = np.linspace(0, R, num = system_geometry_nested_dict["GEOMETRY_CONFIG"]["num_mesh_points"])
+    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MESH_POINTS"] = MESH_POINTS
+    MEMBRANE_RADII = [closest_value(MESH_POINTS, membrane_input_radius) for membrane_input_radius in MEMBRANE_INPUT_RADII]
+    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MEMBRANE_RADII"] = MEMBRANE_RADII
+    NUM_REGIONS = len(MEMBRANE_RADII)
+    system_geometry_nested_dict["GEOMETRY_CONFIG"]["NUM_REGIONS"]  = NUM_REGIONS
+    BOUNDARY_RADII = [0] + MEMBRANE_RADII
+    system_geometry_nested_dict["GEOMETRY_CONFIG"]["BOUNDARY_RADII"]  = BOUNDARY_RADII
+    MESH_POINTS_IN_REGIONS = {
+        region_idx : [mesh_point for mesh_point in MESH_POINTS if BOUNDARY_RADII[region_idx]<=mesh_point<=BOUNDARY_RADII[region_idx+1]]
+        for region_idx in range(NUM_REGIONS)
+    }
+    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]  = MESH_POINTS_IN_REGIONS
+    NUM_MESH_POINTS_IN_REGIONS = {
+        region_idx: len(mesh_points_in_region)
+        for region_idx, mesh_points_in_region in MESH_POINTS_IN_REGIONS.items()
+    }
+    system_geometry_nested_dict["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]  = NUM_MESH_POINTS_IN_REGIONS
+
+    pickle_dump_binary(
+        os.path.join(case_directory, ".SYSTEM_GEOMETRY_pickle"),
+        system_geometry_nested_dict
+    )
 
 
 if __name__ == "__main__":

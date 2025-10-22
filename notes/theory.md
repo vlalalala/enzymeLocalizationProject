@@ -366,3 +366,11 @@ $$
 $$
 f''(x_i) = \frac{1}{h^2}(f_{i+1}-2f_i+f_{i-1})
 $$
+
+
+https://reference.wolfram.com/language/PDEModels/tutorial/MassTransport/MassTransport.html#531721061
+
+MassTransferValue is a special case of a MassFluxValue.
+
+https://reference.wolfram.com/language/ref/MassTransferValue.html
+https://reference.wolfram.com/language/ref/MassFluxValue.html

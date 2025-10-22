@@ -40,7 +40,7 @@ rule check_reaction_network_data_validity:
     # snakemake -s Snakefile.smk data/violacein_0/.reaction_network_validated --cores 1 --use-conda
     input:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{rn}.csv"
-                           for rn in reaction_network_info_dict.keys()]
+                           for rn in reaction_network_info_dict.keys()] + [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle"]
     output:
         touch("{df}/{bn}_{cn}/.reaction_network_validated")
     conda:

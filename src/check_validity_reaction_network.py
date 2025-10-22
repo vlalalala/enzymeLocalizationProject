@@ -2,13 +2,12 @@
 import sys
 import os
 import pandas as pd
-from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary
+from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary, pickle_load_binary
 from auxiliary_functions import (
     define_ratio_from_string, no_empty_cells, no_repeated_rows_in_csv_file,
-    checks_lack_of_repetitions, check_correct_type,
-    define_tuple_of_locationPairTuples_from_string)
+    checks_lack_of_repetitions, check_correct_type, define_region_list)
 
-def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
+def create_pandas_dataframe_from_csv_file(csv_file: str, num_regions: int) -> pd.DataFrame:
     """Reads the csv files and creates corresponding panda dataframes.
     In case some columns have "ratio" as a substring of the header, the values
     are converted to Ratio types (or an error is raised if that is not possible).
@@ -28,11 +27,11 @@ def create_pandas_dataframe_from_csv_file(csv_file: str) -> pd.DataFrame:
         ~dataframe.columns.str.contains("concentration", case=False)] # anything that contains the substring ratio and not the substring concentration (ratio within concentration)
     for ratio_col in ratio_cols:
         dataframe[ratio_col] = dataframe[ratio_col].apply(define_ratio_from_string)
-    # Checks location
-    location_cols = dataframe.columns[dataframe.columns.str.contains("loca")]
-    for location_col in location_cols:
-        dataframe[location_col] = dataframe[location_col].apply(
-            define_tuple_of_locationPairTuples_from_string)
+    # Checks regions
+    regions_cols = dataframe.columns[dataframe.columns.str.contains("regions")]
+    for regions_col in regions_cols:
+        dataframe[regions_col] = dataframe[regions_col].apply(
+            lambda x: define_region_list(x, num_regions))
     return dataframe
 
 def extract_species_and_enzymes_from_reactions_data(
@@ -59,7 +58,7 @@ def extract_species_and_enzymes_from_characteristics_data(
     
     return list(species), list(enzymes)
 
-def check_validity_reaction_network_info(case_directory: str, csv_file_names: list):
+def check_validity_reaction_network_info(case_directory: str, csv_file_names: list, num_regions: int):
     """
     case_directory: relative or absolute path to caseNNN
     csv_file_names: names of csv files without .csv
@@ -79,7 +78,7 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     # Create dataframes from .csv files (checks whether rows are duplicated)
     dataframes = {
         name: create_pandas_dataframe_from_csv_file(
-        os.path.join(case_directory, f"{name}.csv"))
+        os.path.join(case_directory, f"{name}.csv"), num_regions)
         for name in csv_file_names
     }
     # Step 0
@@ -125,4 +124,8 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
     reaction_network_info_file_names = load_json("src/reaction_network_info.json").keys()
-    check_validity_reaction_network_info(folder_to_check_validity, reaction_network_info_file_names)
+    system_geometry_dict = pickle_load_binary(
+        os.path.join(folder_to_check_validity, ".SYSTEM_GEOMETRY_pickle"))
+    num_regions = system_geometry_dict["GEOMETRY_CONFIG"]["NUM_REGIONS"]
+
+    check_validity_reaction_network_info(folder_to_check_validity, reaction_network_info_file_names, num_regions)

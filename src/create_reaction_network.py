@@ -30,10 +30,10 @@ class Participant:
         return f"{self.name}"
 
 class Enzyme(Participant):
-    def __init__(self, name: str, concentration: float, localization) -> None:
+    def __init__(self, name: str, concentration: float, regions: list) -> None:
         super().__init__(name)
         self.concentration = concentration
-        self.localization = localization
+        self.regions = regions
 
     def __str__(self):
         return super().__str__()

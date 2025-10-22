@@ -1,0 +1,440 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 14.3' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[     16238,        430]
+NotebookOptionsPosition[     14109,        397]
+NotebookOutlinePosition[     14510,        413]
+CellTagsIndexPosition[     14467,        410]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell[BoxData[{
+ RowBox[{"cExt", " ", "=", " ", "2"}], "\[IndentingNewLine]", 
+ RowBox[{"P2ext", " ", "=", " ", "1"}], "\[IndentingNewLine]", 
+ RowBox[{"\[CapitalOmega]", "=", 
+  RowBox[{"Interval", "[", 
+   RowBox[{"0", ",", "2"}], "]"}]}]}], "Input",
+ CellChangeTimes->{{3.9699497732263756`*^9, 3.969949773227377*^9}, {
+  3.9699498492458935`*^9, 3.9699498570755825`*^9}, {3.969950531876465*^9, 
+  3.9699505586014137`*^9}, {3.969950702718384*^9, 3.969950703520052*^9}, {
+  3.9699507609828873`*^9, 
+  3.9699507611435127`*^9}},ExpressionUUID->"bbca52f9-b243-764d-a437-\
+a17e0b8c33c5"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.9699507015162373`*^9, 
+  3.9699507015162373`*^9}},ExpressionUUID->"cbbbabfb-8d00-3a47-83a5-\
+340a8a7f655c"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.9699507002965984`*^9, 
+  3.9699507002965984`*^9}},ExpressionUUID->"2a6a8f2c-f793-db49-b6e4-\
+bc9891d7800e"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{3.9699501288944798`*^9},
+ NumberMarks->False,ExpressionUUID->"f632945f-b07a-9444-8a68-fad5daf2b841"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.9699507584316387`*^9, 
+  3.9699507584356537`*^9}},ExpressionUUID->"8c84a44a-ec23-ab4d-becb-\
+2fcede6b49c2"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.96994998816576*^9, 3.969949990024603*^9}},
+ NumberMarks->False,ExpressionUUID->"0a45b09a-035e-c249-9d7a-6917017d2048"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.9699499870461636`*^9, 
+  3.9699499870461636`*^9}},ExpressionUUID->"51074729-1641-944f-8bd7-\
+d074b8287c19"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"vars", "=", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"c", "[", "x", "]"}], ",", 
+     RowBox[{"{", "x", "}"}]}], "}"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"pars", "=", 
+   RowBox[{"<|", "|>"}]}], ";"}]}], "Input",
+ CellChangeTimes->{{3.969949775568983*^9, 3.9699497755699844`*^9}, {
+  3.9699498595156746`*^9, 3.9699498610160007`*^9}},
+ CellLabel->
+  "In[380]:=",ExpressionUUID->"b9209713-dcec-614f-b0f6-88c2a13160c5"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{
+   RowBox[{"pars", "[", "\"\<DiffusionCoefficient\>\"", "]"}], "=", 
+   RowBox[{"10", "^", 
+    RowBox[{"-", "4"}]}]}], ";"}]], "Input",
+ CellChangeTimes->{{3.9699497784362297`*^9, 3.9699497784362297`*^9}},
+ CellLabel->
+  "In[382]:=",ExpressionUUID->"4185a9e9-21cc-6945-96dd-f9056df9c5be"],
+
+Cell[BoxData[
+ RowBox[{"gammaleft", "=", 
+  RowBox[{"MassImpermeableBoundaryValue", "[", 
+   RowBox[{
+    RowBox[{"x", "==", "0"}], ",", "vars", ",", "pars", ",", 
+    RowBox[{"<|", "|>"}]}], "]"}]}]], "Input",
+ CellChangeTimes->{{3.969949781987541*^9, 3.969949781987541*^9}, {
+   3.9699498885764008`*^9, 3.9699498900960636`*^9}, 3.969950477153246*^9},
+ CellLabel->
+  "In[383]:=",ExpressionUUID->"d766c920-01dc-224a-89e7-9b983c0c905c"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"gammaright", " ", "=", " ", 
+   RowBox[{"MassTransferValue", "[", 
+    RowBox[{
+     RowBox[{"x", "==", "2"}], ",", "vars", ",", 
+     RowBox[{"<|", 
+      RowBox[{
+       RowBox[{"\"\<MassTransferCoefficient\>\"", "->", "P2ext"}], ",", 
+       RowBox[{"\"\<AmbientConcentration\>\"", "->", "cExt"}]}], "|>"}], ",", 
+     RowBox[{"<|", "|>"}]}], "]"}]}], ";"}]], "Input",
+ CellChangeTimes->{{3.9699497975057144`*^9, 3.9699497975057144`*^9}, {
+  3.969950188205847*^9, 3.9699502080609417`*^9}, {3.9699505132508335`*^9, 
+  3.969950545412794*^9}},
+ CellLabel->
+  "In[384]:=",ExpressionUUID->"f8078816-6b5c-4e45-a098-b024aa7ce71b"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.969949802425823*^9, 3.969949802430872*^9}, {
+  3.969949910610462*^9, 3.96994991110614*^9}, {3.969950192015728*^9, 
+  3.9699501942058754`*^9}, {3.969950576174736*^9, 
+  3.969950577177288*^9}},ExpressionUUID->"207c6423-39df-cc42-bd8c-\
+cf0deb574f8b"],
+
+Cell[BoxData["\[IndentingNewLine]"], "Input",
+ CellChangeTimes->{{3.969950574693882*^9, 
+  3.969950574693882*^9}},ExpressionUUID->"6624c4a0-df32-f741-8a04-\
+d92bf335908d"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.969949805765976*^9, 3.969949805765976*^9}, 
+   3.969949917045719*^9, {3.9699501969361496`*^9, 3.9699501999809303`*^9}, 
+   3.9699504753856983`*^9},ExpressionUUID->"437e9bb0-a8e5-754a-9fbc-\
+00088fe235c9"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"cfun", "=", 
+   RowBox[{"NDSolveValue", "[", 
+    RowBox[{
+     RowBox[{"{", 
+      RowBox[{
+       RowBox[{"MassTransportPDEComponent", "[", 
+        RowBox[{"vars", ",", "pars"}], "]"}], "==", 
+       RowBox[{"gammaleft", "+", "gammaright"}]}], "}"}], ",", "c", ",", 
+     RowBox[{
+      RowBox[{"{", "x", "}"}], "\[Element]", "\[CapitalOmega]"}]}], "]"}]}], 
+  ";"}]], "Input",
+ CellChangeTimes->{{3.9699498094658394`*^9, 3.9699498094658394`*^9}, {
+   3.969949901455778*^9, 3.969949902785799*^9}, {3.9699502340217724`*^9, 
+   3.9699502427895546`*^9}, 3.9699506153290176`*^9, {3.969950838788122*^9, 
+   3.969950840218645*^9}},
+ CellLabel->
+  "In[386]:=",ExpressionUUID->"1b339da8-69d2-0b4d-82ac-fbf2a204e894"],
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.9699498130753*^9, 3.9699498130753*^9}, {
+  3.969949968896158*^9, 
+  3.9699499808908195`*^9}},ExpressionUUID->"81b8e4a9-4e8f-cb40-b48e-\
+68fbf3770a94"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"\[CapitalOmega]", "=", 
+   RowBox[{"Interval", "[", 
+    RowBox[{"{", 
+     RowBox[{"0", ",", "2"}], "}"}], "]"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"vars", "=", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"c", "[", "x", "]"}], ",", "x"}], "}"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"pars", "=", 
+   RowBox[{"<|", "|>"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{
+   RowBox[{
+    RowBox[{"pars", "[", "\"\<DiffusionCoefficient\>\"", "]"}], "=", 
+    RowBox[{"10", "^", 
+     RowBox[{"-", "4"}]}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"gammaIn", "=", 
+   RowBox[{"MassConcentrationCondition", "[", 
+    RowBox[{
+     RowBox[{"x", "==", "0"}], ",", "vars", ",", "pars", ",", 
+     RowBox[{"<|", 
+      RowBox[{"\"\<MassConcentration\>\"", "->", "1000"}], "|>"}]}], "]"}]}], 
+  ";"}], "\n", 
+ RowBox[{
+  RowBox[{"gammaActive", "=", 
+   RowBox[{"MassFluxValue", "[", 
+    RowBox[{
+     RowBox[{"x", "==", "0.2"}], ",", "vars", ",", "pars", ",", 
+     RowBox[{"<|", 
+      RowBox[{"\"\<MassFlux\>\"", "->", 
+       RowBox[{"-", "0.5"}]}], "|>"}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"gammaLeft", "=", 
+    RowBox[{"MassImpermeableBoundaryValue", "[", 
+     RowBox[{
+      RowBox[{"x", "==", "0"}], ",", "vars", ",", "pars", ",", 
+      RowBox[{"<|", "|>"}]}], "]"}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"cfun", "=", 
+   RowBox[{"NDSolveValue", "[", 
+    RowBox[{
+     RowBox[{"{", 
+      RowBox[{
+       RowBox[{
+        RowBox[{"MassTransportPDEComponent", "[", 
+         RowBox[{"vars", ",", "pars"}], "]"}], "==", "0"}], ",", "gammaIn", ",",
+        "gammaActive", ",", "gammaLeft"}], "}"}], ",", "c", ",", 
+     RowBox[{
+      RowBox[{"{", "x", "}"}], "\[Element]", "\[CapitalOmega]"}]}], "]"}]}], 
+  ";"}]}], "Input",
+ CellChangeTimes->{{3.9699502594959145`*^9, 3.969950259499922*^9}},
+ CellLabel->
+  "In[627]:=",ExpressionUUID->"9ed187f7-2af1-7c4c-a83f-13b2319cf9eb"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"cExt", "=", "2"}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"P2ext", "=", "1"}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"vars", "=", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"c", "[", "x", "]"}], ",", 
+     RowBox[{"{", "x", "}"}]}], "}"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"pars", "=", 
+   RowBox[{"<|", "|>"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{
+   RowBox[{
+    RowBox[{"pars", "[", "\"\<DiffusionCoefficient\>\"", "]"}], "=", 
+    RowBox[{"10", "^", 
+     RowBox[{"-", "4"}]}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"cfun", "=", 
+    RowBox[{"NDSolveValue", "[", 
+     RowBox[{
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"MassTransportPDEComponent", "[", 
+         RowBox[{"vars", ",", "pars"}], "]"}], ",", 
+        RowBox[{"MassImpermeableBoundaryValue", "[", 
+         RowBox[{
+          RowBox[{"x", "==", "0"}], ",", "vars", ",", "pars", ",", 
+          RowBox[{"<|", "|>"}]}], "]"}], ",", 
+        RowBox[{"MassTransferValue", "[", 
+         RowBox[{
+          RowBox[{"x", "==", "2"}], ",", "vars", ",", 
+          RowBox[{"<|", 
+           RowBox[{
+            RowBox[{"\"\<MassTransferCoefficient\>\"", "->", "P2ext"}], ",", 
+            RowBox[{"\"\<AmbientConcentration\>\"", "->", "cExt"}]}], "|>"}], 
+          ",", 
+          RowBox[{"<|", "|>"}]}], "]"}]}], "}"}], ",", 
+      RowBox[{"c", "[", "x", "]"}], ",", 
+      RowBox[{
+       RowBox[{"{", "x", "}"}], "\[Element]", 
+       RowBox[{"Interval", "[", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "2"}], "}"}], "]"}]}]}], "]"}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{"Plot", "[", 
+  RowBox[{
+   RowBox[{"cfun", "[", "x", "]"}], ",", 
+   RowBox[{"{", 
+    RowBox[{"x", ",", "0", ",", "2"}], "}"}]}], "]"}]}], "Input",
+ CellChangeTimes->{{3.9699508669773426`*^9, 3.9699508669773426`*^9}},
+ CellLabel->
+  "In[620]:=",ExpressionUUID->"ae42043d-1220-dd40-9f16-b7999f0626bf"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"vars", "=", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"c", "[", "x", "]"}], ",", 
+     RowBox[{"{", "x", "}"}]}], "}"}]}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"\[CapitalOmega]", "=", 
+   RowBox[{"Interval", "[", 
+    RowBox[{"{", 
+     RowBox[{"0", ",", "1"}], "}"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"cfun", "=", 
+    RowBox[{"NDSolveValue", "[", 
+     RowBox[{
+      RowBox[{"[", 
+       RowBox[{
+        RowBox[{"MassTransportPDEComponent", "[", 
+         RowBox[{"vars", ",", 
+          RowBox[{"<|", 
+           RowBox[{
+            RowBox[{"\"\<DiffusionCoefficient\>\"", "->", "0.025"}], ",", 
+            RowBox[{"\"\<Reaction\>\"", "->", 
+             RowBox[{"(", 
+              RowBox[{
+               RowBox[{"-", "2"}], " ", 
+               RowBox[{"c", "[", "x", "]"}]}], ")"}]}]}], "|>"}]}], "]"}], ",", 
+        RowBox[{"MassImpermeableBoundaryValue", "[", 
+         RowBox[{
+          RowBox[{"x", "==", "0"}], ",", "vars", ",", 
+          RowBox[{"<|", "|>"}], ",", 
+          RowBox[{"<|", "|>"}]}], "]"}], ",", 
+        RowBox[{"MassTransferValue", "[", 
+         RowBox[{
+          RowBox[{"x", "==", "1"}], ",", "vars", ",", 
+          RowBox[{"<|", 
+           RowBox[{
+            RowBox[{"\"\<MassTransferCoefficient\>\"", "->", "1"}], ",", 
+            RowBox[{"\"\<AmbientConcentration\>\"", "->", "4"}]}], "|>"}], ",", 
+          RowBox[{"<|", "|>"}]}], "]"}]}], "]"}], ",", 
+      RowBox[{"c", "[", "x", "]"}], ",", 
+      RowBox[{
+       RowBox[{"{", "x", "}"}], "\[Element]", "\[CapitalOmega]"}]}], "]"}]}], 
+   ";"}], "\[IndentingNewLine]"}], "\n", 
+ RowBox[{"Plot", "[", 
+  RowBox[{
+   RowBox[{"cfun", "[", "x", "]"}], ",", 
+   RowBox[{"{", 
+    RowBox[{"x", ",", "0", ",", "1"}], "}"}], ",", 
+   RowBox[{"AxesLabel", "->", 
+    RowBox[{"{", 
+     RowBox[{"\"\<x\>\"", ",", "\"\<c\>\""}], "}"}]}]}], 
+  "]"}], "\[IndentingNewLine]"}], "Input",
+ CellChangeTimes->{{3.969951045893318*^9, 3.9699511191399937`*^9}, {
+   3.9699511633111496`*^9, 3.96995116368099*^9}, 3.9699512205556602`*^9, 
+   3.9699513433926296`*^9, {3.9699513821388474`*^9, 3.9699513834202805`*^9}, 
+   3.9699514274249935`*^9, {3.9699514624856377`*^9, 3.969951672249975*^9}, 
+   3.9699517103891144`*^9, {3.969951793691248*^9, 3.9699518419947624`*^9}, {
+   3.969951926313919*^9, 3.9699519275643024`*^9}, {3.969951968277643*^9, 
+   3.9699519746792583`*^9}},
+ CellLabel->
+  "In[618]:=",ExpressionUUID->"ebab1324-aba4-b54f-8c84-a87b841f8640"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"vars", "=", 
+   RowBox[{"{", 
+    RowBox[{
+     RowBox[{"c", "[", "x", "]"}], ",", 
+     RowBox[{"{", "x", "}"}]}], "}"}]}], ";", 
+  RowBox[{"\[CapitalOmega]", "=", 
+   RowBox[{"Interval", "[", 
+    RowBox[{"{", 
+     RowBox[{"0", ",", "1"}], "}"}], "]"}]}], ";", 
+  RowBox[{"gammaleft", "=", 
+   RowBox[{"MassImpermeableBoundaryValue", "[", 
+    RowBox[{
+     RowBox[{"x", "==", "0"}], ",", "vars", ",", 
+     RowBox[{"<|", "|>"}], ",", 
+     RowBox[{"<|", "|>"}]}], "]"}]}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"gammaright", "=", 
+   RowBox[{"MassTransferValue", "[", 
+    RowBox[{
+     RowBox[{"x", "==", "1"}], ",", "vars", ",", 
+     RowBox[{"<|", 
+      RowBox[{
+       RowBox[{"\"\<MassTransferCoefficient\>\"", "->", "1"}], ",", 
+       RowBox[{"\"\<AmbientConcentration\>\"", "->", "4"}]}], "|>"}], ",", 
+     RowBox[{"<|", "|>"}]}], "]"}]}], ";", 
+  RowBox[{"eqn", "=", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"MassTransportPDEComponent", "[", 
+      RowBox[{"vars", ",", 
+       RowBox[{"<|", 
+        RowBox[{
+         RowBox[{"\"\<DiffusionCoefficient\>\"", "->", "0.025"}], ",", 
+         RowBox[{"\"\<Reaction\>\"", "->", 
+          RowBox[{"(", 
+           RowBox[{
+            RowBox[{"-", "2"}], "*", 
+            RowBox[{"c", "[", "x", "]"}]}], ")"}]}]}], "|>"}]}], "]"}], "==", 
+     RowBox[{"gammaleft", "+", 
+      RowBox[{"gammaright", " ", "cfun"}]}]}], "=", 
+    RowBox[{"NDSolveValue", "[", 
+     RowBox[{
+      RowBox[{"{", "eqn", "}"}], ",", "c", ",", 
+      RowBox[{"x", "\[Element]", "\[CapitalOmega]"}]}], "]"}]}]}], ";", 
+  RowBox[{"Plot", "[", 
+   RowBox[{
+    RowBox[{"cfun", "[", "x", "]"}], ",", 
+    RowBox[{"x", "\[Element]", "\[CapitalOmega]"}], ",", 
+    RowBox[{"AxesLabel", "->", 
+     RowBox[{"{", 
+      RowBox[{"\"\<x\>\"", ",", "\"\<c\>\""}], "}"}]}]}], "]"}]}]}], "Input",
+ CellChangeTimes->{{3.9699519906789017`*^9, 3.969952004701601*^9}},
+ CellLabel->
+  "In[635]:=",ExpressionUUID->"80ba1b01-2ec5-9c45-8a33-85830f41041b"]
+},
+WindowSize->{940.5, 507},
+WindowMargins->{{Automatic, -5.25}, {Automatic, 0}},
+FrontEndVersion->"14.3 for Microsoft Windows (64-bit) (July 8, 2025)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"7f53185f-98f0-6540-910a-a856a0749da1"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[554, 20, 582, 11, 66, "Input",ExpressionUUID->"bbca52f9-b243-764d-a437-a17e0b8c33c5"],
+Cell[1139, 33, 156, 3, 28, "Input",ExpressionUUID->"cbbbabfb-8d00-3a47-83a5-340a8a7f655c"],
+Cell[1298, 38, 156, 3, 28, "Input",ExpressionUUID->"2a6a8f2c-f793-db49-b6e4-bc9891d7800e"],
+Cell[1457, 43, 146, 2, 28, "Input",ExpressionUUID->"f632945f-b07a-9444-8a68-fad5daf2b841"],
+Cell[1606, 47, 156, 3, 28, "Input",ExpressionUUID->"8c84a44a-ec23-ab4d-becb-2fcede6b49c2"],
+Cell[1765, 52, 167, 2, 28, "Input",ExpressionUUID->"0a45b09a-035e-c249-9d7a-6917017d2048"],
+Cell[1935, 56, 156, 3, 28, "Input",ExpressionUUID->"51074729-1641-944f-8bd7-d074b8287c19"],
+Cell[2094, 61, 457, 13, 47, "Input",ExpressionUUID->"b9209713-dcec-614f-b0f6-88c2a13160c5"],
+Cell[2554, 76, 324, 8, 28, "Input",ExpressionUUID->"4185a9e9-21cc-6945-96dd-f9056df9c5be"],
+Cell[2881, 86, 435, 9, 28, "Input",ExpressionUUID->"d766c920-01dc-224a-89e7-9b983c0c905c"],
+Cell[3319, 97, 661, 15, 28, "Input",ExpressionUUID->"f8078816-6b5c-4e45-a098-b024aa7ce71b"],
+Cell[3983, 114, 297, 5, 28, "Input",ExpressionUUID->"207c6423-39df-cc42-bd8c-cf0deb574f8b"],
+Cell[4283, 121, 171, 3, 47, "Input",ExpressionUUID->"6624c4a0-df32-f741-8a04-d92bf335908d"],
+Cell[4457, 126, 253, 4, 28, "Input",ExpressionUUID->"437e9bb0-a8e5-754a-9fbc-00088fe235c9"],
+Cell[4713, 132, 746, 18, 28, "Input",ExpressionUUID->"1b339da8-69d2-0b4d-82ac-fbf2a204e894"],
+Cell[5462, 152, 199, 4, 28, "Input",ExpressionUUID->"81b8e4a9-4e8f-cb40-b48e-68fbf3770a94"],
+Cell[5664, 158, 1971, 58, 199, "Input",ExpressionUUID->"9ed187f7-2af1-7c4c-a83f-13b2319cf9eb"],
+Cell[7638, 218, 1935, 55, 218, "Input",ExpressionUUID->"ae42043d-1220-dd40-9f16-b7999f0626bf"],
+Cell[9576, 275, 2511, 63, 161, "Input",ExpressionUUID->"ebab1324-aba4-b54f-8c84-a87b841f8640"],
+Cell[12090, 340, 2015, 55, 142, "Input",ExpressionUUID->"80ba1b01-2ec5-9c45-8a33-85830f41041b"]
+}
+]
+*)
+
+(* End of internal cache information *)
+

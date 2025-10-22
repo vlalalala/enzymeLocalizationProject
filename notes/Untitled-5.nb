@@ -1,0 +1,402 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 14.3' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[     16158,        392]
+NotebookOptionsPosition[     15190,        370]
+NotebookOutlinePosition[     15587,        386]
+CellTagsIndexPosition[     15544,        383]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell[BoxData[{
+ RowBox[{"ClearAll", "[", "\"\<Global`*\>\"", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Clear", "[", 
+   RowBox[{"x", ",", "u"}], "]"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"diff", "=", "1.0"}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{"k", "=", "0.5"}], ";"}], "\n", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"P12", "=", "2.0"}], ";"}], "  ", 
+  RowBox[{"(*", 
+   RowBox[{
+    RowBox[{"permeability", " ", "at", " ", "x"}], "=", "1"}], "*)"}]}], "\n", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"P2ext", "=", "1.0"}], ";"}], " ", 
+  RowBox[{"(*", 
+   RowBox[{
+    RowBox[{"permeability", " ", "at", " ", "x"}], "=", "2"}], "*)"}]}], "\n", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"uExt", "=", "1.0"}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"\[CapitalOmega]", "=", 
+    RowBox[{"Interval", "[", 
+     RowBox[{"{", 
+      RowBox[{"0", ",", "2"}], "}"}], "]"}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"vars", "=", 
+    RowBox[{"{", 
+     RowBox[{
+      RowBox[{"u", "[", "x", "]"}], ",", 
+      RowBox[{"{", "x", "}"}]}], "}"}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"uComp", "=", 
+    RowBox[{"MassTransportPDEComponent", "[", 
+     RowBox[{"vars", ",", 
+      RowBox[{"<|", 
+       RowBox[{
+        RowBox[{"\"\<DiffusionCoefficient\>\"", "->", "diff"}], ",", 
+        RowBox[{"\"\<Reaction\>\"", "->", 
+         RowBox[{
+          RowBox[{"-", "k"}], "*", 
+          RowBox[{"u", "[", "x", "]"}]}]}]}], "|>"}]}], "]"}]}], ";"}], 
+  "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"bcs", "=", 
+    RowBox[{"{", 
+     RowBox[{
+      RowBox[{"MassImpermeableBoundaryValue", "[", 
+       RowBox[{
+        RowBox[{"x", "==", "0"}], ",", "vars", ",", 
+        RowBox[{"<|", "|>"}], ",", 
+        RowBox[{"<|", "|>"}]}], "]"}], ",", 
+      RowBox[{"MassTransferValue", "[", 
+       RowBox[{
+        RowBox[{"x", "==", "1"}], ",", "vars", ",", 
+        RowBox[{"<|", 
+         RowBox[{
+          RowBox[{"\"\<MassTransferCoefficient\>\"", "->", "P12"}], ",", 
+          RowBox[{"\"\<AmbientConcentration\>\"", "->", "Automatic"}]}], 
+         "|>"}], ",", 
+        RowBox[{"<|", "|>"}]}], "]"}], ",", 
+      RowBox[{"MassTransferValue", "[", 
+       RowBox[{
+        RowBox[{"x", "==", "2"}], ",", "vars", ",", 
+        RowBox[{"<|", 
+         RowBox[{
+          RowBox[{"\"\<MassTransferCoefficient\>\"", "->", "P2ext"}], ",", 
+          RowBox[{"\"\<AmbientConcentration\>\"", "->", "uExt"}]}], "|>"}], ",", 
+        RowBox[{"<|", "|>"}]}], "]"}]}], "}"}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"sol", "=", 
+    RowBox[{"NDSolveValue", "[", 
+     RowBox[{
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"uComp", "==", "0"}], ",", "bcs"}], "}"}], ",", 
+      RowBox[{"(*", " ", 
+       RowBox[{
+        RowBox[{"<", 
+         RowBox[{
+          RowBox[{"--", "boundary"}], " ", "conditions", " ", "are", " ", 
+          "listed", " ", "separately"}]}], ",", 
+        RowBox[{"not", " ", "as", " ", "equations"}]}], "*)"}], 
+      RowBox[{"u", "[", "x", "]"}], ",", 
+      RowBox[{
+       RowBox[{"{", "x", "}"}], "\[Element]", "\[CapitalOmega]"}], ",", 
+      RowBox[{"Method", "->", 
+       RowBox[{"{", 
+        RowBox[{"\"\<FiniteElement\>\"", ",", 
+         RowBox[{"\"\<MeshOptions\>\"", "->", 
+          RowBox[{"{", 
+           RowBox[{"\"\<MaxCellMeasure\>\"", "->", "0.02"}], "}"}]}]}], 
+        "}"}]}]}], "]"}]}], ";"}], "\n"}], "\[IndentingNewLine]", 
+ RowBox[{"Plot", "[", 
+  RowBox[{
+   RowBox[{"sol", "[", "x", "]"}], ",", 
+   RowBox[{"{", 
+    RowBox[{"x", ",", "0", ",", "2"}], "}"}], ",", 
+   RowBox[{"PlotLabel", "->", "\"\<Single-species steady-state\>\""}], ",", 
+   RowBox[{"PlotLegends", "->", 
+    RowBox[{"{", "\"\<u(x)\>\"", "}"}]}]}], "]"}]}], "Input",
+ CellChangeTimes->{{3.969949672640936*^9, 3.969949672640936*^9}},
+ CellLabel->
+  "In[306]:=",ExpressionUUID->"2157d8b2-e232-7f45-ac19-008ca000151b"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "NDSolveValue", "deqn", 
+   "\"Equation or list of equations expected instead of \
+\\!\\(\\*RowBox[{\\\"NeumannValue\\\", \\\"[\\\", \
+RowBox[{RowBox[{RowBox[{RowBox[{\\\"NeumannBoundaryUnitNormal\\\", \\\"[\\\", \
+RowBox[{\\\"{\\\", \\\"x\\\", \\\"}\\\"}], \\\"]\\\"}], \\\".\\\", RowBox[{\\\
+\"{\\\", \\\"0\\\", \\\"}\\\"}]}], \\\" \\\", RowBox[{\\\"u\\\", \\\"[\\\", \
+\\\"x\\\", \\\"]\\\"}]}], \\\",\\\", RowBox[{\\\"x\\\", \\\"\[Equal]\\\", \
+\\\"0\\\"}]}], \\\"]\\\"}]\\) in the first argument \
+\\!\\(\\*RowBox[{\\\"{\\\", \
+RowBox[{RowBox[{TemplateBox[List[RowBox[List[\\\"(\\\", \
+RowBox[List[RowBox[List[\\\"{\\\", RowBox[List[\\\"{\\\", RowBox[List[\\\"-\\\
+\", \\\"1.`\\\"]], \\\"}\\\"]], \\\"}\\\"]], \\\".\\\", \
+TemplateBox[List[RowBox[List[\\\"u\\\", \\\"[\\\", \\\"x\\\", \\\"]\\\"]], \
+RowBox[List[\\\"{\\\", \\\"x\\\", \\\"}\\\"]], \\\"Inactive\\\"], \
+\\\"InactiveGrad\\\", Rule[SyntaxForm, Del]]]], \\\")\\\"]], \
+RowBox[List[\\\"{\\\", \\\"x\\\", \\\"}\\\"]], \\\"Inactive\\\"], \
+\\\"InactiveDiv\\\", Rule[SyntaxForm, CenterDot]], \\\"\[Equal]\\\", \
+\\\"0\\\"}], \\\",\\\", RowBox[{\\\"{\\\", RowBox[{RowBox[{\\\"NeumannValue\\\
+\", \\\"[\\\", \
+RowBox[{RowBox[{RowBox[{RowBox[{\\\"NeumannBoundaryUnitNormal\\\", \\\"[\\\", \
+RowBox[{\\\"{\\\", \\\"x\\\", \\\"}\\\"}], \\\"]\\\"}], \\\".\\\", RowBox[{\\\
+\"{\\\", \\\"0\\\", \\\"}\\\"}]}], \\\" \\\", RowBox[{\\\"u\\\", \\\"[\\\", \
+\\\"x\\\", \\\"]\\\"}]}], \\\",\\\", RowBox[{\\\"x\\\", \\\"\[Equal]\\\", \
+\\\"0\\\"}]}], \\\"]\\\"}], \\\",\\\", RowBox[{\\\"NeumannValue\\\", \
+\\\"[\\\", RowBox[{RowBox[{\\\"2.`\\\", \\\" \\\", RowBox[{\\\"(\\\", \
+RowBox[{\\\"Automatic\\\", \\\"-\\\", RowBox[{\\\"1.`\\\", \\\" \\\", \
+RowBox[{\\\"u\\\", \\\"[\\\", \\\"x\\\", \\\"]\\\"}]}]}], \\\")\\\"}]}], \
+\\\",\\\", RowBox[{\\\"x\\\", \\\"\[Equal]\\\", \\\"1\\\"}]}], \\\"]\\\"}], \
+\\\",\\\", RowBox[{\\\"NeumannValue\\\", \\\"[\\\", RowBox[{RowBox[{\\\"1.`\\\
+\", \\\" \\\", RowBox[{\\\"(\\\", RowBox[{RowBox[{\\\"1.`\\\", \\\"\
+\[VeryThinSpace]\\\"}], \\\"-\\\", RowBox[{\\\"1.`\\\", \\\" \\\", RowBox[{\\\
+\"u\\\", \\\"[\\\", \\\"x\\\", \\\"]\\\"}]}]}], \\\")\\\"}]}], \\\",\\\", \
+RowBox[{\\\"x\\\", \\\"\[Equal]\\\", \\\"2\\\"}]}], \\\"]\\\"}]}], \
+\\\"}\\\"}]}], \\\"}\\\"}]\\).\"", 2, 317, 156, 23382197450305515197, "Local"},
+  "MessageTemplate",
+  BaseStyle->"MSG"]], "Message",
+ CellChangeTimes->{3.9699496744134083`*^9, 3.9699497514786224`*^9},
+ CellLabel->
+  "During evaluation of \
+In[306]:=",ExpressionUUID->"f6024c17-2a31-304b-a78e-caeeabe920a0"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "NDSolveValue", "dsvar", 
+   "\"\\!\\(\\*RowBox[{\\\"True\\\"}]\\) cannot be used as a variable.\"", 2, 
+   318, 157, 23382197450305515197, "Local"},
+  "MessageTemplate",
+  BaseStyle->"MSG"]], "Message",
+ CellChangeTimes->{3.9699496744134083`*^9, 3.969949751577627*^9},
+ CellLabel->
+  "During evaluation of \
+In[306]:=",ExpressionUUID->"76c037ec-a45e-5443-ad6c-1129d2825f2c"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "NDSolveValue", "dsvar", 
+   "\"\\!\\(\\*RowBox[{\\\"True\\\"}]\\) cannot be used as a variable.\"", 2, 
+   318, 158, 23382197450305515197, "Local"},
+  "MessageTemplate",
+  BaseStyle->"MSG"]], "Message",
+ CellChangeTimes->{3.9699496744134083`*^9, 3.969949751631624*^9},
+ CellLabel->
+  "During evaluation of \
+In[306]:=",ExpressionUUID->"c1e25db4-e779-7542-89aa-441b4c678564"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "NDSolveValue", "dsvar", 
+   "\"\\!\\(\\*RowBox[{\\\"True\\\"}]\\) cannot be used as a variable.\"", 2, 
+   318, 159, 23382197450305515197, "Local"},
+  "MessageTemplate",
+  BaseStyle->"MSG"]], "Message",
+ CellChangeTimes->{3.9699496744134083`*^9, 3.9699497516376247`*^9},
+ CellLabel->
+  "During evaluation of \
+In[306]:=",ExpressionUUID->"c507854f-e9ca-e549-a554-e9792b0523f2"],
+
+Cell[BoxData[
+ TemplateBox[{
+  "General", "stop", 
+   "\"Further output of \\!\\(\\*StyleBox[RowBox[{\\\"NDSolveValue\\\", \
+\\\"::\\\", \\\"dsvar\\\"}], \\\"MessageName\\\"]\\) will be suppressed \
+during this calculation.\"", 2, 318, 160, 23382197450305515197, "Local"},
+  "MessageTemplate",
+  BaseStyle->"MSG"]], "Message",
+ CellChangeTimes->{3.9699496744134083`*^9, 3.969949751644623*^9},
+ CellLabel->
+  "During evaluation of \
+In[306]:=",ExpressionUUID->"969c4a64-b558-7b4b-8370-6884b9a31407"],
+
+Cell[BoxData[
+ TemplateBox[{
+   GraphicsBox[{{{}, {}}}, {
+    DisplayFunction -> Identity, PlotInteractivity :> True, DisplayFunction -> 
+     Identity, PlotInteractivity :> True, 
+     DefaultBaseStyle -> {"PlotGraphics", "Graphics"}, DisplayFunction -> 
+     Identity, Ticks -> {Automatic, Automatic}, AxesOrigin -> {0, 0}, 
+     FrameTicks -> {{Automatic, Automatic}, {Automatic, Automatic}}, 
+     GridLines -> {None, None}, PlotInteractivity :> True, 
+     DefaultBaseStyle -> {"PlotGraphics", "Graphics"}, DisplayFunction -> 
+     Identity, PlotRangePadding -> {{
+        Scaled[0.02], 
+        Scaled[0.02]}, {
+        Scaled[0.05], 
+        Scaled[0.05]}}, PlotRangeClipping -> True, ImagePadding -> All, 
+     PlotInteractivity :> True, DisplayFunction -> Identity, 
+     PlotInteractivity :> True, 
+     DefaultBaseStyle -> {"PlotGraphics", "Graphics"}, AspectRatio -> 
+     NCache[GoldenRatio^(-1), 0.6180339887498948], Axes -> {True, True}, 
+     AxesLabel -> {None, None}, AxesOrigin -> {0, 0}, DisplayFunction :> 
+     Identity, Frame -> {{False, False}, {False, False}}, 
+     FrameLabel -> {{None, None}, {None, None}}, 
+     FrameTicks -> {{Automatic, Automatic}, {Automatic, Automatic}}, 
+     GridLines -> {None, None}, GridLinesStyle -> Directive[
+       GrayLevel[0.5, 0.4]], 
+     Method -> {
+      "DefaultBoundaryStyle" -> Automatic, 
+       "DefaultGraphicsInteraction" -> {
+        "Version" -> 1.2, "TrackMousePosition" -> {True, False}, 
+         "Effects" -> {
+          "Highlight" -> {"ratio" -> 2}, "HighlightPoint" -> {"ratio" -> 2}, 
+           "Droplines" -> {
+            "freeformCursorMode" -> True, 
+             "placement" -> {"x" -> "All", "y" -> "None"}}}}, 
+       "DefaultMeshStyle" -> AbsolutePointSize[6], "ScalingFunctions" -> None,
+        "CoordinatesToolOptions" -> {"DisplayFunction" -> ({
+           (Identity[#]& )[
+            Part[#, 1]], 
+           (Identity[#]& )[
+            Part[#, 2]]}& ), "CopiedValueFunction" -> ({
+           (Identity[#]& )[
+            Part[#, 1]], 
+           (Identity[#]& )[
+            Part[#, 2]]}& )}}, PlotLabel -> 
+     FormBox["\"Single-species steady-state\"", TraditionalForm], 
+     PlotRange -> {{0, 2}, {0., 0.}}, PlotRangeClipping -> True, 
+     PlotRangePadding -> {{
+        Scaled[0.02], 
+        Scaled[0.02]}, {
+        Scaled[0.02], 
+        Scaled[0.02]}}, Ticks -> {Automatic, Automatic}}], 
+   FormBox[
+    FormBox[
+     TemplateBox[{"\"u(x)\""}, "LineLegend", DisplayFunction -> (FormBox[
+        StyleBox[
+         StyleBox[
+          PaneBox[
+           TagBox[
+            GridBox[{{
+               TagBox[
+                GridBox[{{
+                   GraphicsBox[{{
+                    Directive[
+                    EdgeForm[
+                    Directive[
+                    Opacity[0.3], 
+                    GrayLevel[0]]], 
+                    PointSize[0.5], 
+                    Opacity[1.], 
+                    RGBColor[0.24, 0.6, 0.8], 
+                    AbsoluteThickness[2]], {
+                    LineBox[{{0, 12.5}, {20, 12.5}}]}}, {
+                    Directive[
+                    EdgeForm[
+                    Directive[
+                    Opacity[0.3], 
+                    GrayLevel[0]]], 
+                    PointSize[0.5], 
+                    Opacity[1.], 
+                    RGBColor[0.24, 0.6, 0.8], 
+                    AbsoluteThickness[2]], {}}}, AspectRatio -> Full, 
+                    ImageSize -> {20, 12.5}, PlotRangePadding -> None, 
+                    ImagePadding -> Automatic, 
+                    BaselinePosition -> (Scaled[0.18000000000000002`] -> 
+                    Baseline)], #}}, 
+                 GridBoxAlignment -> {
+                  "Columns" -> {Center, Left}, "Rows" -> {{Baseline}}}, 
+                 AutoDelete -> False, 
+                 GridBoxDividers -> {
+                  "Columns" -> {{False}}, "Rows" -> {{False}}}, 
+                 GridBoxItemSize -> {"Columns" -> {{All}}, "Rows" -> {{All}}},
+                  GridBoxSpacings -> {
+                  "Columns" -> {{0.5}}, "Rows" -> {{0.8}}}], "Grid"]}}, 
+             GridBoxAlignment -> {"Columns" -> {{Left}}, "Rows" -> {{Top}}}, 
+             AutoDelete -> False, 
+             GridBoxItemSize -> {
+              "Columns" -> {{Automatic}}, "Rows" -> {{Automatic}}}, 
+             GridBoxSpacings -> {"Columns" -> {{1}}, "Rows" -> {{0}}}], 
+            "Grid"], Alignment -> Left, AppearanceElements -> None, 
+           ImageMargins -> {{5, 5}, {5, 5}}, ImageSizeAction -> 
+           "ResizeToFit"], LineIndent -> 0, StripOnInput -> False], {
+         FontFamily -> "Arial"}, Background -> Automatic, StripOnInput -> 
+         False], TraditionalForm]& ), 
+      InterpretationFunction :> (RowBox[{"LineLegend", "[", 
+         RowBox[{
+           RowBox[{"{", 
+             RowBox[{"Directive", "[", 
+               RowBox[{
+                 RowBox[{"Opacity", "[", "1.`", "]"}], ",", 
+                 
+                 TemplateBox[<|"color" -> RGBColor[0.24, 0.6, 0.8]|>, 
+                  "RGBColorSwatchTemplate"], ",", 
+                 RowBox[{"AbsoluteThickness", "[", "2", "]"}]}], "]"}], "}"}],
+            ",", 
+           RowBox[{"{", #, "}"}], ",", 
+           RowBox[{"LegendMarkers", "\[Rule]", "None"}], ",", 
+           RowBox[{"LabelStyle", "\[Rule]", 
+             RowBox[{"{", "}"}]}], ",", 
+           RowBox[{"LegendLayout", "\[Rule]", "\"Column\""}]}], "]"}]& ), 
+      Editable -> True], TraditionalForm], TraditionalForm]},
+  "Legended",
+  DisplayFunction->(GridBox[{{
+      TagBox[
+       ItemBox[
+        PaneBox[
+         TagBox[#, "SkipImageSizeLevel"], Alignment -> {Center, Baseline}, 
+         BaselinePosition -> Baseline], DefaultBaseStyle -> "Labeled"], 
+       "SkipImageSizeLevel"], 
+      ItemBox[#2, DefaultBaseStyle -> "LabeledLabel"]}}, 
+    GridBoxAlignment -> {"Columns" -> {{Center}}, "Rows" -> {{Center}}}, 
+    AutoDelete -> False, GridBoxItemSize -> Automatic, 
+    BaselinePosition -> {1, 1}]& ),
+  Editable->True,
+  InterpretationFunction->(RowBox[{"Legended", "[", 
+     RowBox[{#, ",", 
+       RowBox[{"Placed", "[", 
+         RowBox[{#2, ",", "After"}], "]"}]}], "]"}]& )]], "Output",
+ CellChangeTimes->{3.9699496746387177`*^9, 3.969949751810623*^9},
+ CellLabel->
+  "Out[318]=",ExpressionUUID->"2c4e15c4-0e9b-e345-822e-7a86aecaba98"]
+}, Open  ]]
+},
+WindowSize->{511.5, 507},
+WindowMargins->{{0, Automatic}, {Automatic, 0}},
+FrontEndVersion->"14.3 for Microsoft Windows (64-bit) (July 8, 2025)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"1178332a-829a-7b4c-b744-2ba4b6b15f82"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[576, 22, 3970, 112, 675, "Input",ExpressionUUID->"2157d8b2-e232-7f45-ac19-008ca000151b"],
+Cell[4549, 136, 2561, 41, 116, "Message",ExpressionUUID->"f6024c17-2a31-304b-a78e-caeeabe920a0"],
+Cell[7113, 179, 406, 10, 22, "Message",ExpressionUUID->"76c037ec-a45e-5443-ad6c-1129d2825f2c"],
+Cell[7522, 191, 406, 10, 22, "Message",ExpressionUUID->"c1e25db4-e779-7542-89aa-441b4c678564"],
+Cell[7931, 203, 408, 10, 22, "Message",ExpressionUUID->"c507854f-e9ca-e549-a554-e9792b0523f2"],
+Cell[8342, 215, 498, 11, 40, "Message",ExpressionUUID->"969c4a64-b558-7b4b-8370-6884b9a31407"],
+Cell[8843, 228, 6331, 139, 243, "Output",ExpressionUUID->"2c4e15c4-0e9b-e345-822e-7a86aecaba98"]
+}, Open  ]]
+}
+]
+*)
+
+(* End of internal cache information *)
+

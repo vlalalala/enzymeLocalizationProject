@@ -28,6 +28,8 @@ def pickle_load_binary(path):
         loaded_variable = pickle.load(f)
     return loaded_variable
 
+def closest_value(my_list, target):
+    return min(my_list, key=lambda x: abs(x - target))
 
 def as_list(value, type_cast=str):
     """

@@ -54,6 +54,12 @@ class LocationTuple:
         else:
             return False
 
+def define_region_list(region_string:str, num_regions: int):
+    list_of_regions = ast.literal_eval(region_string)
+    if all(0<=region<num_regions for region in list_of_regions):
+        return list_of_regions
+    raise ValueError("The region string", region_string, "does not have a valid region.")
+
 def define_tuple_of_locationPairTuples_from_string(location_string: str):
     list_of_location_tuples = ast.literal_eval(location_string)
     # Converts list of tuples to list of objects of class LocationTuple
