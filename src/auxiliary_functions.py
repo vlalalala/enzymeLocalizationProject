@@ -2,6 +2,8 @@ import numpy as np
 from math import gcd
 import pandas as pd
 import ast
+from scipy.sparse import csr_matrix, coo_matrix
+import csv
 
 class Ratio:
     """Auxiliary class. Defines a ratio of a:b """
@@ -124,3 +126,41 @@ def print_network_info(graph):
         print(f"    ↪ types: {type(u)}, {type(v)}")
         print(f"    ↪ attrs: {attrs}")
 
+def save_matrix_as_sparse_txt(matrix: np.ndarray, filepath: str):
+    """
+    Save a 2D NumPy array as a sparse matrix in .txt format (row, col, value).
+    Only nonzero entries are stored.
+    """
+    # Convert to CSR sparse matrix
+    sparse_mat = csr_matrix(matrix)
+    coo = sparse_mat.tocoo()
+    # Stack row, col, data
+    data = np.column_stack((coo.row, coo.col, coo.data))
+    # Save to .txt
+    np.savetxt(filepath+".txt", data, fmt=["%d", "%d", "%.15e"],
+               header="row\tcol\tvalue", delimiter="\t", comments='')
+
+def convert_sparse_txt_to_csv(filepath_txt: str, filepath_csv: str):
+    """
+    Read a sparse .txt file saved in (row, col, value) format
+    and create a full CSV of the dense matrix.
+    """
+    # Load the sparse txt file, skipping header
+    coo_data = np.loadtxt(filepath_txt, skiprows=1)
+    if coo_data.ndim == 1:  # handle single nonzero element
+        coo_data = coo_data.reshape(1,3)
+    
+    rows, cols, vals = coo_data.T
+    rows = rows.astype(int)
+    cols = cols.astype(int)
+    
+    # Determine matrix size
+    nrows = rows.max() + 1
+    ncols = cols.max() + 1
+    
+    # Build dense matrix
+    dense_mat = np.zeros((nrows, ncols))
+    dense_mat[rows, cols] = vals
+    
+    # Save as CSV
+    np.savetxt(filepath_csv+".csv", dense_mat, delimiter=",", fmt="%.6e")

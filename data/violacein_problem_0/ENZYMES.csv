@@ -1,5 +1,5 @@
 ﻿name,concentration,regions
-VioA,25e-2,"[0,1]"
+VioA,25e-2,[0]
 VioB,20e-2,[1]
 VioC,25e-3,[2]
 VioD,25e-3,[0]

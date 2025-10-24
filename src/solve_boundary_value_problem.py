@@ -1,12 +1,14 @@
 #%%
 import sys
 import os
+import math
 import numpy as np
 from itertools import count
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 from auxiliary_functions_using_standard_library import pickle_load_binary, closest_value, dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
+from auxiliary_functions import save_matrix_as_sparse_txt
 
 def build_point_ids_dict() -> dict:
     """ Build a nested dict mapping (region, mesh_point, species) to unique IDs.
@@ -103,7 +105,19 @@ def build_point_neighbor_dict() -> dict:
                     neighbors_dict[(region_idx, n)].append( (region_idx+1, 0) )
     return neighbors_dict
 
-
+def return_saveable_species_concentrations_dict(original_species_concentrations_dict):
+    """ Returns a dictionary equal to species_concentrations, but with species.name as keys
+    to be able to save them as a .json file
+    """
+    species_concentrations_saveable_keys = {
+        region_idx : {
+            mesh_point_idx : {
+                species.name : original_species_concentrations_dict[region_idx][mesh_point_idx][species]
+                for species in REACTION_NETWORK.species}
+            for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
+        for region_idx in range(NUM_REGIONS)
+    }
+    return species_concentrations_saveable_keys
 
 def calculate_reaction_term(region, n, species):
     """ Gives the reaction term for F_i.
@@ -131,7 +145,8 @@ def calculate_reaction_partial_derivative(reaction_to_check, partial_derivative_
         derivative *= -1
     return derivative
 
-def solve_newton(max_newton_iterations):
+def solve_newton(max_newton_iterations, print_info=False):
+    du_norm = np.inf
     for iter in range(max_newton_iterations):
         F = np.zeros(NUM_POINTS)
         J = np.zeros((NUM_POINTS, NUM_POINTS))
@@ -142,21 +157,23 @@ def solve_newton(max_newton_iterations):
             point_type = POINT_INFOS[region][n]
             # CONSTRUCT F_i
             # FOR EACH POINT WITHIN THE BULK
-            if point_type == "i": 
+            if point_type == "i":
                 (_, left_n), (_, center_n), (_, right_n) = NEIGHBORS[(region, n)]
                 c_left = species_concentrations[region][left_n][species]
                 c_center = species_concentrations[region][center_n][species]
                 c_right = species_concentrations[region][right_n][species]
-                diffusion_term = r**2 / DELTA_R**2 * (c_right - 2* c_center + c_left) + r /DELTA_R * (c_right - c_left)
+                diffusion_term = D * (1/ DELTA_R**2 * (c_right - 2* c_center + c_left) + 1 /(DELTA_R*r) * (c_right - c_left))
                 reaction_term = calculate_reaction_term(region, center_n, species)
-                F[i] = diffusion_term + r**2/D * reaction_term
+                F[i] = diffusion_term + reaction_term
                 # FILL IN J_ij
                 for j in range(NUM_POINTS):
                     (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                     if j_region == region and j_n == n and j_species == species: # j == i, basically
-                        J[i][j] += r**2 / DELTA_R**2 * (-2)
-                    elif j_region==region and (j_n==left_n or j==right_n) and j_species == species: # same species, right or left 
-                        J[i][j] += r**2 / DELTA_R**2 + r/DELTA_R
+                        J[i][j] += D * (1/DELTA_R**2 * (-2))
+                    elif j_region==region and j==right_n and j_species == species: # same species, right or left 
+                        J[i][j] += D * (1/DELTA_R**2 + 1/(DELTA_R*r))
+                    elif j_region==region and j==left_n and j_species == species: # same species, right or left 
+                        J[i][j] += D * (1/DELTA_R**2 - 1/(DELTA_R*r))
                     if j_region == region and j_n == center_n: # if on the same place but not necessarily the same species
                         for reaction in species.as_reactant_in + species.as_product_in:
                             if j_species in [reaction.start_species, reaction.end_species]:
@@ -166,14 +183,14 @@ def solve_newton(max_newton_iterations):
                     (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
                     c_r0 = species_concentrations[region][r0_n][species]
                     c_r0_neighbor = species_concentrations[region][r0_neighbor_n][species]
-                    diffusion_term = 3 * D / DELTA_R**2 * (c_r0_neighbor - c_r0)
+                    diffusion_term = 3 * D / DELTA_R**2 * 2 * (c_r0_neighbor - c_r0)
                     reaction_term = calculate_reaction_term(region, r0_n, species)
                     F[i] = diffusion_term + reaction_term
                     for j in range(NUM_POINTS):
                         (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        if j_region == region and j_n == n and j_species == species: # j == i, basically
+                        if j_region == region and j_n == 0 and j_species == species: # j == i, basically
                             J[i][j] += -3 * D / DELTA_R**2 * 2
-                        elif j_region == region and j_n == n+1 and j_species == species: # partial derivative to the one on the right
+                        elif j_region == region and j_n == 1 and j_species == species: # partial derivative to the one on the right
                             J[i][j] += 3 * D / DELTA_R**2 * 2
                         if j_region == region and j_n == n: # if on the same place but not necessarily the same species
                             for reaction in species.as_reactant_in + species.as_product_in:
@@ -225,15 +242,29 @@ def solve_newton(max_newton_iterations):
         du = spsolve(J, -F) # tocsr converts to CSR or CSC
         for i in range(len(du)):
             (region, n, species) = REVERSE_POINT_IDS[i]
-            species_concentrations[region][n][species] += du[i]
+            species_concentrations[region][n][species] += ALPHA * du[i]
+        
+        new_du_norm =  np.linalg.norm(du, np.inf)
+        if print_info:
+            print(iter, new_du_norm)
+            iter_string = str(iter).zfill(int(math.log10(max_newton_iterations)+1))
+            plot_steady_state_concentrations(ITERATION_DATA_PATH, iter_string)
+            species_concentrations_saveable_keys = return_saveable_species_concentrations_dict(species_concentrations)
+            dump_json(ITERATION_DATA_PATH,
+                      f".iteration_nr_{iter_string}_concentration",
+                      species_concentrations_saveable_keys
+            )
+            np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F, fmt="%.15e", delimiter="\n")
+            save_matrix_as_sparse_txt(J, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J"))
 
-        # Convergence check
-        if np.linalg.norm(du, np.inf) < 1e-8:
+        if new_du_norm>du_norm:
+            raise ValueError("The du norm increased!")
+        du_norm = new_du_norm
+        if np.linalg.norm(du, np.inf) < 1e-20:
             print(f"Converged in {iter+1} iterations.")
             break
 
-
-def plot_steady_state_concentrations():
+def plot_steady_state_concentrations(folder, iter_string):
     x_values = []
     y_values = {}
     for species_idx, species in enumerate(REACTION_NETWORK.species):
@@ -246,7 +277,7 @@ def plot_steady_state_concentrations():
         y_values[species] = species_y_values
 
     fig, ax = plt.subplots(1,1, figsize = (5,3))
-    for species in REACTION_NETWORK.species:    
+    for species in REACTION_NETWORK.species:
         ax.plot(x_values/max(x_values), y_values[species], label=species.name)
     ax.set_ylabel("concentration / M")
     ax.set_xlabel("relative distance to origin / r/R")
@@ -258,9 +289,9 @@ def plot_steady_state_concentrations():
     )
     for x_value in SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["internal_membrane_relative_radii"]:
         ax.axvline(x_value, linestyle = "--", alpha = 0.5, c = "k")
-    fig.savefig(os.path.join(FOLDER_TO_SOLVE, "solution.png"), dpi = 300, bbox_inches='tight')
+    fig.savefig(os.path.join(folder, f".iteration_nr_{iter_string}_concentration.png"), dpi = 300, bbox_inches='tight')
 
-#%%
+
 if __name__ == "__main__":
     # Load all the information
     FOLDER_TO_SOLVE = sys.argv[1]
@@ -296,13 +327,18 @@ if __name__ == "__main__":
     species_concentrations = {
         region_idx : {
             mesh_point_idx : {
-                species : 0
+                species : 0#species.external_concentration * RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[region_idx]-1]
                 for species in REACTION_NETWORK.species}
             for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
         for region_idx in range(NUM_REGIONS)
     }
     # Step 5: Run solver and save result; plot
-    solve_newton(max_newton_iterations = 30)
+    ALPHA = 1
+
+    ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
+    if not os.path.exists(ITERATION_DATA_PATH):
+        os.makedirs(ITERATION_DATA_PATH)
+    solve_newton(100, True)
     # Modify species_concentrations such that we save the species through species.name
     species_concentrations_saveable_keys = {
         region_idx : {
@@ -313,6 +349,6 @@ if __name__ == "__main__":
         for region_idx in range(NUM_REGIONS)
     }
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_saveable_keys)
-    plot_steady_state_concentrations()
+    #plot_steady_state_concentrations()
 
 
