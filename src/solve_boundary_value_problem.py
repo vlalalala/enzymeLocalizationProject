@@ -5,6 +5,7 @@ import math
 import numpy as np
 from itertools import count
 from scipy.sparse.linalg import spsolve
+from scipy.sparse import lil_matrix, csr_matrix
 import matplotlib.pyplot as plt
 from auxiliary_functions_using_standard_library import pickle_load_binary, closest_value, dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
@@ -149,7 +150,7 @@ def solve_newton(max_newton_iterations, print_info=False):
     du_norm = np.inf
     for iter in range(max_newton_iterations):
         F = np.zeros(NUM_POINTS)
-        J = np.zeros((NUM_POINTS, NUM_POINTS))
+        J = lil_matrix((NUM_POINTS, NUM_POINTS))# np.zeros((NUM_POINTS, NUM_POINTS)) 
         for i in range(NUM_POINTS):
             (region, n, species) = REVERSE_POINT_IDS[i]
             r = RADII[region][n]
@@ -169,15 +170,15 @@ def solve_newton(max_newton_iterations, print_info=False):
                 for j in range(NUM_POINTS):
                     (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                     if j_region == region and j_n == n and j_species == species: # j == i, basically
-                        J[i][j] += D * (1/DELTA_R**2 * (-2))
+                        J[i,j] += D * (1/DELTA_R**2 * (-2))
                     elif j_region==region and j==right_n and j_species == species: # same species, right or left 
-                        J[i][j] += D * (1/DELTA_R**2 + 1/(DELTA_R*r))
+                        J[i,j] += D * (1/DELTA_R**2 + 1/(DELTA_R*r))
                     elif j_region==region and j==left_n and j_species == species: # same species, right or left 
-                        J[i][j] += D * (1/DELTA_R**2 - 1/(DELTA_R*r))
+                        J[i,j] += D * (1/DELTA_R**2 - 1/(DELTA_R*r))
                     if j_region == region and j_n == center_n: # if on the same place but not necessarily the same species
                         for reaction in species.as_reactant_in + species.as_product_in:
                             if j_species in [reaction.start_species, reaction.end_species]:
-                                J[i][j] += calculate_reaction_partial_derivative(reaction, j_species, region, center_n)
+                                J[i,j] += calculate_reaction_partial_derivative(reaction, j_species, region, center_n)
             elif point_type == "l":
                 if region==0: # deal with r=0 point
                     (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
@@ -189,13 +190,13 @@ def solve_newton(max_newton_iterations, print_info=False):
                     for j in range(NUM_POINTS):
                         (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                         if j_region == region and j_n == 0 and j_species == species: # j == i, basically
-                            J[i][j] += -3 * D / DELTA_R**2 * 2
+                            J[i,j] += -3 * D / DELTA_R**2 * 2
                         elif j_region == region and j_n == 1 and j_species == species: # partial derivative to the one on the right
-                            J[i][j] += 3 * D / DELTA_R**2 * 2
+                            J[i,j] += 3 * D / DELTA_R**2 * 2
                         if j_region == region and j_n == n: # if on the same place but not necessarily the same species
                             for reaction in species.as_reactant_in + species.as_product_in:
                                 if j_species in [reaction.start_species, reaction.end_species]:
-                                    J[i][j] += calculate_reaction_partial_derivative(reaction, j_species, region, n)
+                                    J[i,j] += calculate_reaction_partial_derivative(reaction, j_species, region, n)
                 else: # deal with left-most point within region (except r=0)
                     (prev_region, prev_region_last_n), (_, _), (_, _) = NEIGHBORS[(region, n)]
                     c_prev_region_last = species_concentrations[prev_region][prev_region_last_n][species]
@@ -205,11 +206,11 @@ def solve_newton(max_newton_iterations, print_info=False):
                     for j in range(NUM_POINTS):
                         (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                         if j_region == region and j_n == n and j_species == species:
-                            J[i][j] = -D/DELTA_R - species.permeability_constant
+                            J[i,j] = -D/DELTA_R - species.permeability_constant
                         elif j_region == region and j_species == species and j_n == 1:
-                            J[i][j] = D/DELTA_R
+                            J[i,j] = D/DELTA_R
                         elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
-                            J[i][j] = -species.permeability_constant
+                            J[i,j] = -species.permeability_constant
                         
             else: # point_type == "r"
                 if region == NUM_REGIONS-1: # deal with r=R point
@@ -221,9 +222,9 @@ def solve_newton(max_newton_iterations, print_info=False):
                     for j in range(NUM_POINTS):
                         (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                         if j_region == region and j_n == n and j_species == species: # basically i=j
-                            J[i][j] = D/DELTA_R + species.permeability_constant
+                            J[i,j] = D/DELTA_R + species.permeability_constant
                         elif j_region == region and j_species == species and j_n == rR_neighbor_n:
-                            J[i][j] = -D/DELTA_R
+                            J[i,j] = -D/DELTA_R
                 else: # deal with right-most point within region (except r=R)
                     (_, _), (_, _), (next_region, _) = NEIGHBORS[(region, n)]
                     c_second_to_last = species_concentrations[region][n-1][species]
@@ -233,32 +234,33 @@ def solve_newton(max_newton_iterations, print_info=False):
                     for j in range(NUM_POINTS):
                         (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                         if j_region == region and j_n == n and j_species == species: # basically i=j
-                            J[i][j] = D/DELTA_R + species.permeability_constant
+                            J[i,j] = D/DELTA_R + species.permeability_constant
                         elif j_region == region and j_species == species and j_n == n-1:
-                            J[i][j] = -D/DELTA_R
+                            J[i,j] = -D/DELTA_R
                         elif j_region == next_region and j_species == species and j_n == 0:
-                            J[i][j] = species.permeability_constant
+                            J[i,j] = species.permeability_constant
         # Newton update
-        du = spsolve(J, -F) # tocsr converts to CSR or CSC
+        J_csr = J.tocsr()
+        du = spsolve(J_csr, -F) # tocsr converts to CSR or CSC
         for i in range(len(du)):
             (region, n, species) = REVERSE_POINT_IDS[i]
             species_concentrations[region][n][species] += ALPHA * du[i]
-        
         new_du_norm =  np.linalg.norm(du, np.inf)
         if print_info:
-            print(iter, new_du_norm)
-            iter_string = str(iter).zfill(int(math.log10(max_newton_iterations)+1))
-            plot_steady_state_concentrations(ITERATION_DATA_PATH, iter_string)
-            species_concentrations_saveable_keys = return_saveable_species_concentrations_dict(species_concentrations)
-            dump_json(ITERATION_DATA_PATH,
-                      f".iteration_nr_{iter_string}_concentration",
-                      species_concentrations_saveable_keys
-            )
-            np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F, fmt="%.15e", delimiter="\n")
-            save_matrix_as_sparse_txt(J, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J"))
+            if iter%1000==0:
+                print(iter, new_du_norm)
+                iter_string = str(iter).zfill(int(math.log10(max_newton_iterations)+1))
+                plot_steady_state_concentrations(ITERATION_DATA_PATH, iter_string)
+                #species_concentrations_saveable_keys = return_saveable_species_concentrations_dict(species_concentrations)
+                #dump_json(ITERATION_DATA_PATH,
+                #        f".iteration_nr_{iter_string}_concentration",
+                #        species_concentrations_saveable_keys
+                #)
+                #np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F, fmt="%.15e", delimiter="\n")
+                #save_matrix_as_sparse_txt(J, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J"))
 
-        if new_du_norm>du_norm:
-            raise ValueError("The du norm increased!")
+        #if new_du_norm>du_norm:
+        #    raise ValueError("The du norm increased!")
         du_norm = new_du_norm
         if np.linalg.norm(du, np.inf) < 1e-20:
             print(f"Converged in {iter+1} iterations.")
@@ -289,8 +291,10 @@ def plot_steady_state_concentrations(folder, iter_string):
     )
     for x_value in SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["internal_membrane_relative_radii"]:
         ax.axvline(x_value, linestyle = "--", alpha = 0.5, c = "k")
+    max_value = max(max(y_values[species]) for species in REACTION_NETWORK.species)
+    ax.set_ylim(ymin=0, ymax = max_value * 1.05)
     fig.savefig(os.path.join(folder, f".iteration_nr_{iter_string}_concentration.png"), dpi = 300, bbox_inches='tight')
-
+    plt.close(fig)
 
 if __name__ == "__main__":
     # Load all the information
@@ -327,7 +331,7 @@ if __name__ == "__main__":
     species_concentrations = {
         region_idx : {
             mesh_point_idx : {
-                species : 0#species.external_concentration * RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[region_idx]-1]
+                species : species.external_concentration * RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
                 for species in REACTION_NETWORK.species}
             for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
         for region_idx in range(NUM_REGIONS)
@@ -338,7 +342,7 @@ if __name__ == "__main__":
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
     if not os.path.exists(ITERATION_DATA_PATH):
         os.makedirs(ITERATION_DATA_PATH)
-    solve_newton(100, True)
+    solve_newton(100000, True)
     # Modify species_concentrations such that we save the species through species.name
     species_concentrations_saveable_keys = {
         region_idx : {
