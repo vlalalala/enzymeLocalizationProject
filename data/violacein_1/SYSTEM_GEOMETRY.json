@@ -1,7 +1,0 @@
-{
-    "GEOMETRY_CONFIG": {
-        "membrane_radii": [1e-6, 5e-6, 1e-5], 
-        "num_mesh_points": 100,
-        "num_dimensions": 3
-    }
-}

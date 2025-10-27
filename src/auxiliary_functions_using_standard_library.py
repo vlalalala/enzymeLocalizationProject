@@ -5,6 +5,8 @@ import os
 import ast
 import json
 import pickle
+import glob
+import re
 
 
 def load_json(path):
@@ -74,3 +76,22 @@ def as_list(value, type_cast=str):
     else:
         # Single value (e.g. int or float)
         return [type_cast(value)]
+    
+def find_sorted_file_names(folder, pattern_to_find):
+    """ pattern_to_find must look somewhat like this: ".iteration_nr_*_concentration.png"
+    To have them sorted correctly, the file names should have the correct zero-padding.
+    """
+    pattern = os.path.join(folder, pattern_to_find)
+    files = glob.glob(pattern)
+    files.sort()
+    return files
+
+def find_max_in_nested_dict(d):
+    max_val = float('-inf')
+    for v in d.values():
+        if isinstance(v, dict):
+            # Recurse into nested dictionary
+            max_val = max(max_val, find_max_in_nested_dict(v))
+        elif isinstance(v, (int, float)):
+            max_val = max(max_val, v)
+    return max_val

@@ -66,7 +66,7 @@ rule solve_boundary_value_problem:
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle"]
     output:
-        ["{df}/{bn}_{cn}/solution.png",
+        [#"{df}/{bn}_{cn}/solution.png",
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"]
     conda:
         "config/environment.yaml"

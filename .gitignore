@@ -6,6 +6,8 @@ __pycache__/
 *.png
 # Ignore all pdf files
 *.pdf
+# Ignore all gif files
+*.gif
 
 # Ignore editor VSCode/VSCodium settings
 .vscode/

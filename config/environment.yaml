@@ -9,6 +9,8 @@ dependencies: # not tested yet. Just an example
   - pandas
   - networkx
   - pygraphviz
+  - scipy
+  - imageio
 
 # part of the standard library: os, sys, math, pickle
 

@@ -1,7 +1,0 @@
-{
-    "GEOMETRY_CONFIG": {
-        "radius": 0.5,
-        "num_mesh_points": 20,
-        "num_dimensions": 3
-    }
-}
