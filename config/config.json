@@ -1,6 +1,6 @@
 {
 "data_folder": "data",
-"base_name": "minimal_test",
+"base_name": "minimal",
 "digits_case_numbers": 0,
-"case_numbers": [0]
+"case_numbers": [1]
 }

@@ -3,6 +3,7 @@ To create .csv templates, run from snakemake root directory
 src/create_file_structure.py
 
 """
+import sys
 import os
 from itertools import product
 from pathlib import Path
@@ -32,6 +33,15 @@ def create_data_json_file(geometry_info_json_path, dump_directory, dump_basename
     dump_json(dump_directory, dump_basename, nested)
 
 if __name__ == "__main__":
+    # Take as an input on the command line which membrane model we are using
+    membrane_type = sys.argv[1]
+    membrane_type_header_map = {
+        "permeability": ["permeability_constant"],
+        "enzymatic" : ["k_on", "k_off"]
+    }
+    if membrane_type not in membrane_type_header_map.keys():
+        raise ValueError(f"The membrane types available are {membrane_type_header_map.keys()}.")
+
     # Define which output paths are to be created (if they do not exist yet)
     config_info = load_json("config/config.json")
     data_folder = as_list(config_info["data_folder"])
@@ -42,6 +52,11 @@ if __name__ == "__main__":
 
     # Get information about .csv files to create
     reaction_network_info_dict = load_json("src/reaction_network_info.json")
+
+    # Modify headers for information of species about interaction with semipermeable membranes 
+    reaction_network_info_dict["SPECIES"].remove("*membrane_parameters")
+    reaction_network_info_dict["SPECIES"] += membrane_type_header_map[membrane_type]
+
     # Create all necessary files in which to fill in specific system data
     for df, bn, cn in product(data_folder, base_name, padded_case_numbers):
         for file_name in reaction_network_info_dict.keys():

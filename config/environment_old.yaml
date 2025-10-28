@@ -1,4 +1,4 @@
-name: condaforgeEnv
+name: enzymeLocalizationProject3
 channels:
   - conda-forge
   #- defaults
@@ -11,3 +11,9 @@ dependencies: # not tested yet. Just an example
   - pygraphviz
   - scipy
   - imageio
+
+# part of the standard library: os, sys, math, pickle
+
+# conda install -n snakemake-runner -c conda-forge mambay
+
+

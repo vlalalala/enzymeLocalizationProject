@@ -204,43 +204,52 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                     c_prev_region_last = species_concentrations[prev_region][prev_region_last_n][species]
                     c_region_first = species_concentrations[region][0][species]
                     c_region_second = species_concentrations[region][1][species]
-                    F[i] = D  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
-                    for j in range(NUM_POINTS):
-                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        if j_region == region and j_n == n and j_species == species:
-                            J[i,j] = -D/DELTA_R - species.permeability_constant
-                        elif j_region == region and j_species == species and j_n == 1:
-                            J[i,j] = D/DELTA_R
-                        elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
-                            J[i,j] = -species.permeability_constant
+                    if MEMBRANE_TYPE == "permeability":
+                        F[i] = D  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
+                        for j in range(NUM_POINTS):
+                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                            if j_region == region and j_n == n and j_species == species:
+                                J[i,j] = -D/DELTA_R - species.permeability_constant
+                            elif j_region == region and j_species == species and j_n == 1:
+                                J[i,j] = D/DELTA_R
+                            elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
+                                J[i,j] = -species.permeability_constant
+                    elif MEMBRANE_TYPE == "enzymatic":
+                        raise NotImplementedError("Enzymatic")
                         
             else: # point_type == "r"
                 if region == NUM_REGIONS-1: # deal with r=R point
                     (_, rR_neighbor_n), (_, rR_n) = NEIGHBORS[(region, n)]
                     c_rR_neighbor = species_concentrations[region][rR_neighbor_n][species]
                     c_rR = species_concentrations[region][rR_n][species]
-                    F[i] = D * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
-                    # CONSTRUCT J_ij
-                    for j in range(NUM_POINTS):
-                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        if j_region == region and j_n == n and j_species == species: # basically i=j
-                            J[i,j] = D/DELTA_R + species.permeability_constant
-                        elif j_region == region and j_species == species and j_n == rR_neighbor_n:
-                            J[i,j] = -D/DELTA_R
+                    if MEMBRANE_TYPE == "permeability":
+                        F[i] = D * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
+                        # CONSTRUCT J_ij
+                        for j in range(NUM_POINTS):
+                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                            if j_region == region and j_n == n and j_species == species: # basically i=j
+                                J[i,j] = D/DELTA_R + species.permeability_constant
+                            elif j_region == region and j_species == species and j_n == rR_neighbor_n:
+                                J[i,j] = -D/DELTA_R
+                    elif MEMBRANE_TYPE == "enzymatic":
+                        raise NotImplementedError("Enzymatic")
                 else: # deal with right-most point within region (except r=R)
                     (_, _), (_, _), (next_region, _) = NEIGHBORS[(region, n)]
                     c_second_to_last = species_concentrations[region][n-1][species]
                     c_last = species_concentrations[region][n][species]
                     c_next_region_first = species_concentrations[next_region][0][species]
-                    F[i] = D  * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
-                    for j in range(NUM_POINTS):
-                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        if j_region == region and j_n == n and j_species == species: # basically i=j
-                            J[i,j] = D/DELTA_R + species.permeability_constant
-                        elif j_region == region and j_species == species and j_n == n-1:
-                            J[i,j] = -D/DELTA_R
-                        elif j_region == next_region and j_species == species and j_n == 0:
-                            J[i,j] = species.permeability_constant
+                    if MEMBRANE_TYPE == "permeability":
+                        F[i] = D  * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
+                        for j in range(NUM_POINTS):
+                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                            if j_region == region and j_n == n and j_species == species: # basically i=j
+                                J[i,j] = D/DELTA_R + species.permeability_constant
+                            elif j_region == region and j_species == species and j_n == n-1:
+                                J[i,j] = -D/DELTA_R
+                            elif j_region == next_region and j_species == species and j_n == 0:
+                                J[i,j] = species.permeability_constant
+                    elif MEMBRANE_TYPE == "enzymatic":
+                        raise NotImplementedError("Enzymatic")
         # Newton update
         J_csr = J.tocsr()
         du = spsolve(J_csr, -F) # tocsr converts to CSR or CSC
@@ -313,7 +322,10 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
         max_value = find_max_in_nested_dict(concentration_dict)
         if max_value > max_concentration_value:
             max_concentration_value = max_value
-    max_value *= 1.1
+    for species in REACTION_NETWORK.species:
+        if species.external_concentration > max_concentration_value:
+            max_concentration_value = species.external_concentration
+    max_concentration_value *= 1.1
     png_files_created = []
     # to put the species object back in the dictionary  
     species_lookup = {sp.name: sp for sp in REACTION_NETWORK.species}
@@ -330,7 +342,7 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
         }
         png_file = os.path.splitext(file)[0] + ".png" # remove .json
         number = re.findall(r"\d+", os.path.basename(png_file))[0]
-        plot_steady_state_concentrations(png_file, species_concentrations_to_plot_dict, title = f"iteration # {number}", ymax = max_value)
+        plot_steady_state_concentrations(png_file, species_concentrations_to_plot_dict, title = f"iteration # {number}", ymax = max_concentration_value)
         png_files_created.append(png_file)
     file_to_create = os.path.join(gif_output_folder, "newton_iterations.gif")
     print("creating gif", file_to_create)
@@ -344,6 +356,13 @@ if __name__ == "__main__":
     FOLDER_TO_SOLVE = sys.argv[1]
     REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".REACTION_NETWORK_pickle"))
     SYSTEM_GEOMETRY_DICT = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".SYSTEM_GEOMETRY_pickle"))
+    # Read out type of membrane
+    if hasattr(REACTION_NETWORK.species[0], "permeability_constant"):
+        MEMBRANE_TYPE = "permeability"
+    elif hasattr(REACTION_NETWORK.species[0], "k_on"):
+        MEMBRANE_TYPE = "enzymatic"
+    else:
+        raise ValueError("Membrane type not correctly specified.")
 
     # Step 1: Define all geometry variables
     R = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["outer_membrane_radius"]

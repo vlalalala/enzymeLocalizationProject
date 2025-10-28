@@ -44,12 +44,13 @@ class Enzyme(Participant):
 class Species(Participant):
     def __init__(self, name: str,
                  diffusion_constant: float,
-                 permeability_constant: float,
-                 external_concentration) -> None:
+                 external_concentration:float,
+                 **kwargs) -> None:
         super().__init__(name)
         self.diffusion_constant = diffusion_constant
-        self.permeability_constant = permeability_constant
         self.external_concentration = external_concentration
+        for key, value in kwargs.items():
+            setattr(self, key, value)
         self.as_reactant_in = []
         self.as_product_in = []
 

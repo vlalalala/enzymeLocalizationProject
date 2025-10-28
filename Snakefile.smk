@@ -23,7 +23,8 @@ reaction_network_info_dict = load_json("src/reaction_network_info.json")
 
 ### Define rules to run. The templates must already have been created and all data filled in. ###
 # Create the template files through
-# python src/create_file_structure.py
+# python src/create_file_structure.py permeability 
+# python src/create_file_structure.py enzymatic
 
 rule check_system_geometry_data_validity:
     # snakemake -s Snakefile.smk data/violacein_0/.system_geometry_validated --cores 1 --use-conda
