@@ -182,7 +182,7 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                             if j_species in [reaction.start_species, reaction.end_species]:
                                 J[i,j] += calculate_reaction_partial_derivative(reaction, j_species, region, center_n)
             elif point_type == "l":
-                if region==0: # deal with r=0 point
+                if region==0: # deal with r=0 point, no membrane
                     (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
                     c_r0 = species_concentrations[region][r0_n][species]
                     c_r0_neighbor = species_concentrations[region][r0_neighbor_n][species]
@@ -215,6 +215,8 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                             elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
                                 J[i,j] = -species.permeability_constant
                     elif MEMBRANE_TYPE == "enzymatic":
+                        
+                        F[i] = D * (c_region_second - c_region_first) - 
                         raise NotImplementedError("Enzymatic")
                         
             else: # point_type == "r"
