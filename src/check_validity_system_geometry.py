@@ -81,6 +81,7 @@ def check_validity_system_geometry_info(case_directory):
         os.path.join(case_directory, ".SYSTEM_GEOMETRY_pickle"),
         system_geometry_nested_dict
     )
+    
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from itertools import count
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import lil_matrix, csr_matrix
 import matplotlib.pyplot as plt
-from auxiliary_functions_using_standard_library import pickle_load_binary, closest_value, dump_json, find_sorted_file_names, load_json, find_max_in_nested_dict
+from auxiliary_functions_using_standard_library import format_sci, pickle_load_binary, closest_value, dump_json, find_sorted_file_names, load_json, find_max_in_nested_dict
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from auxiliary_functions import save_matrix_as_sparse_txt
 import imageio.v3 as iio
@@ -149,8 +149,8 @@ def calculate_reaction_partial_derivative(reaction_to_check, partial_derivative_
     return derivative
 
 def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
-    du_norm = np.inf
-    for iter in range(max_newton_iterations):
+    max_du = np.inf
+    for iter in range(int(max_newton_iterations)):
         F = np.zeros(NUM_POINTS)
         J = lil_matrix((NUM_POINTS, NUM_POINTS))# np.zeros((NUM_POINTS, NUM_POINTS)) 
         for i in range(NUM_POINTS):
@@ -216,7 +216,7 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                                 J[i,j] = -species.permeability_constant
                     elif MEMBRANE_TYPE == "enzymatic":
                         
-                        F[i] = D * (c_region_second - c_region_first) - 
+                        F[i] = D * (c_region_second - c_region_first) ############## not finished
                         raise NotImplementedError("Enzymatic")
                         
             else: # point_type == "r"
@@ -258,25 +258,22 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
         for i in range(len(du)):
             (region, n, species) = REVERSE_POINT_IDS[i]
             species_concentrations[region][n][species] += ALPHA * du[i]
-        new_du_norm =  np.linalg.norm(du, np.inf)
+        new_max_du =  max(du)
         if iter%save_1_every==0:
             iter_string = str(iter).zfill(int(math.log10(max_newton_iterations)+1))
             if save_info:
-                print(iter, new_du_norm)
-                species_concentrations_saveable_keys = return_saveable_species_concentrations_dict(species_concentrations)
-                dump_json(ITERATION_DATA_PATH,
-                        f".iteration_nr_{iter_string}_concentration",
-                        species_concentrations_saveable_keys
-                )
+                print(iter, new_max_du)
+                dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentration",
+                        species_concentrations)
+                dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_max_Du",
+                        new_max_du)
                 np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F, fmt="%.15e", delimiter="\n")
                 save_matrix_as_sparse_txt(J, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J"))
 
-        #if new_du_norm>du_norm:
-        #    raise ValueError("The du norm increased!")
-        du_norm = new_du_norm
-        #if np.linalg.norm(du, np.inf) < 1e-20:
-        #    print(f"Converged in {iter+1} iterations.")
-        #    break
+        max_du = new_max_du
+        if max_du < 1e-15:
+            print(f"Converged in {iter+1} iterations.")
+            break
 
 def plot_steady_state_concentrations(output_file_name, species_concentrations_to_plot, title = None, ymax = None):
     x_values = []
@@ -291,6 +288,8 @@ def plot_steady_state_concentrations(output_file_name, species_concentrations_to
         y_values[species] = species_y_values
 
     fig, ax = plt.subplots(1,1, figsize = (5,3))
+    for x_value in x_values:
+        ax.axvline(x_value/max(x_values), ymin = 0.95, ymax = 1, color="k")
     for species in REACTION_NETWORK.species:
         curve, = ax.plot(x_values/max(x_values), y_values[species], label=species.name)
         color = curve.get_color()
@@ -303,8 +302,8 @@ def plot_steady_state_concentrations(output_file_name, species_concentrations_to
         ncol=3,                  # number of columns
         frameon=False
     )
-    for x_value in SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["internal_membrane_relative_radii"] + [1]:
-        ax.axvline(x_value, linestyle = "--", alpha = 0.5, c = "k")
+    for membrane_radius in MEMBRANE_RADII:
+        ax.axvline(membrane_radius/max(MEMBRANE_RADII), linestyle = "--", alpha = 0.5, c = "k")
 
     max_value = max(max(y_values[species]) for species in REACTION_NETWORK.species)
     if ymax == None:
@@ -333,6 +332,8 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
     species_lookup = {sp.name: sp for sp in REACTION_NETWORK.species}
     for file in sorted_files:
         species_concentrations_to_plot_dict_with_strings = load_json(file)
+        max_Du_file = file.replace("_concentration.json", "_max_Du.json")
+        max_Du = load_json(max_Du_file)
         # Make keys that got converted to strings instead of integers into integers again
         species_concentrations_to_plot_dict = {
             int(region_idx): {
@@ -344,7 +345,8 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
         }
         png_file = os.path.splitext(file)[0] + ".png" # remove .json
         number = re.findall(r"\d+", os.path.basename(png_file))[0]
-        plot_steady_state_concentrations(png_file, species_concentrations_to_plot_dict, title = f"iteration # {number}", ymax = max_concentration_value)
+        max_Du_plottable = format_sci(max_Du)
+        plot_steady_state_concentrations(png_file, species_concentrations_to_plot_dict, title = f"iteration # {number}, max(Delta concentration) = {max_Du_plottable}", ymax = max_concentration_value)
         png_files_created.append(png_file)
     file_to_create = os.path.join(gif_output_folder, "newton_iterations.gif")
     print("creating gif", file_to_create)
@@ -371,6 +373,7 @@ if __name__ == "__main__":
     MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]
     NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]
     NUM_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_REGIONS"]
+    MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MEMBRANE_RADII"]
 
     # Step 2: Define structures to access geometry information
     POINT_IDS = build_point_ids_dict()
@@ -380,6 +383,13 @@ if __name__ == "__main__":
     NUM_POINTS = len(REVERSE_POINT_IDS) # each point saves the concentration for one species at one node
     POINT_INFOS = build_point_infos_dict()
     NEIGHBORS = build_point_neighbor_dict()
+    # Save dictionaries in .json files for readability
+    dump_json(FOLDER_TO_SOLVE, ".solver_POINT_IDS", POINT_IDS)
+    dump_json(FOLDER_TO_SOLVE, ".solver_REVERSE_POINT_IDS", REVERSE_POINT_IDS)
+    dump_json(FOLDER_TO_SOLVE, ".solver_RADII", RADII)
+    dump_json(FOLDER_TO_SOLVE, ".solver_POINT_INFOS", POINT_INFOS)
+    dump_json(FOLDER_TO_SOLVE, ".solver_NEIGHBORS", NEIGHBORS)
+
 
     # Step 3: Put enzyme location information
     ENZYMES_CONCENTRATIONS = {
@@ -406,9 +416,8 @@ if __name__ == "__main__":
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
     if not os.path.exists(ITERATION_DATA_PATH):
         os.makedirs(ITERATION_DATA_PATH)
-    solve_newton(1000, save_info=True, save_1_every=100)
+    solve_newton(1000000, save_info=True, save_1_every=1000)
     make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)
 
     # Modify species_concentrations such that we save the species through species.name
-    species_concentrations_saveable_keys = return_saveable_species_concentrations_dict(species_concentrations)
-    dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_saveable_keys)
+    dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations)
