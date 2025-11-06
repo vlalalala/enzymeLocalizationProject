@@ -8,6 +8,16 @@ import pickle
 import glob
 import re
 
+def all_non_negative(dictionary):
+    """Checks in a nested dictionary whether all values are non-negative"""
+    for v in dictionary.values():
+        if isinstance(v, dict):
+            if not all_non_negative(v):
+                return False
+        elif v < 0:
+            return False
+    return True
+
 def format_sci(x: float) -> str:
     """Format a positive float as scientific notation with 1 decimal and 2-digit exponent."""
     s = f"{x:.1e}"           # e.g. "3.6e-16"

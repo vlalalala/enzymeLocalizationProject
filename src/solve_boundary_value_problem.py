@@ -1,13 +1,15 @@
 #%%
 import sys
 import os
+import copy
 import math
+from tqdm import tqdm
 import numpy as np
 from itertools import count
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import lil_matrix, csr_matrix
 import matplotlib.pyplot as plt
-from auxiliary_functions_using_standard_library import format_sci, pickle_load_binary, closest_value, dump_json, find_sorted_file_names, load_json, find_max_in_nested_dict
+from auxiliary_functions_using_standard_library import all_non_negative, format_sci, pickle_load_binary, closest_value, dump_json, find_sorted_file_names, load_json, find_max_in_nested_dict
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from auxiliary_functions import save_matrix_as_sparse_txt
 import imageio.v3 as iio
@@ -108,42 +110,28 @@ def build_point_neighbor_dict() -> dict:
                     neighbors_dict[(region_idx, n)].append( (region_idx+1, 0) )
     return neighbors_dict
 
-def return_saveable_species_concentrations_dict(original_species_concentrations_dict):
-    """ Returns a dictionary equal to species_concentrations, but with species.name as keys
-    to be able to save them as a .json file
-    """
-    species_concentrations_saveable_keys = {
-        region_idx : {
-            mesh_point_idx : {
-                species.name : original_species_concentrations_dict[region_idx][mesh_point_idx][species]
-                for species in REACTION_NETWORK.species}
-            for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
-        for region_idx in range(NUM_REGIONS)
-    }
-    return species_concentrations_saveable_keys
-
-def calculate_reaction_term(region, n, species):
+def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i.
     """
     reaction_term = 0
     for reaction in species.as_reactant_in + species.as_product_in:
         if isinstance(reaction, SpontaneousReaction):
-            term = reaction.k * species_concentrations[region][n][reaction.start_species]
+            term = reaction.k * current_species_concentrations[region][n][reaction.start_species]
         else:
-            term = reaction.k_cat * ENZYMES_CONCENTRATIONS[region][reaction.enzyme] * species_concentrations[region][n][reaction.start_species] / (reaction.k_M + species_concentrations[region][n][reaction.start_species])
+            term = reaction.k_cat * ENZYMES_CONCENTRATIONS[region][reaction.enzyme] * current_species_concentrations[region][n][reaction.start_species] / (reaction.k_M + current_species_concentrations[region][n][reaction.start_species])
         if reaction in species.as_reactant_in: # if acts as reactant, diminishes
             term *= -1
         reaction_term += term
     return reaction_term
 
-def calculate_reaction_partial_derivative(reaction_to_check, partial_derivative_species, region, n):
+def calculate_reaction_partial_derivative(current_species_concentrations, reaction_to_check, partial_derivative_species, region, n):
     """ Gives the partial derivative of a reaction to a concentration of a species
     that is involved in the reaction.
     """
     if isinstance(reaction_to_check, SpontaneousReaction):
         derivative = reaction_to_check.k
     elif isinstance(reaction_to_check, EnzymaticReaction):
-        derivative = reaction_to_check.k_cat * ENZYMES_CONCENTRATIONS[region][reaction_to_check.enzyme] * reaction_to_check.k_M / ( reaction_to_check.k_M + species_concentrations[region][n][partial_derivative_species])
+        derivative = reaction_to_check.k_cat * ENZYMES_CONCENTRATIONS[region][reaction_to_check.enzyme] * reaction_to_check.k_M / ( reaction_to_check.k_M + current_species_concentrations[region][n][partial_derivative_species])
     if partial_derivative_species == reaction_to_check.start_species:
         derivative *= -1
     return derivative
@@ -174,159 +162,294 @@ def get_pore_density_occupation_information(current_species_concentrations, info
     total_occupied_pore_density = sum(occupied_pore_density.values())
     return concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor, occupied_pore_density, total_occupied_pore_density
 
-def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
-    max_du = np.inf
-    for iter in range(int(max_newton_iterations)):
-        F = np.zeros(NUM_POINTS)
+def define_newton_residual_and_optionally_jacobian(current_species_concentrations, fill_jacobian = True):
+    F = np.zeros(NUM_POINTS)
+    if fill_jacobian:
         J = lil_matrix((NUM_POINTS, NUM_POINTS))# np.zeros((NUM_POINTS, NUM_POINTS)) 
-        for i in range(NUM_POINTS):
-            (region, n, species) = REVERSE_POINT_IDS[i]
-            r = RADII[region][n]
-            diff = species.diffusion_constant
-            point_type = POINT_INFOS[region][n]
-            if MEMBRANE_TYPE == "enzymatic":
-                k_on = species.k_on
-                k_off = species.k_off
-            # CONSTRUCT F_i
-            # FOR EACH POINT WITHIN THE BULK
-            if point_type == "i":
-                (_, left_n), (_, center_n), (_, right_n) = NEIGHBORS[(region, n)]
-                c_left = species_concentrations[region][left_n][species]
-                c_center = species_concentrations[region][center_n][species]
-                c_right = species_concentrations[region][right_n][species]
-                diffusion_term = diff * (1/ DELTA_R**2 * (c_right - 2* c_center + c_left) + 1 /(DELTA_R*r) * (c_right - c_left))
-                reaction_term = calculate_reaction_term(region, center_n, species)
+    for i in range(NUM_POINTS):
+        (region, n, species) = REVERSE_POINT_IDS[i]
+        r = RADII[region][n]
+        diff = species.diffusion_constant
+        point_type = POINT_INFOS[region][n]
+        if MEMBRANE_TYPE == "enzymatic":
+            k_on = species.k_on
+            k_off = species.k_off
+        # CONSTRUCT F_i
+        # FOR EACH POINT WITHIN THE BULK
+        if point_type == "i":
+            (_, left_n), (_, center_n), (_, right_n) = NEIGHBORS[(region, n)]
+            c_left = current_species_concentrations[region][left_n][species]
+            c_center = current_species_concentrations[region][center_n][species]
+            c_right = current_species_concentrations[region][right_n][species]
+            diffusion_term = diff * (1/ DELTA_R**2 * (c_right - 2* c_center + c_left) + 1 /(DELTA_R*r) * (c_right - c_left))
+            reaction_term = calculate_reaction_term(current_species_concentrations, region, center_n, species)
+            F[i] = diffusion_term + reaction_term
+            # FILL IN J_ij
+            if not fill_jacobian:
+                continue
+            for j in range(NUM_POINTS):
+                (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                # Contributions from diffusion
+                if j_region == region and j_n == n and j_species == species: # j == i, basically
+                    J[i,j] += diff * (1/DELTA_R**2 * (-2))
+                elif j_region==region and j==right_n and j_species == species: # same species, right or left
+                    J[i,j] += diff * (1/DELTA_R**2 + 1/(DELTA_R*r))
+                elif j_region==region and j==left_n and j_species == species: # same species, right or left
+                    J[i,j] += diff * (1/DELTA_R**2 - 1/(DELTA_R*r))
+                # Contributions from reactions
+                if j_region == region and j_n == center_n: # if on the same place but not necessarily the same species
+                    for reaction in species.as_reactant_in + species.as_product_in:
+                        if j_species in [reaction.start_species, reaction.end_species]:
+                            J[i,j] += calculate_reaction_partial_derivative(current_species_concentrations, reaction, j_species, region, center_n)
+        elif point_type == "l":
+            if region==0: # deal with r=0 point, no membrane
+                (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
+                c_r0 = current_species_concentrations[region][r0_n][species]
+                c_r0_neighbor = current_species_concentrations[region][r0_neighbor_n][species]
+                diffusion_term = 3 * diff / DELTA_R**2 * 2 * (c_r0_neighbor - c_r0)
+                reaction_term = calculate_reaction_term(current_species_concentrations, region, r0_n, species)
                 F[i] = diffusion_term + reaction_term
-                # FILL IN J_ij
+                if not fill_jacobian:
+                    continue
                 for j in range(NUM_POINTS):
                     (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                     # Contributions from diffusion
-                    if j_region == region and j_n == n and j_species == species: # j == i, basically
-                        J[i,j] += diff * (1/DELTA_R**2 * (-2))
-                    elif j_region==region and j==right_n and j_species == species: # same species, right or left
-                        J[i,j] += diff * (1/DELTA_R**2 + 1/(DELTA_R*r))
-                    elif j_region==region and j==left_n and j_species == species: # same species, right or left
-                        J[i,j] += diff * (1/DELTA_R**2 - 1/(DELTA_R*r))
+                    if j_region == region and j_n == 0 and j_species == species: # j == i, basically
+                        J[i,j] += -3 * diff / DELTA_R**2 * 2
+                    elif j_region == region and j_n == 1 and j_species == species: # partial derivative to the one on the right
+                        J[i,j] += 3 * diff / DELTA_R**2 * 2
                     # Contributions from reactions
-                    if j_region == region and j_n == center_n: # if on the same place but not necessarily the same species
+                    if j_region == region and j_n == n: # if on the same place but not necessarily the same species
                         for reaction in species.as_reactant_in + species.as_product_in:
                             if j_species in [reaction.start_species, reaction.end_species]:
-                                J[i,j] += calculate_reaction_partial_derivative(reaction, j_species, region, center_n)
-            elif point_type == "l":
-                if region==0: # deal with r=0 point, no membrane
-                    (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
-                    c_r0 = species_concentrations[region][r0_n][species]
-                    c_r0_neighbor = species_concentrations[region][r0_neighbor_n][species]
-                    diffusion_term = 3 * diff / DELTA_R**2 * 2 * (c_r0_neighbor - c_r0)
-                    reaction_term = calculate_reaction_term(region, r0_n, species)
-                    F[i] = diffusion_term + reaction_term
+                                J[i,j] += calculate_reaction_partial_derivative(current_species_concentrations, reaction, j_species, region, n)
+            else: # deal with left-most point within region (except r=0)
+                (prev_region, prev_region_last_n), (_, _), (_, _) = NEIGHBORS[(region, n)]
+                c_prev_region_last = current_species_concentrations[prev_region][prev_region_last_n][species]
+                c_region_first = current_species_concentrations[region][0][species]
+                c_region_second = current_species_concentrations[region][1][species]
+                if MEMBRANE_TYPE == "permeability":
+                    F[i] = diff  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
+                    if not fill_jacobian:
+                        continue
                     for j in range(NUM_POINTS):
                         (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                         # Contributions from diffusion
-                        if j_region == region and j_n == 0 and j_species == species: # j == i, basically
-                            J[i,j] += -3 * diff / DELTA_R**2 * 2
-                        elif j_region == region and j_n == 1 and j_species == species: # partial derivative to the one on the right
-                            J[i,j] += 3 * diff / DELTA_R**2 * 2
-                        # Contributions from reactions
-                        if j_region == region and j_n == n: # if on the same place but not necessarily the same species
-                            for reaction in species.as_reactant_in + species.as_product_in:
-                                if j_species in [reaction.start_species, reaction.end_species]:
-                                    J[i,j] += calculate_reaction_partial_derivative(reaction, j_species, region, n)
-                else: # deal with left-most point within region (except r=0)
-                    (prev_region, prev_region_last_n), (_, _), (_, _) = NEIGHBORS[(region, n)]
-                    c_prev_region_last = species_concentrations[prev_region][prev_region_last_n][species]
-                    c_region_first = species_concentrations[region][0][species]
-                    c_region_second = species_concentrations[region][1][species]
-                    if MEMBRANE_TYPE == "permeability":
-                        F[i] = diff  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
-                        for j in range(NUM_POINTS):
-                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                            # Contributions from diffusion
-                            if j_region == region and j_n == n and j_species == species:
-                                J[i,j] += -diff/DELTA_R - species.permeability_constant
-                            elif j_region == region and j_species == species and j_n == 1:
-                                J[i,j] += diff/DELTA_R
-                            elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
-                                J[i,j] += -species.permeability_constant
-                            # No contributions from reactions (flux considered)
-                    elif MEMBRANE_TYPE == "enzymatic":
-                        # membrane is at the left of the segment, dM_+/dt
-                        (concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor,
-                         occupied_pore_density, total_occupied_pore_density) = get_pore_density_occupation_information(species_concentrations, (prev_region, prev_region_last_n), (region, 0))
-                        flux_term = -k_on * (PORE_DENSITY - total_occupied_pore_density) * species_concentrations[region][0][species] + k_off * occupied_pore_density[species]
-                        F[i] = diff * (c_region_second - c_region_first) / DELTA_R - flux_term
-                        for j in range(NUM_POINTS):
-                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                            # Diffusion contribution
-                            if j_region == region and j_n == n and j_species == species: # derivative of c_region_first
-                                J[i,j] += -diff/DELTA_R
-                            elif j_region == region and j_species == species and j_n == 1: # derivative of c_region_second
-                                J[i,j] += diff/DELTA_R
-                            # Flux contribution
-                            if j_region == region and j_n == n and j_species == species: # derivative to concentration on right of flux term
-                                derivative_occupied_pore_density = 
-                                complete_derivative = (
-                                    -k_on * (PORE_DENSITY - total_occupied_pore_density) # product rule!
-                                    -k_on * species_concentrations[region][0][species] * (-)
-                                )
-                                J[i,j] += complete_derivative
+                        if j_region == region and j_n == n and j_species == species:
+                            J[i,j] += -diff/DELTA_R - species.permeability_constant
+                        elif j_region == region and j_species == species and j_n == 1:
+                            J[i,j] += diff/DELTA_R
+                        elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
+                            J[i,j] += -species.permeability_constant
+                        # No contributions from reactions (flux considered)
+                elif MEMBRANE_TYPE == "enzymatic":
+                    # membrane is at the left of the segment, dM_+/dt
+                    (concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor,
+                        occupied_pore_density, total_occupied_pore_density) = get_pore_density_occupation_information(current_species_concentrations, (prev_region, prev_region_last_n), (region, 0))
+                    flux_term = -k_on * (PORE_DENSITY - total_occupied_pore_density) * current_species_concentrations[region][0][species] + k_off * occupied_pore_density[species]
+                    F[i] = diff * (c_region_second - c_region_first) / DELTA_R - flux_term
+                    if not fill_jacobian:
+                        continue
+                    for j in range(NUM_POINTS):
+                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                        # Diffusion contribution
+                        if j_region == region and j_n == n and j_species == species: # derivative of c_region_first
+                            J[i,j] += -diff/DELTA_R
+                        elif j_region == region and j_species == species and j_n == 1: # derivative of c_region_second
+                            J[i,j] += diff/DELTA_R
+                        # Flux contribution
+                        if j_region == region and j_n == n and j_species == species: # derivative to concentration on right of flux term
+                            derivative_occupied_pore_density = 1 ##########
+                            complete_derivative = (
+                                -k_on * (PORE_DENSITY - total_occupied_pore_density) # product rule!
+                                -k_on * current_species_concentrations[region][0][species] * (-)
+                            )
+                            J[i,j] += complete_derivative
 
-                        
-            else: # point_type == "r"
-                if region == NUM_REGIONS-1: # deal with r=R point
-                    (_, rR_neighbor_n), (_, rR_n) = NEIGHBORS[(region, n)]
-                    c_rR_neighbor = species_concentrations[region][rR_neighbor_n][species]
-                    c_rR = species_concentrations[region][rR_n][species]
-                    if MEMBRANE_TYPE == "permeability":
-                        F[i] = diff * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
-                        # CONSTRUCT J_ij
-                        for j in range(NUM_POINTS):
-                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                            if j_region == region and j_n == n and j_species == species: # basically i=j
-                                J[i,j] += diff/DELTA_R + species.permeability_constant
-                            elif j_region == region and j_species == species and j_n == rR_neighbor_n:
-                                J[i,j] += -diff/DELTA_R
-                    elif MEMBRANE_TYPE == "enzymatic":
-                        raise NotImplementedError("Enzymatic")
-                else: # deal with right-most point within region (except r=R)
-                    (_, _), (_, _), (next_region, _) = NEIGHBORS[(region, n)]
-                    c_second_to_last = species_concentrations[region][n-1][species]
-                    c_last = species_concentrations[region][n][species]
-                    c_next_region_first = species_concentrations[next_region][0][species]
-                    if MEMBRANE_TYPE == "permeability":
-                        F[i] = diff * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
-                        for j in range(NUM_POINTS):
-                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                            if j_region == region and j_n == n and j_species == species: # basically i=j
-                                J[i,j] += diff/DELTA_R + species.permeability_constant
-                            elif j_region == region and j_species == species and j_n == n-1:
-                                J[i,j] += -diff/DELTA_R
-                            elif j_region == next_region and j_species == species and j_n == 0:
-                                J[i,j] += species.permeability_constant
-                    elif MEMBRANE_TYPE == "enzymatic":
-                        raise NotImplementedError("Enzymatic")
-        # Newton update
-        J_csr = J.tocsr()
-        du = spsolve(J_csr, -F) # tocsr converts to CSR or CSC
+                    
+        else: # point_type == "r"
+            if region == NUM_REGIONS-1: # deal with r=R point
+                (_, rR_neighbor_n), (_, rR_n) = NEIGHBORS[(region, n)]
+                c_rR_neighbor = current_species_concentrations[region][rR_neighbor_n][species]
+                c_rR = current_species_concentrations[region][rR_n][species]
+                if MEMBRANE_TYPE == "permeability":
+                    F[i] = diff * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
+                    if not fill_jacobian:
+                        continue
+                    # CONSTRUCT J_ij
+                    for j in range(NUM_POINTS):
+                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                        if j_region == region and j_n == n and j_species == species: # basically i=j
+                            J[i,j] += diff/DELTA_R + species.permeability_constant
+                        elif j_region == region and j_species == species and j_n == rR_neighbor_n:
+                            J[i,j] += -diff/DELTA_R
+                elif MEMBRANE_TYPE == "enzymatic":
+                    raise NotImplementedError("Enzymatic")
+            else: # deal with right-most point within region (except r=R)
+                (_, _), (_, _), (next_region, _) = NEIGHBORS[(region, n)]
+                c_second_to_last = current_species_concentrations[region][n-1][species]
+                c_last = current_species_concentrations[region][n][species]
+                c_next_region_first = current_species_concentrations[next_region][0][species]
+                if MEMBRANE_TYPE == "permeability":
+                    F[i] = diff * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
+                    if not fill_jacobian:
+                        continue
+                    for j in range(NUM_POINTS):
+                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                        if j_region == region and j_n == n and j_species == species: # basically i=j
+                            J[i,j] += diff/DELTA_R + species.permeability_constant
+                        elif j_region == region and j_species == species and j_n == n-1:
+                            J[i,j] += -diff/DELTA_R
+                        elif j_region == next_region and j_species == species and j_n == 0:
+                            J[i,j] += species.permeability_constant
+                elif MEMBRANE_TYPE == "enzymatic":
+                    raise NotImplementedError("Enzymatic")
+    if fill_jacobian:
+        return F, J
+    else:
+        return F, _
+
+def save_newton_iteration_data(
+    iter_string, J, F, species_concentrations_to_save, max_Du_to_save):
+    dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentration",
+            species_concentrations_to_save)
+    dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_max_Du",
+            max_Du_to_save)
+    np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F, fmt="%.15e", delimiter="\n")
+    save_matrix_as_sparse_txt(J, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J"))
+
+def compute_newton_step(species_concentrations):
+    # Step 1: Compute residual F and jacobian J
+    F_vector, J_matrix = define_newton_residual_and_optionally_jacobian(species_concentrations)
+    # Step 2: Assemble J (sparse), convert to solver-friendly format
+    J_sparse = J_matrix.tocsc()
+    # Step 3: Solve J du = -F
+    du = spsolve(J_sparse, -F_vector)
+    return F_vector, J_sparse, du
+
+def adaptive_newton_step(
+    species_concentrations,
+    alpha_current,
+    adaptive_step_parameters
+    ):
+    """
+    Perform one Newton step with adaptive step length (alpha may be >1).
+    Returns (next_species_concentrations, alpha_current) where info is dict with diagnostics.
+    """
+    # Step 0: Unpack parameters
+    alpha_min = adaptive_step_parameters.get("alpha_min", 1e-8)
+    alpha_max = adaptive_step_parameters.get("alpha_max", 3.0)
+    gamma_inc = adaptive_step_parameters.get("gamma_inc", 1.15)
+    gamma_dec = adaptive_step_parameters.get("gamma_dec", 0.5)
+    max_backtrack = adaptive_step_parameters.get("max_backtrack", 25)
+    # Steps 1-3: Compute du (see compute_newton_step)
+    F_vector, _, du = compute_newton_step(species_concentrations)
+    norm_F_vector = np.linalg.norm(F_vector)
+    if norm_F_vector == 0:
+        return species_concentrations, alpha_current
+    # Step 4: Attempt alpha > 1 first (grow from previous alpha_current)
+    alpha_try = min(alpha_current * gamma_inc, alpha_max)
+    success = False
+    for _ in range(max_backtrack):
+        species_concentrations_try = copy.deepcopy(species_concentrations)
         for i in range(len(du)):
             (region, n, species) = REVERSE_POINT_IDS[i]
-            species_concentrations[region][n][species] += ALPHA * du[i]
-        new_max_du =  max(du)
-        if iter%save_1_every==0:
-            iter_string = str(iter).zfill(int(math.log10(max_newton_iterations)+1))
-            if save_info:
-                print(iter, new_max_du)
-                dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentration",
-                        species_concentrations)
-                dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_max_Du",
-                        new_max_du)
-                np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F, fmt="%.15e", delimiter="\n")
-                save_matrix_as_sparse_txt(J, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J"))
-
-        max_du = new_max_du
-        if max_du < 1e-15:
-            print(f"Converged in {iter+1} iterations.")
+            species_concentrations_try[region][n][species] += alpha_try * du[i]    
+        # Step 5: Check that all new concentrations are still positive (=0 included)
+        # If some negative concentrations, decrease alpha. If alpha is already really small,
+        # will later exit without success
+        if not all_non_negative(species_concentrations_try):
+            alpha_try *= gamma_dec
+            if alpha_try < alpha_min:
+                break
+            continue
+        # Step 6: Compute trial residual
+        F_vector_try, _ = define_newton_residual_and_optionally_jacobian(species_concentrations_try, fill_jacobian=False)
+        norm_F_vector_try = np.linalg.norm(F_vector_try)
+        # Step 7: Accept if residual decreased
+        if norm_F_vector_try < norm_F_vector:
+            next_species_concentrations = species_concentrations_try
+            alpha_current = min(alpha_try, alpha_max)
+            # optionally enlarge alpha for next iter
+            alpha_current = min(alpha_current * gamma_inc, alpha_max)
+            success = True
             break
+        else:
+            next_species_concentrations = species_concentrations
+            # otherwise shrink alpha and retry
+            alpha_try *= gamma_dec
+            if alpha_try < alpha_min:
+                break
+    
+    if success == False:
+        raise ValueError("Newton method failed to reduce the norm of the residual.")
+    return next_species_concentrations, alpha_current
+
+def check_convergence(current_species_concentrations, convergence_parameters, print_info=False):
+    """
+    Returns true if convergence fulfilled (see below); false if not
+    """
+    info = {"max_relative_change": np.inf,
+            "min_relative_change": 0}
+    convergence = True
+    # Step 0: Unpack parameters
+    tol_rel = convergence_parameters.get("tol_relative", 1)
+    tol_abs = convergence_parameters.get("tol_absolute", 1)
+    tol_res = convergence_parameters.get("tol_residual", 1)
+    # Step 1: Get du from concentrations
+    F_vector, _, du = compute_newton_step(current_species_concentrations)
+    # Step 2: Check that the norm of the residual is small
+    F_vector_norm = np.linalg.norm(F_vector)
+    if print_info:
+        info["F_vector_norm"] = F_vector_norm
+        info["max Delta u"] = max(du)
+    if F_vector_norm > tol_res:
+        convergence = False
+    # Step 3: Check that each node has had a very small relative change
+    # (In case the node has a very small value, have the change be smaller than some absolute value)
+    for i in range(len(du)):
+        (region, n, species) = REVERSE_POINT_IDS[i]
+        node_u = current_species_concentrations[region][n][species]
+        node_du = du[i]
+        max_tolerated_relative_change = tol_rel * node_u
+        if print_info:
+            info["max_relative_change"] = max(info["max_relative_change"], max_tolerated_relative_change)
+            info["min_relative_change"] = min(info["min_relative_change"], max_tolerated_relative_change)
+        if node_du > max(tol_abs, max_tolerated_relative_change):
+            convergence = False
+    if print_info:
+        print(print_info)
+    return convergence
+
+def solve_newton(
+        max_newton_iterations,
+        initial_species_concentrations_guess,
+        adaptive_step_parameters,
+        convergence_parameters,
+        save_data_every=1000,
+        check_convergence_every=1000
+    ):
+    """
+    save_data_every and check_convergence_every N iterations. If not to be done, set each to 0.
+    """
+    current_species_concentrations = initial_species_concentrations_guess
+    current_alpha = adaptive_step_parameters["initial_alpha"]
+    for iter in tqdm(range(int(max_newton_iterations))):
+        # Improve species concentration estimate
+        current_species_concentrations, current_alpha = adaptive_newton_step(
+            current_species_concentrations, current_alpha, adaptive_step_parameters)            
+        # Save result if needed
+        if save_data_every !=0 and iter%save_data_every==0:
+            F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
+            iter_string = str(iter).zfill(int(math.log10(max_newton_iterations)+1))
+            save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, max(du))
+        # Stop iterating if criterion for convergence fulfilled
+        if check_convergence_every !=0 and iter%check_convergence_every==0:
+            convergence = check_convergence(current_species_concentrations, convergence_parameters)
+            if convergence:
+                print(f"Convergence after {iter} iterations.")
+                break
+    return current_species_concentrations
 
 def plot_steady_state_concentrations(output_file_name, species_concentrations_to_plot, title = None, ymax = None):
     x_values = []
@@ -428,6 +551,7 @@ if __name__ == "__main__":
     NUM_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_REGIONS"]
     if MEMBRANE_TYPE == "enzymatic":
         PORE_DENSITY = SYSTEM_GEOMETRY_DICT["MEMBRANE_PROPERTIES"]["pore_density"]
+    MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MEMBRANE_RADII"]
 
     # Step 2: Define structures to access geometry information
     POINT_IDS = build_point_ids_dict()
@@ -444,7 +568,6 @@ if __name__ == "__main__":
     dump_json(FOLDER_TO_SOLVE, ".solver_POINT_INFOS", POINT_INFOS)
     dump_json(FOLDER_TO_SOLVE, ".solver_NEIGHBORS", NEIGHBORS)
 
-
     # Step 3: Put enzyme location information
     ENZYMES_CONCENTRATIONS = {
     region_idx : {
@@ -456,7 +579,7 @@ if __name__ == "__main__":
 
     # Step 4: Define structure that saves concentrations at each point and which
     # is updated with every iteration of Newton
-    species_concentrations = {
+    species_concentrations_guess = {
         region_idx : {
             mesh_point_idx : {
                 species : species.external_concentration * RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
@@ -465,13 +588,35 @@ if __name__ == "__main__":
         for region_idx in range(NUM_REGIONS)
     }
     # Step 5: Run solver and save result; plot
-    ALPHA = 1
+    adaptive_step_parameters = dict(
+        initial_alpha=1.0,
+        alpha_min=1e-8,
+        alpha_max=3.0,
+        gamma_inc=1.15,
+        gamma_dec=0.5,
+        max_backtrack=25
+    )
+
+    convergence_parameters = dict(
+        tol_rel=1e-6,
+        tol_abs=1e-12,
+        tol_res=1e-8,
+    )
 
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
     if not os.path.exists(ITERATION_DATA_PATH):
         os.makedirs(ITERATION_DATA_PATH)
-    solve_newton(1000000, save_info=True, save_1_every=1000)
+    species_concentrations_final = solve_newton(
+        max_newton_iterations=1000000,
+        initial_species_concentrations_guess=species_concentrations_guess,
+        adaptive_step_parameters=adaptive_step_parameters,
+        convergence_parameters=convergence_parameters,
+        save_data_every=1000,
+        check_convergence_every=1000
+    )
     make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)
 
     # Modify species_concentrations such that we save the species through species.name
-    dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations)
+    dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
+
+# %%
