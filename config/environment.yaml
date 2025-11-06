@@ -2,7 +2,7 @@ name: condaforgeEnv
 channels:
   - conda-forge
   #- defaults
-dependencies: # not tested yet. Just an example
+dependencies:
   - python=3.12
   - numpy
   - matplotlib

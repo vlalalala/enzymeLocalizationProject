@@ -8,6 +8,12 @@ import pickle
 import glob
 import re
 
+def format_sci(x: float) -> str:
+    """Format a positive float as scientific notation with 1 decimal and 2-digit exponent."""
+    s = f"{x:.1e}"           # e.g. "3.6e-16"
+    base, exp = s.split("e")
+    exp_num = int(exp)
+    return f"{base}e{'+' if exp_num >= 0 else '-'}{abs(exp_num):02d}"
 
 def load_json(path):
     _, file_extension = os.path.splitext(os.path.basename(path))
@@ -18,8 +24,33 @@ def load_json(path):
     return contents
 
 def dump_json(dump_directory: str, file_basename: str, dict_to_dump: dict):
-    with open(os.path.join(dump_directory, f"{file_basename}.json"), "w") as f:
-        json.dump(dict_to_dump, f, indent=4)
+    """
+    Dump a dictionary (possibly nested) as JSON, converting Species objects to their .name.
+    Handles Species in keys, values, lists, sets, tuples, etc.
+    """
+    
+    def convert_species(obj):
+        # Convert Species objects (keys or values)
+        if hasattr(obj, "__class__") and obj.__class__.__name__ == "Species":
+            return obj.name
+
+        # Handle dictionaries (convert both keys and values)
+        elif isinstance(obj, dict):
+            return {str(convert_species(k)): convert_species(v) for k, v in obj.items()}
+
+        # Handle lists, tuples, sets
+        elif isinstance(obj, (list, tuple, set)):
+            return [convert_species(i) for i in obj]
+
+        # Base case: leave unchanged
+        else:
+            return obj
+
+    converted = convert_species(dict_to_dump)
+    os.makedirs(dump_directory, exist_ok=True)
+    path = os.path.join(dump_directory, f"{file_basename}.json")
+    with open(path, "w") as f:
+        json.dump(converted, f, indent=4)
 
 def pickle_dump_binary(path, variable):
     with open(path, 'wb') as f:
