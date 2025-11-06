@@ -6,7 +6,15 @@ import ast
 import json
 import pickle
 import glob
-import re
+
+def nested_max(dictionary):
+    max_val = float("-inf")
+    for v in dictionary.values():
+        if isinstance(v, dict):
+            max_val = max(max_val, nested_max(v))
+        else:
+            max_val = max(max_val, v)
+    return max_val
 
 def all_non_negative(dictionary):
     """Checks in a nested dictionary whether all values are non-negative"""

@@ -3,13 +3,14 @@ import sys
 import os
 import copy
 import math
+import time
 from tqdm import tqdm
 import numpy as np
 from itertools import count
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import lil_matrix, csr_matrix
 import matplotlib.pyplot as plt
-from auxiliary_functions_using_standard_library import all_non_negative, format_sci, pickle_load_binary, closest_value, dump_json, find_sorted_file_names, load_json, find_max_in_nested_dict
+from auxiliary_functions_using_standard_library import nested_max, all_non_negative, format_sci, pickle_load_binary, closest_value, dump_json, find_sorted_file_names, load_json, find_max_in_nested_dict
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from auxiliary_functions import save_matrix_as_sparse_txt
 import imageio.v3 as iio
@@ -262,7 +263,7 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
                             derivative_occupied_pore_density = 1 ##########
                             complete_derivative = (
                                 -k_on * (PORE_DENSITY - total_occupied_pore_density) # product rule!
-                                -k_on * current_species_concentrations[region][0][species] * (-)
+                                -k_on * current_species_concentrations[region][0][species] * (-1) #################################
                             )
                             J[i,j] += complete_derivative
 
@@ -330,18 +331,20 @@ def compute_newton_step(species_concentrations):
 def adaptive_newton_step(
     species_concentrations,
     alpha_current,
-    adaptive_step_parameters
+    successive_unsuccessful_steps,
+    adaptive_step_parameters,
     ):
     """
     Perform one Newton step with adaptive step length (alpha may be >1).
     Returns (next_species_concentrations, alpha_current) where info is dict with diagnostics.
     """
     # Step 0: Unpack parameters
-    alpha_min = adaptive_step_parameters.get("alpha_min", 1e-8)
-    alpha_max = adaptive_step_parameters.get("alpha_max", 3.0)
-    gamma_inc = adaptive_step_parameters.get("gamma_inc", 1.15)
-    gamma_dec = adaptive_step_parameters.get("gamma_dec", 0.5)
-    max_backtrack = adaptive_step_parameters.get("max_backtrack", 25)
+    alpha_min = adaptive_step_parameters.get("alpha_min")
+    alpha_max = adaptive_step_parameters.get("alpha_max")
+    gamma_inc = adaptive_step_parameters.get("gamma_inc")
+    gamma_dec = adaptive_step_parameters.get("gamma_dec")
+    max_backtrack = adaptive_step_parameters.get("max_backtrack")
+    max_accepted_successive_unsuccessful_steps = adaptive_step_parameters.get("max_accepted_successive_unsuccessful_steps")
     # Steps 1-3: Compute du (see compute_newton_step)
     F_vector, _, du = compute_newton_step(species_concentrations)
     norm_F_vector = np.linalg.norm(F_vector)
@@ -352,45 +355,53 @@ def adaptive_newton_step(
     success = False
     for _ in range(max_backtrack):
         species_concentrations_try = copy.deepcopy(species_concentrations)
-        for i in range(len(du)):
+        for i, du_value in enumerate(du):
             (region, n, species) = REVERSE_POINT_IDS[i]
-            species_concentrations_try[region][n][species] += alpha_try * du[i]    
+            species_concentrations_try[region][n][species] += alpha_try * du_value   
         # Step 5: Check that all new concentrations are still positive (=0 included)
         # If some negative concentrations, decrease alpha. If alpha is already really small,
         # will later exit without success
         if not all_non_negative(species_concentrations_try):
+            print("negative_values!?")
             alpha_try *= gamma_dec
             if alpha_try < alpha_min:
                 break
             continue
         # Step 6: Compute trial residual
-        F_vector_try, _ = define_newton_residual_and_optionally_jacobian(species_concentrations_try, fill_jacobian=False)
+        F_vector_try, _ = define_newton_residual_and_optionally_jacobian(
+            species_concentrations_try, fill_jacobian=False)
         norm_F_vector_try = np.linalg.norm(F_vector_try)
         # Step 7: Accept if residual decreased
         if norm_F_vector_try < norm_F_vector:
-            next_species_concentrations = species_concentrations_try
+            species_concentrations = species_concentrations_try
             alpha_current = min(alpha_try, alpha_max)
             # optionally enlarge alpha for next iter
             alpha_current = min(alpha_current * gamma_inc, alpha_max)
             success = True
+            successive_unsuccessful_steps = 0
             break
-        else:
-            next_species_concentrations = species_concentrations
-            # otherwise shrink alpha and retry
-            alpha_try *= gamma_dec
-            if alpha_try < alpha_min:
-                break
-    
-    if success == False:
-        raise ValueError("Newton method failed to reduce the norm of the residual.")
-    return next_species_concentrations, alpha_current
+        # otherwise shrink alpha and retry
+        alpha_try *= gamma_dec
+        if alpha_try < alpha_min:
+            break
+
+    if success is False:
+        successive_unsuccessful_steps += 1
+        if successive_unsuccessful_steps > max_accepted_successive_unsuccessful_steps:
+            raise ValueError("Newton failed")
+        # in case that the backtracking did not work, set alpha_current to 1
+        for i, du_value in enumerate(du):
+            (region, n, species) = REVERSE_POINT_IDS[i]
+            species_concentrations[region][n][species] += 1 * du_value
+        alpha_current = 1
+        
+    return species_concentrations, alpha_current, successive_unsuccessful_steps
 
 def check_convergence(current_species_concentrations, convergence_parameters, print_info=False):
     """
     Returns true if convergence fulfilled (see below); false if not
     """
-    info = {"max_relative_change": np.inf,
-            "min_relative_change": 0}
+    info = {"max_relative_change": 0, "max_Delta_u":0.0, "F_vector_norm":0.0}
     convergence = True
     # Step 0: Unpack parameters
     tol_rel = convergence_parameters.get("tol_relative", 1)
@@ -402,23 +413,21 @@ def check_convergence(current_species_concentrations, convergence_parameters, pr
     F_vector_norm = np.linalg.norm(F_vector)
     if print_info:
         info["F_vector_norm"] = F_vector_norm
-        info["max Delta u"] = max(du)
+        info["max_Delta_u"] = max(du)
     if F_vector_norm > tol_res:
         convergence = False
     # Step 3: Check that each node has had a very small relative change
     # (In case the node has a very small value, have the change be smaller than some absolute value)
-    for i in range(len(du)):
+    for i, du_value in enumerate(du):
         (region, n, species) = REVERSE_POINT_IDS[i]
         node_u = current_species_concentrations[region][n][species]
-        node_du = du[i]
         max_tolerated_relative_change = tol_rel * node_u
         if print_info:
             info["max_relative_change"] = max(info["max_relative_change"], max_tolerated_relative_change)
-            info["min_relative_change"] = min(info["min_relative_change"], max_tolerated_relative_change)
-        if node_du > max(tol_abs, max_tolerated_relative_change):
+        if du_value > max(tol_abs, max_tolerated_relative_change):
             convergence = False
     if print_info:
-        print(print_info)
+        print({k: f"{v:.2e}" for k, v in info.items()})
     return convergence
 
 def solve_newton(
@@ -427,17 +436,25 @@ def solve_newton(
         adaptive_step_parameters,
         convergence_parameters,
         save_data_every=1000,
-        check_convergence_every=1000
+        check_convergence_every=1000,
+        method="simple"
     ):
     """
     save_data_every and check_convergence_every N iterations. If not to be done, set each to 0.
     """
     current_species_concentrations = initial_species_concentrations_guess
     current_alpha = adaptive_step_parameters["initial_alpha"]
+    current_successive_unsuccessful_steps = 0
     for iter in tqdm(range(int(max_newton_iterations))):
         # Improve species concentration estimate
-        current_species_concentrations, current_alpha = adaptive_newton_step(
-            current_species_concentrations, current_alpha, adaptive_step_parameters)            
+        if method == "simple":
+            F, _, du = compute_newton_step(current_species_concentrations)
+            for i, du_value in enumerate(du):
+                (region, n, species) = REVERSE_POINT_IDS[i]
+                current_species_concentrations[region][n][species] +=  du_value
+        elif method == "adaptive":
+            current_species_concentrations, current_alpha, current_successive_unsuccessful_steps = adaptive_newton_step(
+                current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)   
         # Save result if needed
         if save_data_every !=0 and iter%save_data_every==0:
             F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
@@ -445,7 +462,7 @@ def solve_newton(
             save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, max(du))
         # Stop iterating if criterion for convergence fulfilled
         if check_convergence_every !=0 and iter%check_convergence_every==0:
-            convergence = check_convergence(current_species_concentrations, convergence_parameters)
+            convergence = check_convergence(current_species_concentrations, convergence_parameters, print_info=True)
             if convergence:
                 print(f"Convergence after {iter} iterations.")
                 break
@@ -492,6 +509,9 @@ def plot_steady_state_concentrations(output_file_name, species_concentrations_to
     plt.close(fig)
 
 def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
+    """
+    Important: delete any .json files from previous simulations that may not be overwritten.
+    """
     sorted_files = find_sorted_file_names(iteration_data_folder, ".iteration_nr_*_concentration.json")
     max_concentration_value = 0
     for file in sorted_files:
@@ -587,36 +607,47 @@ if __name__ == "__main__":
             for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
         for region_idx in range(NUM_REGIONS)
     }
+    max_guess_concentration = nested_max(species_concentrations_guess)
     # Step 5: Run solver and save result; plot
-    adaptive_step_parameters = dict(
-        initial_alpha=1.0,
-        alpha_min=1e-8,
-        alpha_max=3.0,
-        gamma_inc=1.15,
-        gamma_dec=0.5,
-        max_backtrack=25
-    )
+    adaptive_step_parameters = {
+        "initial_alpha":1.0,
+        "alpha_min":1e-6,
+        "alpha_max":3,
+        "gamma_inc":1.15,
+        "gamma_dec":0.5,
+        "max_backtrack":1000,
+        "max_accepted_successive_unsuccessful_steps": 5
+    }
 
-    convergence_parameters = dict(
-        tol_rel=1e-6,
-        tol_abs=1e-12,
-        tol_res=1e-8,
-    )
+    F_vector_guess, _, _ = compute_newton_step(species_concentrations_guess)
+
+    convergence_parameters = {
+        "tol_relative":1e-20,
+        "tol_absolute":max_guess_concentration*1e-8,
+        "tol_residual":np.linalg.norm(F_vector_guess)*1e-8,
+    }
+    print("convergence parameters",
+          {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()})
 
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
     if not os.path.exists(ITERATION_DATA_PATH):
         os.makedirs(ITERATION_DATA_PATH)
+    
+    start_time = time.time()
     species_concentrations_final = solve_newton(
-        max_newton_iterations=1000000,
+        max_newton_iterations=10000,
         initial_species_concentrations_guess=species_concentrations_guess,
         adaptive_step_parameters=adaptive_step_parameters,
         convergence_parameters=convergence_parameters,
-        save_data_every=1000,
-        check_convergence_every=1000
+        save_data_every=100,
+        check_convergence_every=100,
+        method = "adaptive"
     )
+    end_time = time.time()
+    F_vector_final, _, _ = compute_newton_step(species_concentrations_final)
+
+    print(f"Runtime was {end_time - start_time:.3f} s for a residual norm of {np.linalg.norm(F_vector_final)}")
+
     make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)
-
-    # Modify species_concentrations such that we save the species through species.name
+    # Save final concentration
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
-
-# %%

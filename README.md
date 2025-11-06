@@ -13,7 +13,7 @@ Best to use conda:
     ```
 3. run the snakemake files
     ```bash
-    run python -m snakemake -s Snakefile.smk check_case_input_validity --config case_number=0 --cores 1 --use-conda
+    run python -m snakemake -s Snakefile.smk check_case_input_validity ...
     ```
 
 In case the command prompt does not recognize conda (on Windows), follow the next steps:
