@@ -148,6 +148,32 @@ def calculate_reaction_partial_derivative(reaction_to_check, partial_derivative_
         derivative *= -1
     return derivative
 
+def get_pore_density_occupation_information(current_species_concentrations, info_minus_side, info_plus_side):
+    """ Gives necessary information about the density of occupied pores by each species, when given the current
+    concentrations of species dictionary. It also requires 
+    info_minus_side and info_plus_side, which are each tuples (region, n).
+    In case the info_plus_side is such that the region would correspond to the exterior (and thus the 
+    current_species_concentrations would not be able to read a concentration), it gives the exterior concentration
+    """
+    # concentration_rate_ratio_factor = kon/2koff * ( M- + M+ )
+    region_minus, region_minus_last_n = info_minus_side
+    region_plus, region_plus_first_n = info_plus_side
+    concentration_rate_ratio_factor = {specific_species: None for specific_species in REACTION_NETWORK.species}
+    for specific_species in REACTION_NETWORK.species:
+        concentration_left = current_species_concentrations[region_minus][region_minus_last_n][specific_species]
+        if region_plus == NUM_REGIONS:
+            concentration_right = specific_species.external_concentration
+        else:
+            concentration_right = current_species_concentrations[region_plus][region_plus_first_n][specific_species]
+        concentration_rate_ratio_factor[specific_species] = specific_species.k_on/specific_species.k_off * (concentration_left + concentration_right)
+    sum_concentration_rate_ratio_factor = sum(concentration_rate_ratio_factor.values())
+    occupied_pore_density = {
+        specific_species: PORE_DENSITY * concentration_rate_ratio_factor[specific_species] / (1 + sum_concentration_rate_ratio_factor)
+        for specific_species in REACTION_NETWORK.species
+    }
+    total_occupied_pore_density = sum(occupied_pore_density.values())
+    return concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor, occupied_pore_density, total_occupied_pore_density
+
 def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
     du_norm = np.inf
     for iter in range(max_newton_iterations):
@@ -156,8 +182,11 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
         for i in range(NUM_POINTS):
             (region, n, species) = REVERSE_POINT_IDS[i]
             r = RADII[region][n]
-            D = species.diffusion_constant
+            diff = species.diffusion_constant
             point_type = POINT_INFOS[region][n]
+            if MEMBRANE_TYPE == "enzymatic":
+                k_on = species.k_on
+                k_off = species.k_off
             # CONSTRUCT F_i
             # FOR EACH POINT WITHIN THE BULK
             if point_type == "i":
@@ -165,18 +194,20 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                 c_left = species_concentrations[region][left_n][species]
                 c_center = species_concentrations[region][center_n][species]
                 c_right = species_concentrations[region][right_n][species]
-                diffusion_term = D * (1/ DELTA_R**2 * (c_right - 2* c_center + c_left) + 1 /(DELTA_R*r) * (c_right - c_left))
+                diffusion_term = diff * (1/ DELTA_R**2 * (c_right - 2* c_center + c_left) + 1 /(DELTA_R*r) * (c_right - c_left))
                 reaction_term = calculate_reaction_term(region, center_n, species)
                 F[i] = diffusion_term + reaction_term
                 # FILL IN J_ij
                 for j in range(NUM_POINTS):
                     (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    # Contributions from diffusion
                     if j_region == region and j_n == n and j_species == species: # j == i, basically
-                        J[i,j] += D * (1/DELTA_R**2 * (-2))
-                    elif j_region==region and j==right_n and j_species == species: # same species, right or left 
-                        J[i,j] += D * (1/DELTA_R**2 + 1/(DELTA_R*r))
-                    elif j_region==region and j==left_n and j_species == species: # same species, right or left 
-                        J[i,j] += D * (1/DELTA_R**2 - 1/(DELTA_R*r))
+                        J[i,j] += diff * (1/DELTA_R**2 * (-2))
+                    elif j_region==region and j==right_n and j_species == species: # same species, right or left
+                        J[i,j] += diff * (1/DELTA_R**2 + 1/(DELTA_R*r))
+                    elif j_region==region and j==left_n and j_species == species: # same species, right or left
+                        J[i,j] += diff * (1/DELTA_R**2 - 1/(DELTA_R*r))
+                    # Contributions from reactions
                     if j_region == region and j_n == center_n: # if on the same place but not necessarily the same species
                         for reaction in species.as_reactant_in + species.as_product_in:
                             if j_species in [reaction.start_species, reaction.end_species]:
@@ -186,15 +217,17 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                     (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
                     c_r0 = species_concentrations[region][r0_n][species]
                     c_r0_neighbor = species_concentrations[region][r0_neighbor_n][species]
-                    diffusion_term = 3 * D / DELTA_R**2 * 2 * (c_r0_neighbor - c_r0)
+                    diffusion_term = 3 * diff / DELTA_R**2 * 2 * (c_r0_neighbor - c_r0)
                     reaction_term = calculate_reaction_term(region, r0_n, species)
                     F[i] = diffusion_term + reaction_term
                     for j in range(NUM_POINTS):
                         (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                        # Contributions from diffusion
                         if j_region == region and j_n == 0 and j_species == species: # j == i, basically
-                            J[i,j] += -3 * D / DELTA_R**2 * 2
+                            J[i,j] += -3 * diff / DELTA_R**2 * 2
                         elif j_region == region and j_n == 1 and j_species == species: # partial derivative to the one on the right
-                            J[i,j] += 3 * D / DELTA_R**2 * 2
+                            J[i,j] += 3 * diff / DELTA_R**2 * 2
+                        # Contributions from reactions
                         if j_region == region and j_n == n: # if on the same place but not necessarily the same species
                             for reaction in species.as_reactant_in + species.as_product_in:
                                 if j_species in [reaction.start_species, reaction.end_species]:
@@ -205,19 +238,39 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                     c_region_first = species_concentrations[region][0][species]
                     c_region_second = species_concentrations[region][1][species]
                     if MEMBRANE_TYPE == "permeability":
-                        F[i] = D  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
+                        F[i] = diff  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
                         for j in range(NUM_POINTS):
                             (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                            # Contributions from diffusion
                             if j_region == region and j_n == n and j_species == species:
-                                J[i,j] = -D/DELTA_R - species.permeability_constant
+                                J[i,j] += -diff/DELTA_R - species.permeability_constant
                             elif j_region == region and j_species == species and j_n == 1:
-                                J[i,j] = D/DELTA_R
+                                J[i,j] += diff/DELTA_R
                             elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
-                                J[i,j] = -species.permeability_constant
+                                J[i,j] += -species.permeability_constant
+                            # No contributions from reactions (flux considered)
                     elif MEMBRANE_TYPE == "enzymatic":
-                        
-                        F[i] = D * (c_region_second - c_region_first) - 
-                        raise NotImplementedError("Enzymatic")
+                        # membrane is at the left of the segment, dM_+/dt
+                        (concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor,
+                         occupied_pore_density, total_occupied_pore_density) = get_pore_density_occupation_information(species_concentrations, (prev_region, prev_region_last_n), (region, 0))
+                        flux_term = -k_on * (PORE_DENSITY - total_occupied_pore_density) * species_concentrations[region][0][species] + k_off * occupied_pore_density[species]
+                        F[i] = diff * (c_region_second - c_region_first) / DELTA_R - flux_term
+                        for j in range(NUM_POINTS):
+                            (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                            # Diffusion contribution
+                            if j_region == region and j_n == n and j_species == species: # derivative of c_region_first
+                                J[i,j] += -diff/DELTA_R
+                            elif j_region == region and j_species == species and j_n == 1: # derivative of c_region_second
+                                J[i,j] += diff/DELTA_R
+                            # Flux contribution
+                            if j_region == region and j_n == n and j_species == species: # derivative to concentration on right of flux term
+                                derivative_occupied_pore_density = 
+                                complete_derivative = (
+                                    -k_on * (PORE_DENSITY - total_occupied_pore_density) # product rule!
+                                    -k_on * species_concentrations[region][0][species] * (-)
+                                )
+                                J[i,j] += complete_derivative
+
                         
             else: # point_type == "r"
                 if region == NUM_REGIONS-1: # deal with r=R point
@@ -225,14 +278,14 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                     c_rR_neighbor = species_concentrations[region][rR_neighbor_n][species]
                     c_rR = species_concentrations[region][rR_n][species]
                     if MEMBRANE_TYPE == "permeability":
-                        F[i] = D * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
+                        F[i] = diff * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
                         # CONSTRUCT J_ij
                         for j in range(NUM_POINTS):
                             (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                             if j_region == region and j_n == n and j_species == species: # basically i=j
-                                J[i,j] = D/DELTA_R + species.permeability_constant
+                                J[i,j] += diff/DELTA_R + species.permeability_constant
                             elif j_region == region and j_species == species and j_n == rR_neighbor_n:
-                                J[i,j] = -D/DELTA_R
+                                J[i,j] += -diff/DELTA_R
                     elif MEMBRANE_TYPE == "enzymatic":
                         raise NotImplementedError("Enzymatic")
                 else: # deal with right-most point within region (except r=R)
@@ -241,15 +294,15 @@ def solve_newton(max_newton_iterations, save_info=False, save_1_every=1000):
                     c_last = species_concentrations[region][n][species]
                     c_next_region_first = species_concentrations[next_region][0][species]
                     if MEMBRANE_TYPE == "permeability":
-                        F[i] = D  * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
+                        F[i] = diff * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
                         for j in range(NUM_POINTS):
                             (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                             if j_region == region and j_n == n and j_species == species: # basically i=j
-                                J[i,j] = D/DELTA_R + species.permeability_constant
+                                J[i,j] += diff/DELTA_R + species.permeability_constant
                             elif j_region == region and j_species == species and j_n == n-1:
-                                J[i,j] = -D/DELTA_R
+                                J[i,j] += -diff/DELTA_R
                             elif j_region == next_region and j_species == species and j_n == 0:
-                                J[i,j] = species.permeability_constant
+                                J[i,j] += species.permeability_constant
                     elif MEMBRANE_TYPE == "enzymatic":
                         raise NotImplementedError("Enzymatic")
         # Newton update
@@ -352,7 +405,7 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
         for filename in png_files_created:
             image = iio.imread(filename)
             writer.write(image)
-    
+
 if __name__ == "__main__":
     # Load all the information
     FOLDER_TO_SOLVE = sys.argv[1]
@@ -371,6 +424,8 @@ if __name__ == "__main__":
     MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]
     NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]
     NUM_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_REGIONS"]
+    if MEMBRANE_TYPE == "enzymatic":
+        PORE_DENSITY = SYSTEM_GEOMETRY_DICT["MEMBRANE_PROPERTIES"]["pore_density"]
 
     # Step 2: Define structures to access geometry information
     POINT_IDS = build_point_ids_dict()

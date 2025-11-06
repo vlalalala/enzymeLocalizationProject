@@ -18,7 +18,7 @@ def create_csv_header_file(file_path, header_list):
     df = pd.DataFrame(columns=header_list)
     df.to_csv(file_path, encoding='utf-8-sig', index=False)
 
-def create_data_json_file(geometry_info_json_path, dump_directory, dump_basename):
+def create_data_json_file(geometry_info_json_path, membrane_type, dump_directory, dump_basename):
     """
     Takes a dictionary where the values are lists and creates a .json file
     that stores a "nested" dictionary.
@@ -29,6 +29,8 @@ def create_data_json_file(geometry_info_json_path, dump_directory, dump_basename
         parent_key: {child_key: None for child_key in child_keys}
         for parent_key, child_keys in dict_from_original_json_file.items()
     }
+    if membrane_type == "enzymatic":
+        nested.update({"MEMBRANE_PROPERTIES": {"pore_density": 0}})
     # Save the new nested dictionary to a new JSON file
     dump_json(dump_directory, dump_basename, nested)
 
@@ -67,3 +69,4 @@ if __name__ == "__main__":
         create_data_json_file(
             "src/geometry_info.json", f"{df}/{bn}_{cn}", "SYSTEM_GEOMETRY")
 
+# %%
