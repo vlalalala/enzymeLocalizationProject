@@ -353,20 +353,19 @@ def adaptive_newton_step(
     F_vector, _, du = compute_newton_step(species_concentrations)
     norm_F_vector = np.linalg.norm(F_vector)
     if norm_F_vector == 0:
-        return species_concentrations, alpha_current
+        return species_concentrations, alpha_current, 0, 0
     # Step 4: Attempt alpha > 1 first (grow from previous alpha_current)
     alpha_try = min(alpha_current * gamma_inc, alpha_max)
     success = False
     for _ in range(max_backtrack):
         species_concentrations_try = copy.deepcopy(species_concentrations)
         for i, du_value in enumerate(du):
-            (region, n, species) = REVERSE_POINT_IDS[i]
-            species_concentrations_try[region][n][species] += alpha_try * du_value   
+            (i_region, i_n, i_species) = REVERSE_POINT_IDS[i]
+            species_concentrations_try[i_region][i_n][i_species] += alpha_try * du_value
         # Step 5: Check that all new concentrations are still positive (=0 included)
         # If some negative concentrations, decrease alpha. If alpha is already really small,
         # will later exit without success
         if not all_non_negative(species_concentrations_try):
-            print("negative_values!?")
             alpha_try *= gamma_dec
             if alpha_try < alpha_min:
                 break
@@ -378,8 +377,6 @@ def adaptive_newton_step(
         # Step 7: Accept if residual decreased
         if norm_F_vector_try < norm_F_vector:
             species_concentrations = species_concentrations_try
-            alpha_current = min(alpha_try, alpha_max)
-            # optionally enlarge alpha for next iter
             alpha_current = min(alpha_current * gamma_inc, alpha_max)
             success = True
             successive_unsuccessful_steps = 0
@@ -466,7 +463,7 @@ def solve_newton(
             if print_iteration_info_every != 0 and iter%print_iteration_info_every==0 :
                 print(f"No step adaptation:\n"
                       f"iteration: {iter}, norm of F: {format_sci(np.linalg.norm(current_F))}\n"
-                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n"
+                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
                 )
         else:
             current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, current_F_norm = adaptive_newton_step(
@@ -475,7 +472,7 @@ def solve_newton(
                 print(f"Step adaptation:\n"
                       f"iteration: {iter}, norm of F: {current_F_norm},\n"
                       f"alpha: {current_alpha}, current successive unsuccessful steps: {current_successive_unsuccessful_steps}\n",
-                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n"
+                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
                 )
         # Save result if needed
         if save_data_every !=0 and iter%save_data_every==0:
@@ -641,6 +638,11 @@ if __name__ == "__main__":
     dump_json(FOLDER_TO_SOLVE, ".solver_RADII", RADII)
     dump_json(FOLDER_TO_SOLVE, ".solver_POINT_INFOS", POINT_INFOS)
     dump_json(FOLDER_TO_SOLVE, ".solver_NEIGHBORS", NEIGHBORS)
+
+    # Check that each region has at least 3 points
+    for region, radii in RADII.items():
+        if len(radii)<3:
+            raise ValueError(f"Region {region} has less than 3 points, such that the diffusion term does not work.")
 
     # Step 3: Put enzyme location information
     ENZYMES_CONCENTRATIONS = {

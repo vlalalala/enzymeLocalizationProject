@@ -78,12 +78,12 @@ def check_validity_system_geometry_info(case_directory):
     }
     system_geometry_nested_dict["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]  = NUM_MESH_POINTS_IN_REGIONS
 
+
+
     pickle_dump_binary(
         os.path.join(case_directory, ".SYSTEM_GEOMETRY_pickle"),
         system_geometry_nested_dict
     )
-    
-
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
