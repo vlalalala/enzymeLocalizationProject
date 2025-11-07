@@ -641,18 +641,18 @@ if __name__ == "__main__":
     print("convergence parameters",
           {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()})
 
-    ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
+    ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, ".solver_iteration_data")
     if not os.path.exists(ITERATION_DATA_PATH):
         os.makedirs(ITERATION_DATA_PATH)
     
     start_time = time.time()
     ##############################################################################
     species_concentrations_final = solve_newton(
-        max_newton_iterations=10000,
+        max_newton_iterations=1000000,
         initial_species_concentrations_guess=species_concentrations_guess,
         adaptive_step_parameters=adaptive_step_parameters,
         convergence_parameters=convergence_parameters,
-        save_data_every=0,
+        save_data_every=100,
         check_convergence_every=100,
         method = "adaptive"
     )

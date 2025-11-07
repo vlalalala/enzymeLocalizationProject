@@ -29,7 +29,8 @@ reaction_network_info_dict = load_json("src/reaction_network_info.json")
 rule check_system_geometry_data_validity:
     # snakemake -s Snakefile.smk data/violacein_0/.system_geometry_validated --cores 1 --use-conda
     input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json"
+        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json",
+                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info.json"]
     output:
         [touch("{df}/{bn}_{cn}/.system_geometry_validated"), "{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle"]
     conda:

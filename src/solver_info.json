@@ -1,0 +1,30 @@
+{
+"CONVERGENCE_PARAMETERS": [
+    "tol_relative_value",
+    "tol_absolute_factor",
+    "tol_residual_factor"
+],
+"ADAPTIVE_STEP_PARAMETERS": [
+    "initial_alpha",
+    "alpha_min",
+    "alpha_max",
+    "gamma_inc",
+    "gamma_dec",
+    "max_backtrack",
+    "max_accepted_successive_unsuccessful_steps"
+],
+"NEWTON_PARAMETERS": [
+    "max_newton_iterations",
+    "check_convergence_every",
+    "override_adaptive_method"
+],
+"GEOMETRY_PARAMETERS": [
+    "num_mesh_points"
+],
+"OUTPUT_OPTIONS": [
+    "print_convergence_progress",
+    "save_data_every",
+    "create_gif_with_saved_data",
+    "delete_data_at_the_end"
+]
+}
