@@ -4,7 +4,7 @@ import os
 import copy
 import math
 import time
-import shutil
+import glob
 import re
 from itertools import count
 from contextlib import redirect_stdout
@@ -314,13 +314,22 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
         return F, _
 
 def save_newton_iteration_data(
-    iter_string, J, F, species_concentrations_to_save, max_Du_to_save):
-    dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentration",
+    iter_string, J_to_save, F_to_save, species_concentrations_to_save, du_to_save, variables_to_save_dictionary):
+    if variables_to_save_dictionary["save_F_vector"]:
+        np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F_to_save, fmt="%.15e", delimiter="\n")
+    if variables_to_save_dictionary["save_F_vector_norm"]:
+        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F_vector_norm",
+            np.linalg.norm(F_to_save))
+    if variables_to_save_dictionary["save_J_matrix"]:
+        save_matrix_as_sparse_txt(J_to_save, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J_matrix"))
+    if variables_to_save_dictionary["save_du_vector"]:
+        np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_du_vector.txt"), du_to_save, fmt="%.15e", delimiter="\n")
+    if variables_to_save_dictionary["save_du_vector_max"]:
+        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_du_vector_max",
+            max(du_to_save))
+    if variables_to_save_dictionary["save_concentrations"]:    
+        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentration",
             species_concentrations_to_save)
-    dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_max_Du",
-            max_Du_to_save)
-    np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F, fmt="%.15e", delimiter="\n")
-    save_matrix_as_sparse_txt(J, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J"))
 
 def compute_newton_step(species_concentrations):
     # Step 1: Compute residual F and jacobian J
@@ -439,6 +448,7 @@ def solve_newton(
         initial_species_concentrations_guess,
         adaptive_step_parameters,
         convergence_parameters,
+        variables_to_save_dictionary,
         save_data_every=1000,
         check_convergence_every=1000,
         adaptive=True,
@@ -475,10 +485,10 @@ def solve_newton(
                       f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
                 )
         # Save result if needed
-        if save_data_every !=0 and iter%save_data_every==0:
+        if save_data_every !=0 and (iter+1)%save_data_every==0:
             F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
             iter_string = str(iter).zfill(int(math.log10(max_num_newton_iterations)+1))
-            save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, max(du))
+            save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, du, variables_to_save_dictionary)
             if plot_iteration_data_during_simulation:
                 plot_steady_state_concentrations(
                     os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_plot.png"),
@@ -613,6 +623,8 @@ if __name__ == "__main__":
 
     # Step 0: Get all solver parameters
     SOLVER_PARAMS = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".solver_info_pickle"))
+    if SOLVER_PARAMS["OUTPUT_OPTIONS"]["create_gif_with_saved_data"] is True and SOLVER_PARAMS["VARIABLES_TO_SAVE"]["save_concentrations"] is False:
+        raise ValueError("Cannot make the gif if the concentrations are not saved.")
 
     # Step 1: Define all geometry variables
     R = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["outer_membrane_radius"]
@@ -623,7 +635,6 @@ if __name__ == "__main__":
     if MEMBRANE_TYPE == "enzymatic":
         PORE_DENSITY = SYSTEM_GEOMETRY_DICT["MEMBRANE_PROPERTIES"]["pore_density"]
     
-
     # Step 2: Define structures to access geometry information
     POINT_IDS = build_point_ids_dict()
     REVERSE_POINT_IDS = build_reverse_point_ids_dict(POINT_IDS)
@@ -686,6 +697,7 @@ if __name__ == "__main__":
             initial_species_concentrations_guess=species_concentrations_guess,
             adaptive_step_parameters=SOLVER_PARAMS["ADAPTIVE_STEP_PARAMETERS"],
             convergence_parameters=convergence_parameters,
+            variables_to_save_dictionary = SOLVER_PARAMS["VARIABLES_TO_SAVE"],
             save_data_every=SOLVER_PARAMS["OUTPUT_OPTIONS"]["save_data_every"],
             check_convergence_every=SOLVER_PARAMS["NEWTON_PARAMETERS"]["check_convergence_every"],
             adaptive = not SOLVER_PARAMS["NEWTON_PARAMETERS"]["override_adaptive_method"],
@@ -702,17 +714,19 @@ if __name__ == "__main__":
             f"for a residual norm of {format_sci(np.linalg.norm(F_vector_final))},\n"
             f"and a maximum absolute step in concentration of {format_sci(max(du_final))}\n"
             f"with early convergence: {early_convergence}")
-        
-    # Save final concentration
+
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
     plot_steady_state_concentrations(
         os.path.join(FOLDER_TO_SOLVE, "species_steady_state_concentrations.png"),
         species_concentrations_final)
+
     # Make gif
     if SOLVER_PARAMS["OUTPUT_OPTIONS"]["create_gif_with_saved_data"]:
         make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)
     if SOLVER_PARAMS["OUTPUT_OPTIONS"]["delete_data_at_the_end"]:
-        shutil.rmtree(ITERATION_DATA_PATH)
+        files = glob.glob(os.path.join(ITERATION_DATA_PATH, "*"))
+        for f in files:
+            os.remove(f)
 
 
 

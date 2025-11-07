@@ -28,5 +28,13 @@
     "print_iteration_info_every",
     "delete_data_at_the_end",
     "plot_iteration_data_during_simulation"
+],
+"VARIABLES_TO_SAVE":[
+    "save_F_vector",
+    "save_F_vector_norm",
+    "save_J_matrix",
+    "save_du_vector",
+    "save_concentrations",
+    "save_du_vector_max"
 ]
 }
