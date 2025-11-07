@@ -1,4 +1,12 @@
 {
+"GEOMETRY_PARAMETERS": [
+    "num_mesh_points"
+],
+"NEWTON_PARAMETERS": [
+    "max_num_newton_iterations",
+    "check_convergence_every",
+    "override_adaptive_method"
+],
 "CONVERGENCE_PARAMETERS": [
     "tol_relative_value",
     "tol_absolute_factor",
@@ -10,16 +18,8 @@
     "alpha_max",
     "gamma_inc",
     "gamma_dec",
-    "max_backtrack",
-    "max_accepted_successive_unsuccessful_steps"
-],
-"NEWTON_PARAMETERS": [
-    "max_newton_iterations",
-    "check_convergence_every",
-    "override_adaptive_method"
-],
-"GEOMETRY_PARAMETERS": [
-    "num_mesh_points"
+    "max_num_backtrack",
+    "max_num_accepted_successive_unsuccessful_steps"
 ],
 "OUTPUT_OPTIONS": [
     "print_convergence_progress",

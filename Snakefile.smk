@@ -26,13 +26,28 @@ reaction_network_info_dict = load_json("src/reaction_network_info.json")
 # python src/create_file_structure.py permeability 
 # python src/create_file_structure.py enzymatic
 
+rule check_solver_data_validity:
+    # snakemake -s Snakefile.smk data/violacein_0/.solver_info_pickle --cores 1 --use-conda
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info.json"
+    output:
+        touch("{df}/{bn}_{cn}/.solver_info_pickle")
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/check_validity_solver_parameters.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+
+
 rule check_system_geometry_data_validity:
-    # snakemake -s Snakefile.smk data/violacein_0/.system_geometry_validated --cores 1 --use-conda
+    """ To define the system geometry, the number of mesh points for the solver already
+    has to be read, in order to shift the membrane positions to the closest mesh positions
+    """
+    # snakemake -s Snakefile.smk data/violacein_0/.SYSTEM_GEOMETRY_pickle --cores 1 --use-conda
     input:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json",
                            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info.json"]
     output:
-        [touch("{df}/{bn}_{cn}/.system_geometry_validated"), "{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle"]
+        touch(f"{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle")
     conda:
         "config/environment.yaml"
     shell:
@@ -66,10 +81,10 @@ rule solve_boundary_value_problem:
     input:
         lambda wildcards: [
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle"]
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle"]
     output:
-        [#"{df}/{bn}_{cn}/solution.png",
-        "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"]
+        "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     conda:
         "config/environment.yaml"
     shell:
