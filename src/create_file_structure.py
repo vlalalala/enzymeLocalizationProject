@@ -77,8 +77,11 @@ if __name__ == "__main__":
             if os.path.isfile(file_path):
                 continue
             create_csv_header_file(file_path, reaction_network_info_dict[file_name])
+        solver_iteration_data_folder = f"{df}/{bn}_{cn}/solver_iteration_data"
+        os.makedirs(solver_iteration_data_folder, exist_ok=True)
+        with open(os.path.join(solver_iteration_data_folder, ".iteration_data"), 'w') as f:
+            pass  # Ensure no content is written
         create_system_geometry_json_file(
             "src/geometry_info.json", membrane_type, f"{df}/{bn}_{cn}", "SYSTEM_GEOMETRY")
         create_solver_parameters_json_file("src/solver_info.json", f"{df}/{bn}_{cn}", "solver_info")
 
-# %%

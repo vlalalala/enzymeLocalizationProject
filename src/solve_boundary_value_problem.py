@@ -8,12 +8,16 @@ import glob
 import re
 from itertools import count
 from contextlib import redirect_stdout
+import argparse
 from tqdm import tqdm
 import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import lil_matrix, csr_matrix
 import matplotlib.pyplot as plt
-from auxiliary_functions_using_standard_library import nested_max, all_non_negative, format_sci, pickle_load_binary, closest_value, dump_json, find_sorted_file_names, load_json, find_max_in_nested_dict
+from auxiliary_functions_using_standard_library import (rename_iteration_files,
+    int_from_sci, nested_max, all_non_negative, format_sci, pickle_load_binary,
+    closest_value, dump_json, find_sorted_unique_files_with_max_digits_and_max_value, load_json,
+    find_max_in_nested_dict)
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from auxiliary_functions import save_matrix_as_sparse_txt
 import imageio.v3 as iio
@@ -328,7 +332,7 @@ def save_newton_iteration_data(
         dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_du_vector_max",
             max(du_to_save))
     if variables_to_save_dictionary["save_concentrations"]:    
-        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentration",
+        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentrations",
             species_concentrations_to_save)
 
 def compute_newton_step(species_concentrations):
@@ -444,8 +448,9 @@ def check_convergence(current_species_concentrations, convergence_parameters, pr
 
 def solve_newton(
         simulation_start_time,
+        initial_iteration_number,
         max_num_newton_iterations,
-        initial_species_concentrations_guess,
+        initial_species_concentrations,
         adaptive_step_parameters,
         convergence_parameters,
         variables_to_save_dictionary,
@@ -459,11 +464,14 @@ def solve_newton(
     """
     save_data_every and check_convergence_every N iterations. If not to be done, set each to 0.
     """
-    current_species_concentrations = initial_species_concentrations_guess
+    current_species_concentrations = initial_species_concentrations
     current_alpha = adaptive_step_parameters["initial_alpha"]
     current_successive_unsuccessful_steps = 0
     early_convergence = False
-    for iter in tqdm(range(int(max_num_newton_iterations)), file=sys.stderr):
+    for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
+                     file=sys.stderr,
+                     total=int(max_num_newton_iterations),
+                     initial=initial_iteration_number):
         # Improve species concentration estimate
         if adaptive == False:
             current_F, _, du = compute_newton_step(current_species_concentrations)
@@ -487,7 +495,7 @@ def solve_newton(
         # Save result if needed
         if save_data_every !=0 and (iter+1)%save_data_every==0:
             F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
-            iter_string = str(iter).zfill(int(math.log10(max_num_newton_iterations)+1))
+            iter_string = str(iter).zfill(NUM_NEWTON_ITERATIONS_DIGITS)
             save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, du, variables_to_save_dictionary)
             if plot_iteration_data_during_simulation:
                 plot_steady_state_concentrations(
@@ -551,12 +559,26 @@ def plot_steady_state_concentrations(output_file_name, species_concentrations_to
     fig.savefig(output_file_name, dpi = 300, bbox_inches='tight')
     plt.close(fig)
 
+def get_species_concentrations_from_json_file(imported_concentrations_dict_from_json):
+    """Make keys that got converted to strings instead of integers into integers again
+    """
+    dict_in_correct_concentrations_format = {
+            int(region_idx): {
+                int(mesh_point_idx): {
+                    SPECIES_LOOKUP[species_name]: data
+                    for species_name, data in mesh_point_info.items()}
+                for mesh_point_idx, mesh_point_info in region_info.items()}
+            for region_idx, region_info in imported_concentrations_dict_from_json.items()
+        }
+    return dict_in_correct_concentrations_format
+
+
 def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
     """
     Important: delete any .json files from previous simulations that may not be overwritten.
     """
     file_to_create = os.path.join(gif_output_folder, "newton_iterations.gif")
-    sorted_files = find_sorted_file_names(iteration_data_folder, ".iteration_nr_*_concentration.json")
+    sorted_files, max_digits = find_sorted_unique_files_with_max_digits_and_max_value(iteration_data_folder, ".iteration_nr_*_concentrations.json", max_iteration_value = MAX_NUM_NEWTON_ITERATIONS)
     max_concentration_value = 0
     for file in sorted_files:
         concentration_dict = load_json(file)
@@ -568,33 +590,22 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
             max_concentration_value = species.external_concentration
     max_concentration_value *= 1.1
     png_files_created = []
-    # to put the species object back in the dictionary  
-    species_lookup = {sp.name: sp for sp in REACTION_NETWORK.species}
     print("creating files for gif", file_to_create)
     for file in tqdm(sorted_files, file=sys.stderr):
-        species_concentrations_to_plot_dict_with_strings = load_json(file)
-        max_Du_file = file.replace("_concentration.json", "_max_Du.json")
-        max_Du = load_json(max_Du_file)
-        F_file = file.replace("_concentration.json", "_F.txt")
-        F_norm = np.linalg.norm(np.loadtxt(F_file))
-        # Make keys that got converted to strings instead of integers into integers again
-        species_concentrations_to_plot_dict = {
-            int(region_idx): {
-                int(mesh_point_idx): {
-                    species_lookup[species_name]: data
-                    for species_name, data in mesh_point_info.items()}
-                for mesh_point_idx, mesh_point_info in region_info.items()}
-            for region_idx, region_info in species_concentrations_to_plot_dict_with_strings.items()
-        }
         png_file = os.path.splitext(file)[0] + ".png" # remove .json
-        number = re.findall(r"\d+", os.path.basename(png_file))[0]
+        number = int(re.findall(r"\d+", os.path.basename(png_file))[0])
+        number_with_max_digits = f"{number:0{max_digits}d}"
+        title_lines = [f"iteration #{number_with_max_digits}"]
+        species_concentrations_to_plot_dict_with_strings = load_json(file)
+        if SOLVER_PARAMS["VARIABLES_TO_SAVE"]["save_F_vector_norm"]:
+            residual_norm_file= file.replace("_concentrations.json", "_F_vector_norm.json")
+            residual_norm = load_json(residual_norm_file)
+            title_lines.append(f"residual norm: {format_sci(residual_norm)}")
+        species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
+            species_concentrations_to_plot_dict_with_strings)
         plot_steady_state_concentrations(
             png_file, species_concentrations_to_plot_dict,
-            title = (
-                f"iteration #{number}\n"
-                f"residual norm: {format_sci(F_norm)}\n"
-                f"max absolute step: {format_sci(max_Du)}"
-            ),
+            title = "\n".join(title_lines),
             ymax = max_concentration_value)
         png_files_created.append(png_file)
     
@@ -605,13 +616,26 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
             writer.write(image)
 
 if __name__ == "__main__":
-    # Load all the information
-    FOLDER_TO_SOLVE = sys.argv[1]
-    # Create a folder in which to save iteration data
-    ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, ".solver_iteration_data")
-    os.makedirs(ITERATION_DATA_PATH, exist_ok=True)
+    # Parse arguments from command line
+    parser = argparse.ArgumentParser()
+    parser.add_argument("folder_to_solve", type=str, help="Path to folder with system info")
+    # use int(float()) to be able to pass scientific notation
+    parser.add_argument("--max-iterations", type=lambda x: int(float(x)), help="Maximum Newton iterations") 
+    parser.add_argument("--previous-solution", type=str, default=None,
+                        help="Optional path to previous iteration solution file.")
+    args = parser.parse_args()
 
+    # Load all the passed information
+    FOLDER_TO_SOLVE = args.folder_to_solve
+    MAX_NUM_NEWTON_ITERATIONS = args.max_iterations
+    PREVIOUS_SOLUTION = args.previous_solution
+    ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
+    NUM_NEWTON_ITERATIONS_DIGITS = int(math.log10(MAX_NUM_NEWTON_ITERATIONS)+1)
+
+    # Load inputs and define global parameters
     REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".REACTION_NETWORK_pickle"))
+    # Lookup to be able to match the species from the species name saved in .json files  
+    SPECIES_LOOKUP = {sp.name: sp for sp in REACTION_NETWORK.species}
     SYSTEM_GEOMETRY_DICT = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".SYSTEM_GEOMETRY_pickle"))
     # Read out type of membrane
     if hasattr(REACTION_NETWORK.species[0], "permeability_constant"):
@@ -674,8 +698,25 @@ if __name__ == "__main__":
             for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
         for region_idx in range(NUM_REGIONS)
     }
+    # Guess is used to find the order of magnitude of convergence conditions
     max_guess_concentration = nested_max(species_concentrations_guess)
     F_vector_guess, _, _ = compute_newton_step(species_concentrations_guess)
+    # Load any previous solution
+    BASENAME_PREVIOUS_SOLUTION = os.path.basename(PREVIOUS_SOLUTION)
+    if "iteration_data" not in BASENAME_PREVIOUS_SOLUTION:
+        previous_solution_species_concentrations_dict_with_strings = load_json(PREVIOUS_SOLUTION)
+        species_concentrations_initial = get_species_concentrations_from_json_file(
+            previous_solution_species_concentrations_dict_with_strings)
+        match = re.search(r"(\d+)", BASENAME_PREVIOUS_SOLUTION)
+        if match:
+            INITIAL_ITERATION_NUMBER = int(match.group(1))
+        else:
+            raise ValueError("Could not get the iter from the previous solution")
+        rename_iteration_files(ITERATION_DATA_PATH, max_digits=NUM_NEWTON_ITERATIONS_DIGITS, dry_run=False)
+        
+    else:
+        species_concentrations_initial = species_concentrations_guess
+        INITIAL_ITERATION_NUMBER = 0
     
     # Step 5: Define convergence criterion
     convergence_parameters = {
@@ -685,16 +726,19 @@ if __name__ == "__main__":
         "tol_absolute":max_guess_concentration*SOLVER_PARAMS["CONVERGENCE_PARAMETERS"]["tol_absolute_factor"],
         "tol_residual":np.linalg.norm(F_vector_guess)*SOLVER_PARAMS["CONVERGENCE_PARAMETERS"]["tol_residual_factor"],
     }
+
     # Important: save output for checking. tqdm is excluded
-    with open(os.path.join(FOLDER_TO_SOLVE, ".newton_solver.log"), "w") as f, redirect_stdout(f):
+    with open(os.path.join(FOLDER_TO_SOLVE, ".newton_solver.log"), "a") as f, redirect_stdout(f):
+        print(f"Starting solver from iteration number {INITIAL_ITERATION_NUMBER} \n")
         print("convergence parameters",
             {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()}, "\n")
         # Step 6: Run solver (timed)
         start_time = time.time()
         species_concentrations_final, early_convergence = solve_newton(
             simulation_start_time=start_time,
-            max_num_newton_iterations=SOLVER_PARAMS["NEWTON_PARAMETERS"]["max_num_newton_iterations"],
-            initial_species_concentrations_guess=species_concentrations_guess,
+            initial_iteration_number=INITIAL_ITERATION_NUMBER,
+            max_num_newton_iterations=MAX_NUM_NEWTON_ITERATIONS,
+            initial_species_concentrations=species_concentrations_initial,
             adaptive_step_parameters=SOLVER_PARAMS["ADAPTIVE_STEP_PARAMETERS"],
             convergence_parameters=convergence_parameters,
             variables_to_save_dictionary = SOLVER_PARAMS["VARIABLES_TO_SAVE"],
@@ -727,6 +771,3 @@ if __name__ == "__main__":
         files = glob.glob(os.path.join(ITERATION_DATA_PATH, "*"))
         for f in files:
             os.remove(f)
-
-
-

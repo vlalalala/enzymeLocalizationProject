@@ -2,10 +2,14 @@
 Functions (to use e.g. for cleaning config inputs) that only require Python's standard library
 """
 import os
+import re
 import ast
 import json
 import pickle
 import glob
+
+def int_from_sci(x):
+    return int(float(x))
 
 def nested_max(dictionary):
     max_val = float("-inf")
@@ -125,15 +129,120 @@ def as_list(value, type_cast=str):
     else:
         # Single value (e.g. int or float)
         return [type_cast(value)]
-    
-def find_sorted_file_names(folder, pattern_to_find):
-    """ pattern_to_find must look somewhat like this: ".iteration_nr_*_concentration.png"
-    To have them sorted correctly, the file names should have the correct zero-padding.
+
+def rename_iteration_files(folder, max_digits=5, dry_run=True):
+    """
+    Renames files like .iteration_nr_3_concentrations.json → .iteration_nr_00003_concentrations.json
+
+    Parameters
+    ----------
+    folder : str
+        Folder containing the files.
+    max_digits : int
+        Desired number of digits in the iteration number.
+    dry_run : bool
+        If True, only print what would be done (no actual rename).
+    """
+    pattern = os.path.join(folder, ".iteration_nr_*_*")
+    files = glob.glob(pattern)
+
+    renamed = []
+    skipped = []
+    for f in files:
+        basename = os.path.basename(f)
+
+        # Find iteration number
+        match = re.search(r"(\d+)", basename)
+        if not match:
+            continue
+
+        old_num_str = match.group(1)
+        num = int(old_num_str)
+
+        # Skip renaming if number length exceeds max_digits
+        if len(str(num)) > max_digits:
+            print(f"Skipping {basename}: number {num} exceeds max_digits={max_digits}")
+            skipped.append(basename)
+            continue
+
+        new_num_str = f"{num:0{max_digits}d}"
+
+        # Replace only the first number in the filename
+        new_basename = re.sub(r"\d+", new_num_str, basename, count=1)
+        new_path = os.path.join(folder, new_basename)
+
+        if f != new_path:
+            if dry_run:
+                print(f"Would rename: {basename} → {new_basename}")
+            else:
+                os.rename(f, new_path)
+                print(f"Renamed: {basename} → {new_basename}")
+            renamed.append((basename, new_basename))
+
+    print(f"\nTotal files processed: {len(files)}")
+    print(f"Files renamed: {len(renamed)}")
+    print(f"Files skipped (too many digits): {len(skipped)}")
+
+    return renamed, skipped
+
+def find_sorted_unique_files_with_max_digits_and_max_value(folder, pattern_to_find, max_iteration_value):
+    """
+    Returns a tuple:
+        (unique_files_sorted, max_digits)
+
+    - unique_files_sorted: list of files sorted numerically by iteration number,
+      keeping only one file per iteration number (the one with the most digits / leading zeros),
+      and only including iterations <= max_iteration_value.
+    - max_digits: the highest number of digits in the iteration numbers
     """
     pattern = os.path.join(folder, pattern_to_find)
     files = glob.glob(pattern)
-    files.sort()
-    return files
+    
+    iter_map = {}  # iteration number -> list of files
+    max_digits = 0
+
+    for f in files:
+        basename = os.path.basename(f)
+        m = re.search(r"(\d+)", basename)
+        if not m:
+            continue
+
+        iter_num_str = m.group(1)
+        iter_num = int(iter_num_str)
+
+        # ✅ skip anything above the requested max iteration value
+        if iter_num > max_iteration_value:
+            continue
+
+        max_digits = max(max_digits, len(iter_num_str))
+        iter_map.setdefault(iter_num, []).append(f)
+
+    unique_files = []
+    for iter_num, flist in iter_map.items():
+        # Sort by number of digits (descending), keep the most zero-padded one
+        flist.sort(
+            key=lambda x: len(re.search(r"(\d+)", os.path.basename(x)).group(1)),
+            reverse=True
+        )
+        best_file = flist[0]
+        unique_files.append(best_file)
+
+        # Delete duplicates (keep only the most zero-padded one)
+        for duplicate in flist[1:]:
+            try:
+                os.remove(duplicate)
+                print(f"Deleted duplicate: {duplicate}")
+            except OSError:
+                print(f"Warning: could not delete {duplicate}")
+
+    # Sort the unique files numerically
+    unique_files.sort(
+        key=lambda x: int(re.search(r"(\d+)", os.path.basename(x)).group(1))
+    )
+
+    return unique_files, max_digits
+
+
 
 def find_max_in_nested_dict(d):
     max_val = float('-inf')

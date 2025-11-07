@@ -3,6 +3,7 @@
 ### Import libraries from Python standard libraries ###
 
 import os
+import re
 from itertools import product
 from src.auxiliary_functions_using_standard_library import as_list, load_json
 
@@ -65,19 +66,72 @@ rule create_reaction_network:
     shell:
         "python src/create_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-rule solve_boundary_value_problem:
-    # snakemake -s Snakefile.smk data/violacein_0/.species_steady_state_concentrations.json --cores 1 --use-conda
+def find_latest_solution(wildcards):
+    """
+    Return the path to the latest results/solution_iter_XX.pkl file.
+    Handles zero-padded iteration numbers (e.g. 00, 001, etc.).
+    """
+    results_folder = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_iteration_data"
+    files = [f for f in os.listdir(results_folder) if re.match(r"\.iteration_nr_\d+_concentrations", f)]
+    if not files:
+        print("No latest solution files exist")
+        return os.path.join(results_folder, ".iteration_data")  # fallback if nothing yet
+    # Extract iteration numbers as integers
+    iter_nums = [int(re.search(r"(\d+)", f).group(1)) for f in files]
+    latest_iter = max(iter_nums)
+    # Keep original zero-padding width
+    width = len(re.search(r"(\d+)", files[0]).group(1))
+    return os.path.join(results_folder, f".iteration_nr_{latest_iter:0{width}d}_concentrations.json")
+
+rule cleanup_old_iterations:
+    """In case the input files for a simulation have been changed, all of the
+    files with .iteration_nr* have to be deleted, as well as the log file created
+    previously.
+    """
     input:
-        lambda wildcards: [
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle"]
+        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
+        solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
+    output:
+        touch("{df}/{bn}_{cn}/.cleanup_done")
+    run:
+        import os, glob
+        folder = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        print(f"Cleaning up {folder}")
+        # delete all old iteration files
+        for f in glob.glob(os.path.join(folder, "solver_iteration_data/.iteration_nr_*")):
+            os.remove(f)
+        log_file = os.path.join(folder, ".newton_solver.log")
+        if os.path.exists(log_file):
+            os.remove(log_file)
+        # mark cleanup as done
+        with open(output[0], "w") as f:
+            f.write("done\n")
+
+rule solve_boundary_value_problem:
+    """The max-iterations condition can be increased as required without deleting anything.
+    """
+    # snakemake -s Snakefile.smk data/exampleToManuallyCheck_0/.species_steady_state_concentrations.json --config max_iterations=1e6 --cores 1 --use-conda
+    input:
+        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
+        solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
+        cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.cleanup_done",
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
+    params:
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 1000)),
+        previous_solution = find_latest_solution
     conda:
         "config/environment.yaml"
     shell:
-        "python src/solve_boundary_value_problem.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        """
+        python src/solve_boundary_value_problem.py \
+            {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+            --max-iterations {params.max_iterations} \
+            --previous-solution {params.previous_solution}"
+        """
+        
 
 
 

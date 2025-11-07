@@ -3,7 +3,6 @@
     "num_mesh_points"
 ],
 "NEWTON_PARAMETERS": [
-    "max_num_newton_iterations",
     "check_convergence_every",
     "override_adaptive_method"
 ],
