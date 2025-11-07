@@ -450,7 +450,7 @@ def solve_newton(
     for iter in tqdm(range(int(max_newton_iterations))):
         # Improve species concentration estimate
         if method == "simple":
-            F, _, du = compute_newton_step(current_species_concentrations)
+            _, _, du = compute_newton_step(current_species_concentrations)
             for i, du_value in enumerate(du):
                 (region, n, species) = REVERSE_POINT_IDS[i]
                 current_species_concentrations[region][n][species] +=  du_value
@@ -610,24 +610,34 @@ if __name__ == "__main__":
         for region_idx in range(NUM_REGIONS)
     }
     max_guess_concentration = nested_max(species_concentrations_guess)
-    # Step 5: Run solver and save result; plot
-    adaptive_step_parameters = {
-        "initial_alpha":1.0,
-        "alpha_min":1e-6,
-        "alpha_max":10,
-        "gamma_inc":1.15,
-        "gamma_dec":0.5,
-        "max_backtrack":1000,
-        "max_accepted_successive_unsuccessful_steps": 5
-    }
-
     F_vector_guess, _, _ = compute_newton_step(species_concentrations_guess)
-
+    
+    ##############################################################################
+    # Step 5: Define convergence criterion and parameters for adaptive steps
     convergence_parameters = {
         "tol_relative":1e-20,
         "tol_absolute":max_guess_concentration*1e-8,
         "tol_residual":np.linalg.norm(F_vector_guess)*1e-8,
     }
+
+    adaptive_step_parameters = {
+        "initial_alpha":1.0,
+        "alpha_min":1e-6,
+        "alpha_max":20,
+        "gamma_inc":1.15,
+        "gamma_dec":0.5,
+        "max_backtrack":1000,
+        "max_accepted_successive_unsuccessful_steps": 3
+    }
+
+    newton_parameters = {
+        "max_newton_iterations": 10000,
+        "check_convergence_every": 100,
+        "method": "adaptive",
+        "show_data_every": 0
+    }
+    ##############################################################################
+
     print("convergence parameters",
           {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()})
 
@@ -636,20 +646,24 @@ if __name__ == "__main__":
         os.makedirs(ITERATION_DATA_PATH)
     
     start_time = time.time()
+    ##############################################################################
     species_concentrations_final = solve_newton(
         max_newton_iterations=10000,
         initial_species_concentrations_guess=species_concentrations_guess,
         adaptive_step_parameters=adaptive_step_parameters,
         convergence_parameters=convergence_parameters,
-        save_data_every=100,
+        save_data_every=0,
         check_convergence_every=100,
         method = "adaptive"
     )
+    ##############################################################################
     end_time = time.time()
     F_vector_final, _, _ = compute_newton_step(species_concentrations_final)
 
     print(f"Runtime was {end_time - start_time:.3f} s for a residual norm of {np.linalg.norm(F_vector_final)}")
-
-    make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)
+    
     # Save final concentration
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
+    # Make gif
+    make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)
+
