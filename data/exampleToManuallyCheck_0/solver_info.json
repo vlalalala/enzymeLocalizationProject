@@ -14,8 +14,8 @@
         "max_num_accepted_successive_unsuccessful_steps": 5
     },
     "NEWTON_PARAMETERS": {
-        "max_num_newton_iterations": 1e6,
-        "check_convergence_every": 1e4,
+        "max_num_newton_iterations": 1e4,
+        "check_convergence_every": 1e2,
         "override_adaptive_method": "True"
     },
     "GEOMETRY_PARAMETERS": {
@@ -23,9 +23,9 @@
     },
     "OUTPUT_OPTIONS": {
         "print_convergence_progress": "False",
-        "save_data_every": 1e4,
+        "save_data_every": 1e2,
         "plot_iteration_data_during_simulation":"False",
-        "print_iteration_info_every": 1000,
+        "print_iteration_info_every": 1e2,
         "create_gif_with_saved_data": "True",
         "delete_data_at_the_end": "True"
     }

@@ -25,6 +25,8 @@
     "print_convergence_progress",
     "save_data_every",
     "create_gif_with_saved_data",
-    "delete_data_at_the_end"
+    "print_iteration_info_every",
+    "delete_data_at_the_end",
+    "plot_iteration_data_during_simulation"
 ]
 }

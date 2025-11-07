@@ -63,7 +63,6 @@ if __name__ == "__main__":
     case_numbers = as_list(config_info["case_numbers"], int)
     digits_case_numbers = int(config_info["digits_case_numbers"])
     padded_case_numbers = [str(n).zfill(digits_case_numbers) for n in case_numbers]
-
     # Get information about .csv files to create
     reaction_network_info_dict = load_json("src/reaction_network_info.json")
 

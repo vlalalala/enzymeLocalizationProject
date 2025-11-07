@@ -5,9 +5,11 @@ import copy
 import math
 import time
 import shutil
+import re
+from itertools import count
+from contextlib import redirect_stdout
 from tqdm import tqdm
 import numpy as np
-from itertools import count
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import lil_matrix, csr_matrix
 import matplotlib.pyplot as plt
@@ -15,7 +17,7 @@ from auxiliary_functions_using_standard_library import nested_max, all_non_negat
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from auxiliary_functions import save_matrix_as_sparse_txt
 import imageio.v3 as iio
-import re
+
 
 def build_point_ids_dict() -> dict:
     """ Build a nested dict mapping (region, mesh_point, species) to unique IDs.
@@ -381,6 +383,7 @@ def adaptive_newton_step(
             alpha_current = min(alpha_current * gamma_inc, alpha_max)
             success = True
             successive_unsuccessful_steps = 0
+            norm_F_to_return = norm_F_vector_try
             break
         # otherwise shrink alpha and retry
         alpha_try *= gamma_dec
@@ -396,9 +399,9 @@ def adaptive_newton_step(
         for i, du_value in enumerate(du):
             (region, n, species) = REVERSE_POINT_IDS[i]
             species_concentrations[region][n][species] += alpha_current * du_value
+        norm_F_to_return = norm_F_vector
         
-        
-    return species_concentrations, alpha_current, successive_unsuccessful_steps
+    return species_concentrations, alpha_current, successive_unsuccessful_steps, norm_F_to_return
 
 def check_convergence(current_species_concentrations, convergence_parameters, print_info):
     """
@@ -434,6 +437,7 @@ def check_convergence(current_species_concentrations, convergence_parameters, pr
     return convergence
 
 def solve_newton(
+        simulation_start_time,
         max_num_newton_iterations,
         initial_species_concentrations_guess,
         adaptive_step_parameters,
@@ -441,7 +445,9 @@ def solve_newton(
         save_data_every=1000,
         check_convergence_every=1000,
         adaptive=True,
-        print_convergence_info=False
+        print_convergence_info=False,
+        print_iteration_info_every=0,
+        plot_iteration_data_during_simulation=False
     ):
     """
     save_data_every and check_convergence_every N iterations. If not to be done, set each to 0.
@@ -450,21 +456,42 @@ def solve_newton(
     current_alpha = adaptive_step_parameters["initial_alpha"]
     current_successive_unsuccessful_steps = 0
     early_convergence = False
-    for iter in tqdm(range(int(max_num_newton_iterations))):
+    for iter in tqdm(range(int(max_num_newton_iterations)), file=sys.stderr):
         # Improve species concentration estimate
         if adaptive == False:
-            _, _, du = compute_newton_step(current_species_concentrations)
+            current_F, _, du = compute_newton_step(current_species_concentrations)
             for i, du_value in enumerate(du):
                 (region, n, species) = REVERSE_POINT_IDS[i]
                 current_species_concentrations[region][n][species] +=  du_value
+            if print_iteration_info_every != 0 and iter%print_iteration_info_every==0 :
+                print(f"No step adaptation:\n"
+                      f"iteration: {iter}, norm of F: {format_sci(np.linalg.norm(current_F))}\n"
+                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n"
+                )
         else:
-            current_species_concentrations, current_alpha, current_successive_unsuccessful_steps = adaptive_newton_step(
-                current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)   
+            current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, current_F_norm = adaptive_newton_step(
+                current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)
+            if print_iteration_info_every != 0 and iter%print_iteration_info_every==0 :
+                print(f"Step adaptation:\n"
+                      f"iteration: {iter}, norm of F: {current_F_norm},\n"
+                      f"alpha: {current_alpha}, current successive unsuccessful steps: {current_successive_unsuccessful_steps}\n",
+                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n"
+                )
         # Save result if needed
         if save_data_every !=0 and iter%save_data_every==0:
             F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
             iter_string = str(iter).zfill(int(math.log10(max_num_newton_iterations)+1))
             save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, max(du))
+            if plot_iteration_data_during_simulation:
+                plot_steady_state_concentrations(
+                    os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_plot.png"),
+                    current_species_concentrations,
+                    title = (
+                            f"iteration #{iter}\n"
+                            f"residual norm: {format_sci(np.linalg.norm(F_vector))}\n"
+                            f"max absolute step: {format_sci(max(du))}"
+                        )
+                )
         # Stop iterating if criterion for convergence fulfilled
         if check_convergence_every !=0 and iter%check_convergence_every==0:
             convergence = check_convergence(
@@ -521,6 +548,7 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
     """
     Important: delete any .json files from previous simulations that may not be overwritten.
     """
+    file_to_create = os.path.join(gif_output_folder, "newton_iterations.gif")
     sorted_files = find_sorted_file_names(iteration_data_folder, ".iteration_nr_*_concentration.json")
     max_concentration_value = 0
     for file in sorted_files:
@@ -535,10 +563,13 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
     png_files_created = []
     # to put the species object back in the dictionary  
     species_lookup = {sp.name: sp for sp in REACTION_NETWORK.species}
-    for file in sorted_files:
+    print("creating files for gif", file_to_create)
+    for file in tqdm(sorted_files, file=sys.stderr):
         species_concentrations_to_plot_dict_with_strings = load_json(file)
         max_Du_file = file.replace("_concentration.json", "_max_Du.json")
         max_Du = load_json(max_Du_file)
+        F_file = file.replace("_concentration.json", "_F.txt")
+        F_norm = np.linalg.norm(np.loadtxt(F_file))
         # Make keys that got converted to strings instead of integers into integers again
         species_concentrations_to_plot_dict = {
             int(region_idx): {
@@ -550,13 +581,19 @@ def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
         }
         png_file = os.path.splitext(file)[0] + ".png" # remove .json
         number = re.findall(r"\d+", os.path.basename(png_file))[0]
-        max_Du_plottable = format_sci(max_Du)
-        plot_steady_state_concentrations(png_file, species_concentrations_to_plot_dict, title = f"iteration # {number}, max(Delta concentration) = {max_Du_plottable}", ymax = max_concentration_value)
+        plot_steady_state_concentrations(
+            png_file, species_concentrations_to_plot_dict,
+            title = (
+                f"iteration #{number}\n"
+                f"residual norm: {format_sci(F_norm)}\n"
+                f"max absolute step: {format_sci(max_Du)}"
+            ),
+            ymax = max_concentration_value)
         png_files_created.append(png_file)
-    file_to_create = os.path.join(gif_output_folder, "newton_iterations.gif")
+    
     print("creating gif", file_to_create)
     with iio.imopen(file_to_create, "w") as writer:
-        for filename in png_files_created:
+        for filename in tqdm(png_files_created, file=sys.stderr):
             image = iio.imread(filename)
             writer.write(image)
 
@@ -635,30 +672,40 @@ if __name__ == "__main__":
         "tol_absolute":max_guess_concentration*SOLVER_PARAMS["CONVERGENCE_PARAMETERS"]["tol_absolute_factor"],
         "tol_residual":np.linalg.norm(F_vector_guess)*SOLVER_PARAMS["CONVERGENCE_PARAMETERS"]["tol_residual_factor"],
     }
+    # Important: save output for checking. tqdm is excluded
+    with open(os.path.join(FOLDER_TO_SOLVE, ".newton_solver.log"), "w") as f, redirect_stdout(f):
+        print("convergence parameters",
+            {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()}, "\n")
+        # Step 6: Run solver (timed)
+        start_time = time.time()
+        species_concentrations_final, early_convergence = solve_newton(
+            simulation_start_time=start_time,
+            max_num_newton_iterations=SOLVER_PARAMS["NEWTON_PARAMETERS"]["max_num_newton_iterations"],
+            initial_species_concentrations_guess=species_concentrations_guess,
+            adaptive_step_parameters=SOLVER_PARAMS["ADAPTIVE_STEP_PARAMETERS"],
+            convergence_parameters=convergence_parameters,
+            save_data_every=SOLVER_PARAMS["OUTPUT_OPTIONS"]["save_data_every"],
+            check_convergence_every=SOLVER_PARAMS["NEWTON_PARAMETERS"]["check_convergence_every"],
+            adaptive = not SOLVER_PARAMS["NEWTON_PARAMETERS"]["override_adaptive_method"],
+            print_iteration_info_every = SOLVER_PARAMS["OUTPUT_OPTIONS"]["print_iteration_info_every"],
+            print_convergence_info = SOLVER_PARAMS["OUTPUT_OPTIONS"]["print_convergence_progress"],
+            plot_iteration_data_during_simulation = SOLVER_PARAMS["OUTPUT_OPTIONS"]["plot_iteration_data_during_simulation"]
+        )
+        end_time = time.time()
 
-    print("convergence parameters",
-          {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()})
+        # Log relevant data (if given)
+        F_vector_final, _, du_final = compute_newton_step(species_concentrations_final)
 
-    # Step 6: Run solver (timed)
-    start_time = time.time()
-    species_concentrations_final, early_convergence = solve_newton(
-        max_num_newton_iterations=SOLVER_PARAMS["NEWTON_PARAMS"]["max_num_newton_iterations"],
-        initial_species_concentrations_guess=species_concentrations_guess,
-        adaptive_step_parameters=SOLVER_PARAMS["ADAPTIVE_STEP_PARAMETERS"],
-        convergence_parameters=convergence_parameters,
-        save_data_every=SOLVER_PARAMS["OUTPUT_OPTIONS"]["save_data_every"],
-        check_convergence_every=SOLVER_PARAMS["NEWTON_PARAMS"]["check_convergence_every"],
-        adaptive = not SOLVER_PARAMS["NEWTON_PARAMS"]["override_adaptive_method"],
-        print_convergence_info = SOLVER_PARAMS["OUTPUT_OPTIONS"]["print_convergence_progress"]
-    )
-    end_time = time.time()
-    
-    # Print run time (if given)
-    F_vector_final, _, _ = compute_newton_step(species_concentrations_final)
-    print(f"Runtime was {end_time - start_time:.3f} s for a residual norm of {np.linalg.norm(F_vector_final)}, with early convergence: {early_convergence}")
-    
+        print(f"Runtime was {end_time - start_time:.3f} s\n"
+            f"for a residual norm of {format_sci(np.linalg.norm(F_vector_final))},\n"
+            f"and a maximum absolute step in concentration of {format_sci(max(du_final))}\n"
+            f"with early convergence: {early_convergence}")
+        
     # Save final concentration
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
+    plot_steady_state_concentrations(
+        os.path.join(FOLDER_TO_SOLVE, "species_steady_state_concentrations.png"),
+        species_concentrations_final)
     # Make gif
     if SOLVER_PARAMS["OUTPUT_OPTIONS"]["create_gif_with_saved_data"]:
         make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)

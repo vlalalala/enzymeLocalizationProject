@@ -89,7 +89,3 @@ if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
     check_validity_system_geometry_info(folder_to_check_validity)
 
-
-# %%
-int("True")
-# %%

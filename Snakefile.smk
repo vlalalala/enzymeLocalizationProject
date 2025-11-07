@@ -6,17 +6,6 @@ import os
 from itertools import product
 from src.auxiliary_functions_using_standard_library import as_list, load_json
 
-### Setup import of inputs ###
-
-configfile: "config/config.json"
-
-data_folder = config["data_folder"]
-base_name = config["base_name"]
-
-case_numbers = as_list(config["case_numbers"], int)
-digits_case_numbers = int(config["digits_case_numbers"])
-padded_case_numbers = [str(n).zfill(digits_case_numbers) for n in case_numbers]
-
 ### Get template for input files about reaction network ###
 
 reaction_network_info_dict = load_json("src/reaction_network_info.json")
@@ -47,7 +36,7 @@ rule check_system_geometry_data_validity:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json",
                            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info.json"]
     output:
-        touch(f"{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle")
+        touch("{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle")
     conda:
         "config/environment.yaml"
     shell:
