@@ -339,6 +339,7 @@ def adaptive_newton_step(
     Returns (next_species_concentrations, alpha_current) where info is dict with diagnostics.
     """
     # Step 0: Unpack parameters
+    initial_alpha = adaptive_step_parameters.get("initial_alpha")
     alpha_min = adaptive_step_parameters.get("alpha_min")
     alpha_max = adaptive_step_parameters.get("alpha_max")
     gamma_inc = adaptive_step_parameters.get("gamma_inc")
@@ -389,11 +390,12 @@ def adaptive_newton_step(
         successive_unsuccessful_steps += 1
         if successive_unsuccessful_steps > max_accepted_successive_unsuccessful_steps:
             raise ValueError("Newton failed")
-        # in case that the backtracking did not work, set alpha_current to 1
+        # in case that the backtracking did not work, set alpha_current to initial value
+        alpha_current = initial_alpha
         for i, du_value in enumerate(du):
             (region, n, species) = REVERSE_POINT_IDS[i]
-            species_concentrations[region][n][species] += 1 * du_value
-        alpha_current = 1
+            species_concentrations[region][n][species] += alpha_current * du_value
+        
         
     return species_concentrations, alpha_current, successive_unsuccessful_steps
 
@@ -462,7 +464,7 @@ def solve_newton(
             save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, max(du))
         # Stop iterating if criterion for convergence fulfilled
         if check_convergence_every !=0 and iter%check_convergence_every==0:
-            convergence = check_convergence(current_species_concentrations, convergence_parameters, print_info=True)
+            convergence = check_convergence(current_species_concentrations, convergence_parameters, print_info=False)
             if convergence:
                 print(f"Convergence after {iter} iterations.")
                 break
@@ -612,7 +614,7 @@ if __name__ == "__main__":
     adaptive_step_parameters = {
         "initial_alpha":1.0,
         "alpha_min":1e-6,
-        "alpha_max":3,
+        "alpha_max":10,
         "gamma_inc":1.15,
         "gamma_dec":0.5,
         "max_backtrack":1000,
