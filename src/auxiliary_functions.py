@@ -98,21 +98,24 @@ def no_repeated_rows_in_csv_file(csv_file: str):
         raise ValueError(f"Found {len(duplicates)} duplicated row(s):", duplicates)
 
 def check_correct_type(dataframe: pd.DataFrame, columns_of_interest: list, expected_type) -> bool:
+    """ Returns True or raises Error (good for asserting) if all the values within
+    the columns listed in columns_of_interest have the type expected_type.
+    """
     for col in columns_of_interest:
         if not dataframe[col].map(lambda x: isinstance(x, expected_type)).all():
             raise TypeError(f"Column '{col}' contains values not of type {expected_type}")
     return True
 
 def checks_lack_of_repetitions(array)-> bool:
-    """Returns True only if there are no repetitions in the array.
-    Raises an error if these are repeated"""
+    """Returns True only if there are no repetitions in the array. 
+    Raises an error if these are repeated (good for asserting).
+    """
     unique_values, values_counts = np.unique(array, return_counts=True)
     if any(count for count in values_counts if count!=1):
         repetitions_dict = {value: count for value, count in zip(unique_values, values_counts)
                             if count!=1}
         raise ValueError("There are repeated values:", repetitions_dict)
-    else:
-        return True
+    return True
 
 def print_network_info(graph):
     """Prints all the graph info."""

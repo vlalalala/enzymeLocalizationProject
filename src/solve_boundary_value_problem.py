@@ -6,117 +6,22 @@ import math
 import time
 import glob
 import re
-from itertools import count
 from contextlib import redirect_stdout
 import argparse
 from tqdm import tqdm
 import numpy as np
 from scipy.sparse.linalg import spsolve
-from scipy.sparse import lil_matrix, csr_matrix
+from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
 from auxiliary_functions_using_standard_library import (rename_iteration_files,
-    int_from_sci, nested_max, all_non_negative, format_sci, pickle_load_binary,
-    closest_value, dump_json, find_sorted_unique_files_with_max_digits_and_max_value, load_json,
-    find_max_in_nested_dict)
+    nested_max, all_non_negative, format_sci, pickle_load_binary,
+    dump_json, load_json)
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-from auxiliary_functions import save_matrix_as_sparse_txt
-import imageio.v3 as iio
-
-
-def build_point_ids_dict() -> dict:
-    """ Build a nested dict mapping (region, mesh_point, species) to unique IDs.
-    """
-    counter = count()  # local counter — resets each time you call the function
-    point_ids_dict = {
-        region_idx: {
-            mesh_point_idx: {
-                species: next(counter)
-                for species in REACTION_NETWORK.species
-            }
-            for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])
-        }
-        for region_idx in range(NUM_REGIONS)
-    }
-    return point_ids_dict
-
-def build_reverse_point_ids_dict(point_ids_dict) -> dict:
-    """ Takes the return dict from build_point_ids_dict and constructs a
-    inverse dictionary.
-    The key is the index of the node and the value is (region, n, species).
-    """
-    reverse_point_ids_dict = {
-        value: (region_idx, mesh_point_idx, species)
-        for region_idx, mesh_points in point_ids_dict.items()
-        for mesh_point_idx, species_map in mesh_points.items()
-        for species, value in species_map.items()
-    }
-    return reverse_point_ids_dict
-
-def build_radii_dict() -> dict:
-    """ Returns a dictionary dict_name[region][n] : radius_to_origin
-    """
-    radii_dict = {
-        region_idx : {
-            mesh_point_idx : MESH_POINTS_IN_REGIONS[region_idx][mesh_point_idx]
-            for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])
-        }
-        for region_idx in range(NUM_REGIONS)
-    }
-    return radii_dict
-
-def build_point_infos_dict() -> dict:
-    """ Gives information on whether the node is within the bulk of the region,
-    the left-most node within the region or the right-most node within the region.
-    dict_name[region][n] : "i" or "l" or "r", respectively
-    """
-    point_infos_dict = {
-        region_idx : {
-            mesh_point_idx : "l" if mesh_point_idx==0 else ("r" if mesh_point_idx==NUM_MESH_POINTS_IN_REGIONS[region_idx]-1 else "i")
-            for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])
-        }
-        for region_idx in range(NUM_REGIONS)
-    }
-    return point_infos_dict
-
-def build_point_neighbor_dict() -> dict:
-    """ Gives a list of (region, n) tuples for each [region][n] which specifies
-    the node information of spatial neighbors (and itself).
-    dict_name[region][n] : [(region, n-1), (region, n), (region, n+1)] e.g. for
-    "i" nodes. for "l" and "r" nodes it depends on whether the node is at an inner
-    boundary or at r=0 or r=R. Always goes from left to right.
-    """
-    neighbors_dict = {}
-
-    for region_idx, mesh_points in POINT_INFOS.items():
-        for n, kind in mesh_points.items():
-            if kind == "i":
-                # Internal: previous, self, next
-                neighbors_dict[(region_idx, n)] = [
-                    (region_idx, n - 1),
-                    (region_idx, n),
-                    (region_idx, n + 1),
-                ]
-            elif kind == "l":
-                # Left boundary: connect to previous region's rightmost point (if it exists)
-                if region_idx > 0:
-                    prev_region_last = NUM_MESH_POINTS_IN_REGIONS[region_idx - 1] - 1
-                    neighbors_dict[(region_idx, n)] = [
-                        (region_idx - 1, prev_region_last),
-                    ]
-                else:
-                    neighbors_dict[(region_idx, n)] = []
-                neighbors_dict[(region_idx, n)].append( (region_idx, 0) )
-                neighbors_dict[(region_idx, n)].append( (region_idx, 1) )
-            elif kind == "r":
-                # Right boundary: self’s region last, then 0 and 1 in same region
-                last_in_region = NUM_MESH_POINTS_IN_REGIONS[region_idx] - 1
-                neighbors_dict[(region_idx, n)] = [
-                    (region_idx, last_in_region-1),
-                    (region_idx, last_in_region),
-                ]
-                if region_idx < NUM_REGIONS-1:
-                    neighbors_dict[(region_idx, n)].append( (region_idx+1, 0) )
-    return neighbors_dict
+from plot_boundary_value_problem import plot_steady_state_concentrations, make_newton_iterations_gif
+from auxiliary_functions_framework_organization import (
+    get_species_concentrations_from_json_file, save_newton_iteration_data)
+from solver_mesh_descriptor import (build_point_ids_dict, build_reverse_point_ids_dict, 
+    build_radii_dict, build_point_infos_dict, build_point_neighbor_dict)
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i.
@@ -171,6 +76,10 @@ def get_pore_density_occupation_information(current_species_concentrations, info
     return concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor, occupied_pore_density, total_occupied_pore_density
 
 def define_newton_residual_and_optionally_jacobian(current_species_concentrations, fill_jacobian = True):
+    """Defines the residual vector F and the jacobian matrix J (not sparse) 
+    (the latter only if fill_jacobian is set to True (default)).
+    Returns either F, _ or F, J.    
+    """
     F = np.zeros(NUM_POINTS)
     if fill_jacobian:
         J = lil_matrix((NUM_POINTS, NUM_POINTS))# np.zeros((NUM_POINTS, NUM_POINTS)) 
@@ -317,25 +226,10 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
     else:
         return F, _
 
-def save_newton_iteration_data(
-    iter_string, J_to_save, F_to_save, species_concentrations_to_save, du_to_save, variables_to_save_dictionary):
-    if variables_to_save_dictionary["save_F_vector"]:
-        np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F.txt"), F_to_save, fmt="%.15e", delimiter="\n")
-    if variables_to_save_dictionary["save_F_vector_norm"]:
-        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_F_vector_norm",
-            np.linalg.norm(F_to_save))
-    if variables_to_save_dictionary["save_J_matrix"]:
-        save_matrix_as_sparse_txt(J_to_save, os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_J_matrix"))
-    if variables_to_save_dictionary["save_du_vector"]:
-        np.savetxt(os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_du_vector.txt"), du_to_save, fmt="%.15e", delimiter="\n")
-    if variables_to_save_dictionary["save_du_vector_max"]:
-        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_du_vector_max",
-            max(du_to_save))
-    if variables_to_save_dictionary["save_concentrations"]:    
-        dump_json(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentrations",
-            species_concentrations_to_save)
-
 def compute_newton_step(species_concentrations):
+    """ Returns the vector of the residual, the jacobian as a sparse matrix, and delta u vector
+    found by solving for the change in the concentrations.
+    """
     # Step 1: Compute residual F and jacobian J
     F_vector, J_matrix = define_newton_residual_and_optionally_jacobian(species_concentrations)
     # Step 2: Assemble J (sparse), convert to solver-friendly format
@@ -519,101 +413,9 @@ def solve_newton(
                 break
     return current_species_concentrations, early_convergence
 
-def plot_steady_state_concentrations(output_file_name, species_concentrations_to_plot, title = None, ymax = None):
-    x_values = []
-    y_values = {}
-    for species_idx, species in enumerate(REACTION_NETWORK.species):
-        species_y_values = []
-        for region in range(NUM_REGIONS):
-            for n in range(NUM_MESH_POINTS_IN_REGIONS[region]):
-                if species_idx == 0:
-                    x_values.append(RADII[region][n])
-                species_y_values.append(species_concentrations_to_plot[region][n][species])
-        y_values[species] = species_y_values
-
-    fig, ax = plt.subplots(1,1, figsize = (5,3))
-    for x_value in x_values:
-        ax.axvline(x_value/max(x_values), ymin = 0.95, ymax = 1, color="k")
-    for species in REACTION_NETWORK.species:
-        curve, = ax.plot(x_values/max(x_values), y_values[species], label=species.name)
-        color = curve.get_color()
-        ax.hlines(species.external_concentration, xmin=1, xmax = 1.1, color = color)
-    ax.set_ylabel("concentration / M")
-    ax.set_xlabel("relative distance to origin / r/R")
-    ax.legend(
-        loc='upper center',      # anchor point of legend
-        bbox_to_anchor=(0.5, -0.25),  # (x, y) position in figure coordinates
-        ncol=3,                  # number of columns
-        frameon=False
-    )
-    for membrane_radius in MEMBRANE_RADII:
-        ax.axvline(membrane_radius/max(MEMBRANE_RADII), linestyle = "--", alpha = 0.5, c = "k")
-
-    max_value = max(max(y_values[species]) for species in REACTION_NETWORK.species)
-    if ymax == None:
-        ymax = max_value * 1.05
-    if title != None:
-        ax.set_title(title, loc="left")
-    ax.set_ylim(ymin=0, ymax = ymax)
-    ax.set_xlim(xmin=0, xmax = 1.1)
-    fig.savefig(output_file_name, dpi = 300, bbox_inches='tight')
-    plt.close(fig)
-
-def get_species_concentrations_from_json_file(imported_concentrations_dict_from_json):
-    """Make keys that got converted to strings instead of integers into integers again
-    """
-    dict_in_correct_concentrations_format = {
-            int(region_idx): {
-                int(mesh_point_idx): {
-                    SPECIES_LOOKUP[species_name]: data
-                    for species_name, data in mesh_point_info.items()}
-                for mesh_point_idx, mesh_point_info in region_info.items()}
-            for region_idx, region_info in imported_concentrations_dict_from_json.items()
-        }
-    return dict_in_correct_concentrations_format
 
 
-def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
-    """
-    Important: delete any .json files from previous simulations that may not be overwritten.
-    """
-    file_to_create = os.path.join(gif_output_folder, "newton_iterations.gif")
-    sorted_files, max_digits = find_sorted_unique_files_with_max_digits_and_max_value(iteration_data_folder, ".iteration_nr_*_concentrations.json", max_iteration_value = MAX_NUM_NEWTON_ITERATIONS)
-    max_concentration_value = 0
-    for file in sorted_files:
-        concentration_dict = load_json(file)
-        max_value = find_max_in_nested_dict(concentration_dict)
-        if max_value > max_concentration_value:
-            max_concentration_value = max_value
-    for species in REACTION_NETWORK.species:
-        if species.external_concentration > max_concentration_value:
-            max_concentration_value = species.external_concentration
-    max_concentration_value *= 1.1
-    png_files_created = []
-    print("creating files for gif", file_to_create)
-    for file in tqdm(sorted_files, file=sys.stderr):
-        png_file = os.path.splitext(file)[0] + ".png" # remove .json
-        number = int(re.findall(r"\d+", os.path.basename(png_file))[0])
-        number_with_max_digits = f"{number:0{max_digits}d}"
-        title_lines = [f"iteration #{number_with_max_digits}"]
-        species_concentrations_to_plot_dict_with_strings = load_json(file)
-        if SOLVER_PARAMS["VARIABLES_TO_SAVE"]["save_F_vector_norm"]:
-            residual_norm_file= file.replace("_concentrations.json", "_F_vector_norm.json")
-            residual_norm = load_json(residual_norm_file)
-            title_lines.append(f"residual norm: {format_sci(residual_norm)}")
-        species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
-            species_concentrations_to_plot_dict_with_strings)
-        plot_steady_state_concentrations(
-            png_file, species_concentrations_to_plot_dict,
-            title = "\n".join(title_lines),
-            ymax = max_concentration_value)
-        png_files_created.append(png_file)
-    
-    print("creating gif", file_to_create)
-    with iio.imopen(file_to_create, "w") as writer:
-        for filename in tqdm(png_files_created, file=sys.stderr):
-            image = iio.imread(filename)
-            writer.write(image)
+
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -668,11 +470,12 @@ if __name__ == "__main__":
     POINT_INFOS = build_point_infos_dict()
     NEIGHBORS = build_point_neighbor_dict()
     # Save dictionaries in .json files for readability
-    dump_json(FOLDER_TO_SOLVE, ".solver_POINT_IDS", POINT_IDS)
-    dump_json(FOLDER_TO_SOLVE, ".solver_REVERSE_POINT_IDS", REVERSE_POINT_IDS)
-    dump_json(FOLDER_TO_SOLVE, ".solver_RADII", RADII)
-    dump_json(FOLDER_TO_SOLVE, ".solver_POINT_INFOS", POINT_INFOS)
-    dump_json(FOLDER_TO_SOLVE, ".solver_NEIGHBORS", NEIGHBORS)
+    if SOLVER_PARAMS["OUTPUT_OPTIONS"]["save_geometry_structure"]:
+        dump_json(FOLDER_TO_SOLVE, ".solver_POINT_IDS", POINT_IDS)
+        dump_json(FOLDER_TO_SOLVE, ".solver_REVERSE_POINT_IDS", REVERSE_POINT_IDS)
+        dump_json(FOLDER_TO_SOLVE, ".solver_RADII", RADII)
+        dump_json(FOLDER_TO_SOLVE, ".solver_POINT_INFOS", POINT_INFOS)
+        dump_json(FOLDER_TO_SOLVE, ".solver_NEIGHBORS", NEIGHBORS)
 
     # Check that each region has at least 3 points
     for region, radii in RADII.items():
@@ -703,7 +506,7 @@ if __name__ == "__main__":
     F_vector_guess, _, _ = compute_newton_step(species_concentrations_guess)
     # Load any previous solution
     BASENAME_PREVIOUS_SOLUTION = os.path.basename(PREVIOUS_SOLUTION)
-    if "iteration_data" not in BASENAME_PREVIOUS_SOLUTION:
+    if "none" not in BASENAME_PREVIOUS_SOLUTION:
         previous_solution_species_concentrations_dict_with_strings = load_json(PREVIOUS_SOLUTION)
         species_concentrations_initial = get_species_concentrations_from_json_file(
             previous_solution_species_concentrations_dict_with_strings)

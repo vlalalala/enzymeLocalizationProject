@@ -6,6 +6,8 @@ import os
 import re
 from itertools import product
 from src.auxiliary_functions_using_standard_library import as_list, load_json
+from src.auxiliary_functions_framework_organization_using_standard_library import(
+    find_latest_solution)
 
 ### Get template for input files about reaction network ###
 
@@ -66,26 +68,9 @@ rule create_reaction_network:
     shell:
         "python src/create_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-def find_latest_solution(wildcards):
-    """
-    Return the path to the latest results/solution_iter_XX.pkl file.
-    Handles zero-padded iteration numbers (e.g. 00, 001, etc.).
-    """
-    results_folder = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_iteration_data"
-    files = [f for f in os.listdir(results_folder) if re.match(r"\.iteration_nr_\d+_concentrations", f)]
-    if not files:
-        print("No latest solution files exist")
-        return os.path.join(results_folder, ".iteration_data")  # fallback if nothing yet
-    # Extract iteration numbers as integers
-    iter_nums = [int(re.search(r"(\d+)", f).group(1)) for f in files]
-    latest_iter = max(iter_nums)
-    # Keep original zero-padding width
-    width = len(re.search(r"(\d+)", files[0]).group(1))
-    return os.path.join(results_folder, f".iteration_nr_{latest_iter:0{width}d}_concentrations.json")
-
 rule cleanup_old_iterations:
     """In case the input files for a simulation have been changed, all of the
-    files with .iteration_nr* have to be deleted, as well as the log file created
+    files with .iteration_nr_* have to be deleted, as well as the log file created
     previously.
     """
     input:
@@ -93,7 +78,7 @@ rule cleanup_old_iterations:
         geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
         solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
     output:
-        touch("{df}/{bn}_{cn}/.cleanup_done")
+        touch("{df}/{bn}_{cn}/.clean_iterations")
     run:
         import os, glob
         folder = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
@@ -109,18 +94,19 @@ rule cleanup_old_iterations:
             f.write("done\n")
 
 rule solve_boundary_value_problem:
-    """The max-iterations condition can be increased as required without deleting anything.
+    """The max-iterations condition can be changed as required without deleting anything.
+    Automatically finds the latest iteration saved.
     """
     # snakemake -s Snakefile.smk data/exampleToManuallyCheck_0/.species_steady_state_concentrations.json --config max_iterations=1e6 --cores 1 --use-conda
     input:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
         geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
         solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
-        cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.cleanup_done",
+        cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.clean_iterations",
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 1000)),
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 1e6)),
         previous_solution = find_latest_solution
     conda:
         "config/environment.yaml"
@@ -131,6 +117,32 @@ rule solve_boundary_value_problem:
             --max-iterations {params.max_iterations} \
             --previous-solution {params.previous_solution}"
         """
+
+rule plot_boundary_value_problem_iteration:
+    """Plots the concentration of the species. If the number of the iteration
+    --config iteration=<n> is given, that iteration is plotted.
+    Otherwise, the latest iteration file found is used.
+    """
+    # snakemake -s Snakefile.smk data/exampleToManuallyCheck_0/.plot_iteration --config iteration=42 --cores 1 --use-conda
+    input:
+        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
+        solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
+    params:
+        iteration_file = lambda wildcards: find_iteration_to_plot(wildcards, config.get("iteration", None))
+    output:
+        lambda w: os.path.splitext(params.iteration_file(w))[0] + ".png"
+    conda:
+        "config/environment.yaml"
+    shell:
+        """
+        python src/plot_boundary_value_problem.py \
+            {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+
+        
+        """
+
+
         
 
 

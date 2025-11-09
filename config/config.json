@@ -2,5 +2,6 @@
 "data_folder": "data",
 "base_name": "exampleToManuallyCheck",
 "digits_case_numbers": 0,
-"case_numbers": [1]
+"case_numbers": [1],
+"solver_data_folder": "solver_iteration_data"
 }
