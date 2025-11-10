@@ -448,7 +448,8 @@ if __name__ == "__main__":
         raise ValueError("Membrane type not correctly specified.")
 
     # Step 0: Get all solver parameters
-    SOLVER_PARAMS = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".solver_info_pickle"))
+    
+    SOLVER_PARAMS = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".solver_info_input_pickle"))
     if SOLVER_PARAMS["OUTPUT_OPTIONS"]["create_gif_with_saved_data"] is True and SOLVER_PARAMS["VARIABLES_TO_SAVE"]["save_concentrations"] is False:
         raise ValueError("Cannot make the gif if the concentrations are not saved.")
 
@@ -462,13 +463,13 @@ if __name__ == "__main__":
         PORE_DENSITY = SYSTEM_GEOMETRY_DICT["MEMBRANE_PROPERTIES"]["pore_density"]
     
     # Step 2: Define structures to access geometry information
-    POINT_IDS = build_point_ids_dict()
+    POINT_IDS = build_point_ids_dict(REACTION_NETWORK, NUM_MESH_POINTS_IN_REGIONS)
     REVERSE_POINT_IDS = build_reverse_point_ids_dict(POINT_IDS)
-    RADII = build_radii_dict()
+    RADII = build_radii_dict(MESH_POINTS_IN_REGIONS, )
     DELTA_R = RADII[0][1]-RADII[0][0] # the different points within a region are equally spaced
     NUM_POINTS = len(REVERSE_POINT_IDS) # each point saves the concentration for one species at one node
-    POINT_INFOS = build_point_infos_dict()
-    NEIGHBORS = build_point_neighbor_dict()
+    POINT_INFOS = build_point_infos_dict(NUM_MESH_POINTS_IN_REGIONS)
+    NEIGHBORS = build_point_neighbor_dict(NUM_MESH_POINTS_IN_REGIONS)
     # Save dictionaries in .json files for readability
     if SOLVER_PARAMS["OUTPUT_OPTIONS"]["save_geometry_structure"]:
         dump_json(FOLDER_TO_SOLVE, ".solver_POINT_IDS", POINT_IDS)

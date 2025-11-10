@@ -1,7 +1,7 @@
 import sys
 import os
 import numpy as np
-from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary, closest_value
+from auxiliary_functions_using_standard_library import dump_json, load_json, pickle_dump_binary, closest_value
 
 def check_validity_system_geometry_info(case_directory):
     
@@ -78,7 +78,10 @@ def check_validity_system_geometry_info(case_directory):
     }
     system_geometry_nested_dict["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]  = NUM_MESH_POINTS_IN_REGIONS
 
-
+    dump_json(
+        os.path.join(case_directory, ".SYSTEM_GEOMETRY_expanded.json"),
+        system_geometry_nested_dict
+    )
 
     pickle_dump_binary(
         os.path.join(case_directory, ".SYSTEM_GEOMETRY_pickle"),

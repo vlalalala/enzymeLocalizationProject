@@ -2,10 +2,8 @@ import sys
 import os
 from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary, closest_value
 
-def check_validity_solver_parameters(case_directory):
-    """Checks that in the solver info, everything has the correct type
-    """
-    solver_info_nested_dict = load_json(os.path.join(case_directory, "solver_info.json"))
+def check_validity_file(case_directory, file_name):
+    solver_info_nested_dict = load_json(os.path.join(case_directory, file_name))
 
     for section, section_dict in solver_info_nested_dict.items():
         for key, value in section_dict.items():
@@ -103,11 +101,17 @@ def check_validity_solver_parameters(case_directory):
                         raise ValueError(
                             f"In '{section}', '{key}' ({min_val_f}) cannot be greater than '{max_key}' ({max_val_f})."
                         )
-   
-    pickle_dump_binary(
-        os.path.join(case_directory, ".solver_info_pickle"),
-        solver_info_nested_dict
-    )
+    return solver_info_nested_dict
+
+def check_validity_solver_parameters(case_directory):
+    """Checks that in the solver info, everything has the correct type
+    """
+    for file_name in ["solver_info_input", "solver_info_params"]:
+        solver_info_nested_dict = check_validity_file(case_directory, f"{file_name}.json")
+        pickle_dump_binary(
+            os.path.join(case_directory, f".{file_name}_pickle"),
+            solver_info_nested_dict
+        )
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]

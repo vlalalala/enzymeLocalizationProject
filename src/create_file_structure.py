@@ -39,7 +39,7 @@ def create_system_geometry_json_file(path_to_json_file_describing_dict_structure
     # Save the new nested dictionary to a new JSON file
     dump_json(dump_directory, dump_basename, nested)
 
-def create_solver_parameters_json_file(path_to_json_file_describing_dict_structure, dump_directory, dump_basename):
+def create_json_file_with_None_values(path_to_json_file_describing_dict_structure, dump_directory, dump_basename):
     """Creates the json file with the solver parameters.
     """
     nested = get_nested_dict_with_None_values(path_to_json_file_describing_dict_structure)
@@ -82,5 +82,6 @@ if __name__ == "__main__":
         os.makedirs(solver_iteration_data_folder, exist_ok=True)
         create_system_geometry_json_file(
             "src/geometry_info.json", membrane_type, f"{df}/{bn}_{cn}", "SYSTEM_GEOMETRY")
-        create_solver_parameters_json_file("src/solver_info.json", f"{df}/{bn}_{cn}", "solver_info")
+        for file_name in ["solver_info_input", "solver_info_params"]:
+            create_json_file_with_None_values(f"src/{file_name}.json", f"{df}/{bn}_{cn}", f"{file_name}")
 

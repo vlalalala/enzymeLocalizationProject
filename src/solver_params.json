@@ -1,0 +1,7 @@
+{
+"CONVERGENCE_PARAMETERS": [
+    "tol_relative_value",
+    "tol_absolute_factor",
+    "tol_residual_factor"
+]
+}

@@ -35,33 +35,33 @@ def build_reverse_point_ids_dict(point_ids_dict) -> dict:
     }
     return reverse_point_ids_dict
 
-def build_radii_dict(num_mesh_points_in_regions) -> dict:
+def build_radii_dict(mesh_points_in_regions) -> dict:
     """ Returns a dictionary dict_name[region][n] : radius_to_origin
     """
     radii_dict = {
         region_idx : {
-            mesh_point_idx : MESH_POINTS_IN_REGIONS[region_idx][mesh_point_idx]
-            for mesh_point_idx in range(num_mesh_points_in_regions[region_idx])
+            mesh_point_idx : mesh_points_in_regions[region_idx][mesh_point_idx]
+            for mesh_point_idx in range(len(mesh_points_in_regions[region_idx]))
         }
-        for region_idx in range(len(num_mesh_points_in_regions))
+        for region_idx in range(len(mesh_points_in_regions))
     }
     return radii_dict
 
-def build_point_infos_dict() -> dict:
+def build_point_infos_dict(num_mesh_points_in_regions) -> dict:
     """ Gives information on whether the node is within the bulk of the region,
     the left-most node within the region or the right-most node within the region.
     dict_name[region][n] : "i" or "l" or "r", respectively
     """
     point_infos_dict = {
         region_idx : {
-            mesh_point_idx : "l" if mesh_point_idx==0 else ("r" if mesh_point_idx==NUM_MESH_POINTS_IN_REGIONS[region_idx]-1 else "i")
-            for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])
+            mesh_point_idx : "l" if mesh_point_idx==0 else ("r" if mesh_point_idx==num_mesh_points_in_regions[region_idx]-1 else "i")
+            for mesh_point_idx in range(num_mesh_points_in_regions[region_idx])
         }
-        for region_idx in range(NUM_REGIONS)
+        for region_idx in range(len(num_mesh_points_in_regions))
     }
     return point_infos_dict
 
-def build_point_neighbor_dict() -> dict:
+def build_point_neighbor_dict(num_mesh_points_in_regions) -> dict:
     """ Gives a list of (region, n) tuples for each [region][n] which specifies
     the node information of spatial neighbors (and itself).
     dict_name[region][n] : [(region, n-1), (region, n), (region, n+1)] e.g. for
@@ -69,8 +69,8 @@ def build_point_neighbor_dict() -> dict:
     boundary or at r=0 or r=R. Always goes from left to right.
     """
     neighbors_dict = {}
-
-    for region_idx, mesh_points in POINT_INFOS.items():
+    point_infos = build_point_infos_dict(num_mesh_points_in_regions)
+    for region_idx, mesh_points in point_infos.items():
         for n, kind in mesh_points.items():
             if kind == "i":
                 # Internal: previous, self, next
@@ -82,7 +82,7 @@ def build_point_neighbor_dict() -> dict:
             elif kind == "l":
                 # Left boundary: connect to previous region's rightmost point (if it exists)
                 if region_idx > 0:
-                    prev_region_last = NUM_MESH_POINTS_IN_REGIONS[region_idx - 1] - 1
+                    prev_region_last = num_mesh_points_in_regions[region_idx - 1] - 1
                     neighbors_dict[(region_idx, n)] = [
                         (region_idx - 1, prev_region_last),
                     ]
@@ -92,11 +92,11 @@ def build_point_neighbor_dict() -> dict:
                 neighbors_dict[(region_idx, n)].append( (region_idx, 1) )
             elif kind == "r":
                 # Right boundary: self’s region last, then 0 and 1 in same region
-                last_in_region = NUM_MESH_POINTS_IN_REGIONS[region_idx] - 1
+                last_in_region = num_mesh_points_in_regions[region_idx] - 1
                 neighbors_dict[(region_idx, n)] = [
                     (region_idx, last_in_region-1),
                     (region_idx, last_in_region),
                 ]
-                if region_idx < NUM_REGIONS-1:
+                if region_idx < len(num_mesh_points_in_regions)-1:
                     neighbors_dict[(region_idx, n)].append( (region_idx+1, 0) )
     return neighbors_dict

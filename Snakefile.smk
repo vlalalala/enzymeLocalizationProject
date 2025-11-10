@@ -19,11 +19,11 @@ reaction_network_info_dict = load_json("src/reaction_network_info.json")
 # python src/create_file_structure.py enzymatic
 
 rule check_solver_data_validity:
-    # snakemake -s Snakefile.smk data/violacein_0/.solver_info_pickle --cores 1 --use-conda
+    # snakemake -s Snakefile.smk data/test_0/.solver_info_*_pickle --cores 1 --use-conda
     input:
         lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info.json"
     output:
-        touch("{df}/{bn}_{cn}/.solver_info_pickle")
+        ["{df}/{bn}_{cn}/.solver_info_input_pickle", "{df}/{bn}_{cn}/.solver_info_params_pickle"]
     conda:
         "config/environment.yaml"
     shell:
@@ -37,9 +37,12 @@ rule check_system_geometry_data_validity:
     # snakemake -s Snakefile.smk data/violacein_0/.SYSTEM_GEOMETRY_pickle --cores 1 --use-conda
     input:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json",
-                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info.json"]
+                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info_input.json",
+                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info_params.json"
+                           ]
     output:
-        touch("{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle")
+        ["{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle",
+        "{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_expanded.json"]
     conda:
         "config/environment.yaml"
     shell:
@@ -101,13 +104,13 @@ rule solve_boundary_value_problem:
     input:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
         geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
-        solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
+        solver_info_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_input_pickle",
         cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.clean_iterations",
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
         max_iterations = lambda wildcards: int(config.get("max_iterations", 1e6)),
-        previous_solution = find_latest_solution
+        solver_info_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_params_pickle"
     conda:
         "config/environment.yaml"
     shell:
@@ -118,29 +121,6 @@ rule solve_boundary_value_problem:
             --previous-solution {params.previous_solution}"
         """
 
-rule plot_boundary_value_problem_iteration:
-    """Plots the concentration of the species. If the number of the iteration
-    --config iteration=<n> is given, that iteration is plotted.
-    Otherwise, the latest iteration file found is used.
-    """
-    # snakemake -s Snakefile.smk data/exampleToManuallyCheck_0/.plot_iteration --config iteration=42 --cores 1 --use-conda
-    input:
-        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
-        solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
-    params:
-        iteration_file = lambda wildcards: find_iteration_to_plot(wildcards, config.get("iteration", None))
-    output:
-        lambda w: os.path.splitext(params.iteration_file(w))[0] + ".png"
-    conda:
-        "config/environment.yaml"
-    shell:
-        """
-        python src/plot_boundary_value_problem.py \
-            {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
-
-        
-        """
 
 
         

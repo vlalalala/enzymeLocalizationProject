@@ -6,11 +6,6 @@
     "check_convergence_every",
     "override_adaptive_method"
 ],
-"CONVERGENCE_PARAMETERS": [
-    "tol_relative_value",
-    "tol_absolute_factor",
-    "tol_residual_factor"
-],
 "ADAPTIVE_STEP_PARAMETERS": [
     "initial_alpha",
     "alpha_min",
