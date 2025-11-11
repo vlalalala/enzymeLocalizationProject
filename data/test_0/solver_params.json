@@ -1,7 +1,0 @@
-{
-    "CONVERGENCE_PARAMETERS": {
-        "tol_relative_value": 1e-20,
-        "tol_absolute_factor": 1e-8,
-        "tol_residual_factor": 1e-8
-    }
-}

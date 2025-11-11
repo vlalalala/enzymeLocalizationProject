@@ -11,7 +11,7 @@ from src.auxiliary_functions_framework_organization_using_standard_library impor
 
 ### Get template for input files about reaction network ###
 
-reaction_network_info_dict = load_json("src/reaction_network_info.json")
+reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
 ### Define rules to run. The templates must already have been created and all data filled in. ###
 # Create the template files through
@@ -39,7 +39,7 @@ rule check_system_geometry_info_validity:
     """
     # snakemake -s Snakefile.smk data/test_0/.system_geometry_expanded.json --cores 1 --use-conda
     input:
-        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json",
+        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/system_geometry.json",
                            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver",
                            ]
     output:
@@ -68,7 +68,7 @@ rule create_reaction_network:
     input:
         lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_reaction_network"
     output:
-        ["{df}/{bn}_{cn}/.pickled_REACTION_NETWORK", "{df}/{bn}_{cn}/reaction_network_graph.png"]
+        ["{df}/{bn}_{cn}/.pickled_reaction_network", "{df}/{bn}_{cn}/reaction_network_graph.png"]
     conda:
         "config/environment.yaml"
     shell:
@@ -79,7 +79,7 @@ rule create_system_mesh:
     input:
         lambda wildcards: [
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_REACTION_NETWORK",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json"]
     output:
         "{df}/{bn}_{cn}/.expanded_system_mesh.json"
@@ -94,11 +94,11 @@ rule cleanup_old_iterations:
     previously.
     """
     input:
-        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
+        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_system_geometry",
         solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
     output:
-        touch("{df}/{bn}_{cn}/.clean_iterations")
+        touch("{df}/{bn}_{cn}/.validated_iterations")
     run:
         import os, glob
         folder = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
@@ -119,10 +119,10 @@ rule solve_boundary_value_problem:
     """
     # snakemake -s Snakefile.smk data/exampleToManuallyCheck_0/.species_steady_state_concentrations.json --config max_iterations=1e6 --cores 1 --use-conda
     input:
-        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.REACTION_NETWORK_pickle",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle",
-        solver_info_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_input_pickle",
-        cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.clean_iterations",
+        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_system_geometry",
+        solver_info_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
+        cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_iterations",
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:

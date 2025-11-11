@@ -1,6 +1,0 @@
-{
-"ENZYMATIC_REACTIONS": ["start_species", "end_species", "ratio_endtostart_species", "enzyme", "k_cat", "k_M", "hill"],
-"SPONTANEOUS_REACTIONS": ["start_species", "end_species", "ratio_endtostart_species", "k"],
-"ENZYMES": ["name", "quantity", "regions"],
-"SPECIES": ["name", "diffusion_constant", "external_concentration", "*membrane_parameters"]
-}
