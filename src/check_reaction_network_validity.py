@@ -2,7 +2,7 @@
 import sys
 import os
 import pandas as pd
-from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary, pickle_load_binary
+from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary
 from auxiliary_functions import (
     define_ratio_from_string, no_empty_cells, no_repeated_rows_in_csv_file,
     checks_lack_of_repetitions, check_correct_type, define_region_list)
@@ -85,8 +85,8 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     for dataframe_name, dataframe_object in dataframes.items():
         assert no_empty_cells(dataframe_object), f"dataframe {dataframe_name} has empty cells"
 
-    reaction_species, reaction_enzymes = extract_species_and_enzymes_from_reactions_data(dataframes["ENZYMATIC_REACTIONS"], dataframes["SPONTANEOUS_REACTIONS"])
-    species, enzymes = extract_species_and_enzymes_from_characteristics_data(dataframes["SPECIES"], dataframes["ENZYMES"])
+    reaction_species, reaction_enzymes = extract_species_and_enzymes_from_reactions_data(dataframes["enzymatic_reactions"], dataframes["spontaneous_reactions"])
+    species, enzymes = extract_species_and_enzymes_from_characteristics_data(dataframes["species"], dataframes["enzymes"])
     
     # Step 1
     missing_species_description = [
@@ -95,7 +95,7 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     if len(missing_species_description) == 0:
         print("All species that partake in reactions have their properties defined.")
     else:
-        raise ImportError("The species", missing_species_description, "are not properly defined in SPECIES.csv")
+        raise ImportError("The species", missing_species_description, "are not properly defined in species.csv")
     species_not_in_reaction = [individual_species for individual_species in species
         if individual_species not in reaction_species]
     if len(species_not_in_reaction) != 0:
@@ -126,6 +126,6 @@ if __name__ == "__main__":
     reaction_network_info_file_names = load_json("src/reaction_network_info.json").keys()
     system_geometry_dict = load_json(
         os.path.join(folder_to_check_validity, ".expanded_system_geometry.json"))
-    num_regions = system_geometry_dict["GEOMETRY_CONFIG"]["NUM_REGIONS"]
+    num_regions = system_geometry_dict["geometry_config"]["num_regions"]
 
     check_validity_reaction_network_info(folder_to_check_validity, reaction_network_info_file_names, num_regions)

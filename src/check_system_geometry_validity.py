@@ -1,5 +1,6 @@
 import sys
 import os
+from typing import Dict, Any, Union
 import numpy as np
 from auxiliary_functions_using_standard_library import load_json, closest_value
 from auxiliary_functions import dump_json
@@ -8,8 +9,8 @@ def check_validity_system_geometry_info(case_directory):
     """
     """
     
-    system_geometry_nested_dict = load_json(os.path.join(case_directory, "SYSTEM_GEOMETRY.json"))
-    solver_input_nested_dict = load_json(os.path.join(case_directory, "solver_input.json"))
+    system_geometry_nested_dict : Dict[Union[str, int], Dict[str, Any]] = load_json(os.path.join(case_directory, "system_geometry.json"))
+    solver_input_nested_dict : Dict[Union[str, int], Dict[str, Any]] = load_json(os.path.join(case_directory, "solver_input.json"))
     
     for section, section_dict in system_geometry_nested_dict.items():
         for key, value in section_dict.items():
@@ -53,33 +54,33 @@ def check_validity_system_geometry_info(case_directory):
                         f"Invalid type for '{key}' in '{section}': expected all elements with type int or float"
                     )
             # Rule 5: if anything is not yet programmed, raise NotImplementedError
-            if section=="GEOMETRY_CONFIG" and key=="num_dimensions" and value!=3:
+            if section=="geometry_config" and key=="num_dimensions" and value!=3:
                 raise NotImplementedError("Only 3-dimensional systems are implemented to date.")
 
     #if (system_geometry_nested_dict["GEOMETRY_CONFIG"]["inner_mesh_radius_relative_to_smallest_membrane"]
     #    >= system_geometry_nested_dict["GEOMETRY_CONFIG"]["inner_mesh_radius_relative_to_smallest_membrane"]):
 
-    R = system_geometry_nested_dict["GEOMETRY_CONFIG"]["outer_membrane_radius"]
-    MEMBRANE_INPUT_RADII = [relative * R for relative in system_geometry_nested_dict["GEOMETRY_CONFIG"]["internal_membrane_relative_radii"] + [1]]
-    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MEMBRANE_INPUT_RADII"] = MEMBRANE_INPUT_RADII
-    MESH_POINTS = np.linspace(0, R, num = solver_input_nested_dict["GEOMETRY_PARAMETERS"]["num_mesh_points"])
-    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MESH_POINTS"] = MESH_POINTS
-    MEMBRANE_RADII = [closest_value(MESH_POINTS, membrane_input_radius) for membrane_input_radius in MEMBRANE_INPUT_RADII]
-    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MEMBRANE_RADII"] = MEMBRANE_RADII
-    NUM_REGIONS = len(MEMBRANE_RADII)
-    system_geometry_nested_dict["GEOMETRY_CONFIG"]["NUM_REGIONS"]  = NUM_REGIONS
-    BOUNDARY_RADII = [0] + MEMBRANE_RADII
-    system_geometry_nested_dict["GEOMETRY_CONFIG"]["BOUNDARY_RADII"]  = BOUNDARY_RADII
-    MESH_POINTS_IN_REGIONS = {
-        region_idx : [mesh_point for mesh_point in MESH_POINTS if BOUNDARY_RADII[region_idx]<=mesh_point<=BOUNDARY_RADII[region_idx+1]]
-        for region_idx in range(NUM_REGIONS)
+    external_radius = system_geometry_nested_dict["geometry_config"]["outer_membrane_radius"]
+    membrane_input_radii = [relative * external_radius for relative in system_geometry_nested_dict["geometry_config"]["internal_membrane_relative_radii"] + [1]]
+    system_geometry_nested_dict["geometry_config"]["membrane_input_radii"] = membrane_input_radii
+    mesh_points = np.linspace(0, external_radius, num = solver_input_nested_dict["geometry_parameters"]["num_mesh_points"])
+    system_geometry_nested_dict["geometry_config"]["MESH_POINTS"] = mesh_points
+    membrane_radii = [closest_value(mesh_points, membrane_input_radius) for membrane_input_radius in membrane_input_radii]
+    system_geometry_nested_dict["geometry_config"]["MEMBRANE_RADII"] = membrane_radii
+    num_regions = len(membrane_radii)
+    system_geometry_nested_dict["geometry_config"]["NUM_REGIONS"]  = num_regions
+    boundary_radii = [0] + membrane_radii
+    system_geometry_nested_dict["geometry_config"]["BOUNDARY_RADII"]  = boundary_radii
+    mesh_points_in_regions = {
+        region_idx : [mesh_point for mesh_point in mesh_points if boundary_radii[region_idx]<=mesh_point<=boundary_radii[region_idx+1]]
+        for region_idx in range(num_regions)
     }
-    system_geometry_nested_dict["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]  = MESH_POINTS_IN_REGIONS
-    NUM_MESH_POINTS_IN_REGIONS = {
+    system_geometry_nested_dict["geometry_config"]["mesh_points_in_regions"]  = mesh_points_in_regions
+    num_mesh_points_in_regions = {
         region_idx: len(mesh_points_in_region)
-        for region_idx, mesh_points_in_region in MESH_POINTS_IN_REGIONS.items()
+        for region_idx, mesh_points_in_region in mesh_points_in_regions.items()
     }
-    system_geometry_nested_dict["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]  = NUM_MESH_POINTS_IN_REGIONS
+    system_geometry_nested_dict["geometry_config"]["num_mesh_points_in_regions"]  = num_mesh_points_in_regions
 
     dump_json(
         case_directory,
