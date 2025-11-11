@@ -1,35 +1,7 @@
 {
-    "ADAPTIVE_STEP_PARAMETERS": {
-        "initial_alpha": 1.0,
-        "alpha_min": 1e-4,
-        "alpha_max": 10,
-        "gamma_inc": 1.15,
-        "gamma_dec": 0.50,
-        "max_num_backtrack": 100,
-        "max_num_accepted_successive_unsuccessful_steps": 2
-    },
-    "NEWTON_PARAMETERS": {
-        "check_convergence_every": 1e4,
-        "override_adaptive_method": "False"
-    },
-    "GEOMETRY_PARAMETERS": {
-        "num_mesh_points": 25
-    },
-    "OUTPUT_OPTIONS": {
-        "print_convergence_progress": "False",
-        "save_data_every": 1e4,
-        "plot_iteration_data_during_simulation":"False",
-        "print_iteration_info_every": 1e4,
-        "create_gif_with_saved_data": "True",
-        "delete_data_at_the_end": "True",
-        "save_geometry_structure": "False"
-    },
-    "VARIABLES_TO_SAVE":{
-        "save_F_vector": "False",
-        "save_F_vector_norm": "True", 
-        "save_J_matrix": "False",
-        "save_du_vector": "False",
-        "save_concentrations": "True",
-        "save_du_vector_max": "False"
+    "CONVERGENCE_PARAMETERS": {
+        "tol_relative_value": 1e-20,
+        "tol_absolute_factor": 1e-8,
+        "tol_residual_factor": 1e-8
     }
 }

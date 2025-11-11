@@ -21,8 +21,7 @@
     "create_gif_with_saved_data",
     "print_iteration_info_every",
     "delete_data_at_the_end",
-    "plot_iteration_data_during_simulation",
-    "save_geometry_structure"
+    "plot_iteration_data_during_simulation"
 ],
 "VARIABLES_TO_SAVE":[
     "save_F_vector",

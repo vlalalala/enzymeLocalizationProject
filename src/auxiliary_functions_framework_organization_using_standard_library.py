@@ -1,7 +1,7 @@
 import os
 import re
 import glob
-from auxiliary_functions_using_standard_library import load_json
+from src.auxiliary_functions_using_standard_library import load_json
 
 config_info = load_json("config/config.json")
 solver_data_folder = config_info["solver_data_folder"]

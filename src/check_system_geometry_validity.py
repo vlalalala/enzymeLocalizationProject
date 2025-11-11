@@ -1,12 +1,15 @@
 import sys
 import os
 import numpy as np
-from auxiliary_functions_using_standard_library import dump_json, load_json, pickle_dump_binary, closest_value
+from auxiliary_functions_using_standard_library import load_json, closest_value
+from auxiliary_functions import dump_json
 
 def check_validity_system_geometry_info(case_directory):
+    """
+    """
     
     system_geometry_nested_dict = load_json(os.path.join(case_directory, "SYSTEM_GEOMETRY.json"))
-    solver_info_nested_dict = load_json(os.path.join(case_directory, "solver_info.json"))
+    solver_input_nested_dict = load_json(os.path.join(case_directory, "solver_input.json"))
     
     for section, section_dict in system_geometry_nested_dict.items():
         for key, value in section_dict.items():
@@ -59,7 +62,7 @@ def check_validity_system_geometry_info(case_directory):
     R = system_geometry_nested_dict["GEOMETRY_CONFIG"]["outer_membrane_radius"]
     MEMBRANE_INPUT_RADII = [relative * R for relative in system_geometry_nested_dict["GEOMETRY_CONFIG"]["internal_membrane_relative_radii"] + [1]]
     system_geometry_nested_dict["GEOMETRY_CONFIG"]["MEMBRANE_INPUT_RADII"] = MEMBRANE_INPUT_RADII
-    MESH_POINTS = np.linspace(0, R, num = solver_info_nested_dict["GEOMETRY_PARAMETERS"]["num_mesh_points"])
+    MESH_POINTS = np.linspace(0, R, num = solver_input_nested_dict["GEOMETRY_PARAMETERS"]["num_mesh_points"])
     system_geometry_nested_dict["GEOMETRY_CONFIG"]["MESH_POINTS"] = MESH_POINTS
     MEMBRANE_RADII = [closest_value(MESH_POINTS, membrane_input_radius) for membrane_input_radius in MEMBRANE_INPUT_RADII]
     system_geometry_nested_dict["GEOMETRY_CONFIG"]["MEMBRANE_RADII"] = MEMBRANE_RADII
@@ -79,12 +82,8 @@ def check_validity_system_geometry_info(case_directory):
     system_geometry_nested_dict["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]  = NUM_MESH_POINTS_IN_REGIONS
 
     dump_json(
-        os.path.join(case_directory, ".SYSTEM_GEOMETRY_expanded.json"),
-        system_geometry_nested_dict
-    )
-
-    pickle_dump_binary(
-        os.path.join(case_directory, ".SYSTEM_GEOMETRY_pickle"),
+        case_directory,
+        ".expanded_system_geometry",
         system_geometry_nested_dict
     )
 

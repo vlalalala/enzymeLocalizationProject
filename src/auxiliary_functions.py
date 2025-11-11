@@ -1,9 +1,49 @@
+import os
+import json
 import numpy as np
 from math import gcd
 import pandas as pd
 import ast
 from scipy.sparse import csr_matrix, coo_matrix
 import csv
+
+def dump_json(dump_directory: str, file_basename: str, dict_to_dump: dict):
+    """
+    Dump a dictionary (possibly nested) as JSON, converting Species objects to their .name.
+    Handles Species in keys, values, lists, sets, tuples, etc.
+    Set file_basename without the .json ending.
+    """
+    
+    def convert_to_saveable_type(obj):
+        # Convert Species objects (keys or values)
+        if hasattr(obj, "__class__") and obj.__class__.__name__ == "Species":
+            return obj.name
+
+        # Handle NumPy arrays and scalars
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()  # convert ndarray → list
+        elif isinstance(obj, (np.float32, np.float64)):
+            return float(obj)
+        elif isinstance(obj, (np.int32, np.int64)):
+            return int(obj)
+        
+        # Handle dictionaries (convert both keys and values)
+        elif isinstance(obj, dict):
+            return {str(convert_to_saveable_type(k)): convert_to_saveable_type(v) for k, v in obj.items()}
+
+        # Handle lists, tuples, sets
+        elif isinstance(obj, (list, tuple, set)):
+            return [convert_to_saveable_type(i) for i in obj]
+
+        # Base case: leave unchanged
+        else:
+            return obj
+
+    converted = convert_to_saveable_type(dict_to_dump)
+    os.makedirs(dump_directory, exist_ok=True)
+    path = os.path.join(dump_directory, f"{file_basename}.json")
+    with open(path, "w") as f:
+        json.dump(converted, f, indent=4)
 
 class Ratio:
     """Auxiliary class. Defines a ratio of a:b """

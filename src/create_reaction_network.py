@@ -257,7 +257,7 @@ def create_reaction_network(case_folder, csv_file_names):
     # Step 1: Import dataframes
     dataframes = {}
     for csv_file_name in csv_file_names:
-        pickle_path = os.path.join(case_folder, f".{csv_file_name}_dataframe_pickle")
+        pickle_path = os.path.join(case_folder, f".pickled_dataframe_{csv_file_name}")
         dataframes[csv_file_name] = pickle_load_binary(pickle_path)
     
     # Step 2: read rows for each dataframe and create an object for each; save each object in System
@@ -304,7 +304,7 @@ def create_reaction_network(case_folder, csv_file_names):
 
     # Step 5: draw the network graph and save a png file of it
     system.draw_network(case_folder)
-    pickle_dump_binary(os.path.join(case_folder, ".REACTION_NETWORK_pickle"), system)
+    pickle_dump_binary(os.path.join(case_folder, ".pickled_REACTION_NETWORK"), system)
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]

@@ -1,4 +1,8 @@
+import sys
+import os
 from itertools import count
+from auxiliary_functions_using_standard_library import pickle_load_binary, load_json
+from auxiliary_functions import dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 
 def build_point_ids_dict(reaction_network: System, num_mesh_points_in_regions: dict) -> dict:
@@ -100,3 +104,44 @@ def build_point_neighbor_dict(num_mesh_points_in_regions) -> dict:
                 if region_idx < len(num_mesh_points_in_regions)-1:
                     neighbors_dict[(region_idx, n)].append( (region_idx+1, 0) )
     return neighbors_dict
+
+if __name__ == "__main__":
+    FOLDER_TO_SOLVE = sys.argv[1]    
+    # Step 0: Load inputs and define global parameters
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_REACTION_NETWORK"))
+    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
+    SOLVER_INPUT = load_json(os.path.join(FOLDER_TO_SOLVE, "solver_input.json"))
+
+    # Step 1: Define all geometry variables
+    MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]
+    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]
+    
+    # Step 2: Define structures to access geometry information
+    POINT_IDS = build_point_ids_dict(REACTION_NETWORK, NUM_MESH_POINTS_IN_REGIONS)
+    REVERSE_POINT_IDS = build_reverse_point_ids_dict(POINT_IDS)
+    RADII = build_radii_dict(MESH_POINTS_IN_REGIONS)
+    DELTA_R = RADII[0][1]-RADII[0][0] # the different points within a region are equally spaced
+    NUM_POINTS = len(REVERSE_POINT_IDS) # each point saves the concentration for one species at one node
+    POINT_INFOS = build_point_infos_dict(NUM_MESH_POINTS_IN_REGIONS)
+    NEIGHBORS = build_point_neighbor_dict(NUM_MESH_POINTS_IN_REGIONS)
+    
+    # Check that each region has at least 3 points
+    for region, radii in RADII.items():
+        if len(radii)<3:
+            raise ValueError(f"Region {region} has less than 3 points, such that the diffusion term does not work.")
+
+    # Save dictionary in .json file for readability
+    dict_to_dump = {
+        "POINT_IDS": POINT_IDS,
+        "REVERSE_POINT_IDS": REVERSE_POINT_IDS,
+        "RADII": RADII,
+        "DELTA_R": DELTA_R,
+        "NUM_POINTS": NUM_POINTS,
+        "POINT_INFOS": POINT_INFOS,
+        "NEIGHBORS": NEIGHBORS,
+
+    }
+    dump_json(FOLDER_TO_SOLVE, ".expanded_system_mesh", dict_to_dump)
+
+
+    

@@ -118,14 +118,14 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     # Pickle dataframes separately
     for filename, dataframe in dataframes.items():
         pickle_dump_binary(
-            os.path.join(case_directory, f".{filename}_dataframe_pickle"), dataframe)
+            os.path.join(case_directory, f".pickled_dataframe_{filename}"), dataframe)
     print(f"{case_directory} is good to go!")
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
     reaction_network_info_file_names = load_json("src/reaction_network_info.json").keys()
-    system_geometry_dict = pickle_load_binary(
-        os.path.join(folder_to_check_validity, ".SYSTEM_GEOMETRY_pickle"))
+    system_geometry_dict = load_json(
+        os.path.join(folder_to_check_validity, ".expanded_system_geometry.json"))
     num_regions = system_geometry_dict["GEOMETRY_CONFIG"]["NUM_REGIONS"]
 
     check_validity_reaction_network_info(folder_to_check_validity, reaction_network_info_file_names, num_regions)

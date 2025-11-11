@@ -15,61 +15,78 @@ reaction_network_info_dict = load_json("src/reaction_network_info.json")
 
 ### Define rules to run. The templates must already have been created and all data filled in. ###
 # Create the template files through
-# python src/create_file_structure.py permeability 
-# python src/create_file_structure.py enzymatic
+# python src/_create_file_structure.py permeability 
+# python src/_create_file_structure.py enzymatic
 
-rule check_solver_data_validity:
-    # snakemake -s Snakefile.smk data/test_0/.solver_info_*_pickle --cores 1 --use-conda
+rule check_solver_info_validity:
+    # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
     input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info.json"
+        lambda wildcards: [
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_params.json"
+        ]
     output:
-        ["{df}/{bn}_{cn}/.solver_info_input_pickle", "{df}/{bn}_{cn}/.solver_info_params_pickle"]
+        touch("{df}/{bn}_{cn}/.validated_solver")
     conda:
         "config/environment.yaml"
     shell:
-        "python src/check_validity_solver_parameters.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/check_solver_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 
-rule check_system_geometry_data_validity:
+rule check_system_geometry_info_validity:
     """ To define the system geometry, the number of mesh points for the solver already
     has to be read, in order to shift the membrane positions to the closest mesh positions
     """
-    # snakemake -s Snakefile.smk data/violacein_0/.SYSTEM_GEOMETRY_pickle --cores 1 --use-conda
+    # snakemake -s Snakefile.smk data/test_0/.system_geometry_expanded.json --cores 1 --use-conda
     input:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/SYSTEM_GEOMETRY.json",
-                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info_input.json",
-                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_info_params.json"
+                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver",
                            ]
     output:
-        ["{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_pickle",
-        "{df}/{bn}_{cn}/.SYSTEM_GEOMETRY_expanded.json"]
+        "{df}/{bn}_{cn}/.expanded_system_geometry.json"
     conda:
         "config/environment.yaml"
     shell:
-        "python src/check_validity_system_geometry.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/check_system_geometry_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-rule check_reaction_network_data_validity:
-    # snakemake -s Snakefile.smk data/violacein_0/.reaction_network_validated --cores 1 --use-conda
+rule check_reaction_network_info_validity:
+    # snakemake -s Snakefile.smk data/test_0/.validated_reaction_network --cores 1 --use-conda
     input:
-        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{rn}.csv"
-                           for rn in reaction_network_info_dict.keys()] + [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.SYSTEM_GEOMETRY_pickle"]
+        lambda wildcards: [
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{rn}.csv"
+            for rn in reaction_network_info_dict.keys()
+            ] + [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json"]
     output:
-        touch("{df}/{bn}_{cn}/.reaction_network_validated")
+        touch("{df}/{bn}_{cn}/.validated_reaction_network")
     conda:
         "config/environment.yaml"
     shell:
-        "python src/check_validity_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/check_reaction_network_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 rule create_reaction_network:
     # snakemake -s Snakefile.smk data/violacein_0/reaction_network_graph.png --cores 1 --use-conda
     input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.reaction_network_validated"
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_reaction_network"
     output:
-        ["{df}/{bn}_{cn}/.REACTION_NETWORK_pickle", "{df}/{bn}_{cn}/reaction_network_graph.png"]
+        ["{df}/{bn}_{cn}/.pickled_REACTION_NETWORK", "{df}/{bn}_{cn}/reaction_network_graph.png"]
     conda:
         "config/environment.yaml"
     shell:
         "python src/create_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+
+rule create_system_mesh:
+    # snakemake -s Snakefile.smk data/test_0/.expanded_system_mesh.json --cores 1 --use-conda
+    input:
+        lambda wildcards: [
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_REACTION_NETWORK",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json"]
+    output:
+        "{df}/{bn}_{cn}/.expanded_system_mesh.json"
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/create_system_mesh.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 rule cleanup_old_iterations:
     """In case the input files for a simulation have been changed, all of the

@@ -2,7 +2,7 @@
 import sys
 import os
 import copy
-import math
+from typing import Dict, Any
 import time
 import glob
 import re
@@ -15,12 +15,13 @@ from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
 from auxiliary_functions_using_standard_library import (rename_iteration_files,
     nested_max, all_non_negative, format_sci, pickle_load_binary,
-    dump_json, load_json)
+    load_json)
+from auxiliary_functions import dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from plot_boundary_value_problem import plot_steady_state_concentrations, make_newton_iterations_gif
 from auxiliary_functions_framework_organization import (
     get_species_concentrations_from_json_file, save_newton_iteration_data)
-from solver_mesh_descriptor import (build_point_ids_dict, build_reverse_point_ids_dict, 
+from create_system_mesh import (build_point_ids_dict, build_reverse_point_ids_dict, 
     build_radii_dict, build_point_infos_dict, build_point_neighbor_dict)
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
@@ -421,24 +422,32 @@ if __name__ == "__main__":
     # Parse arguments from command line
     parser = argparse.ArgumentParser()
     parser.add_argument("folder_to_solve", type=str, help="Path to folder with system info")
+    parser.add_argument("solver_input_file", type=str)
+    parser.add_argument("solver_params_file", type=str)
     # use int(float()) to be able to pass scientific notation
     parser.add_argument("--max-iterations", type=lambda x: int(float(x)), help="Maximum Newton iterations") 
-    parser.add_argument("--previous-solution", type=str, default=None,
-                        help="Optional path to previous iteration solution file.")
     args = parser.parse_args()
 
-    # Load all the passed information
+    # Load all the passed information, create folder for background info
     FOLDER_TO_SOLVE = args.folder_to_solve
-    MAX_NUM_NEWTON_ITERATIONS = args.max_iterations
-    PREVIOUS_SOLUTION = args.previous_solution
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
-    NUM_NEWTON_ITERATIONS_DIGITS = int(math.log10(MAX_NUM_NEWTON_ITERATIONS)+1)
+    SOLVER_PARAMS = load_json(args.solver_params_file)
+    SOLVER_INPUT = load_json(args.solver_input_file)
+    MAX_NUM_NEWTON_ITERATIONS = args.max_iterations
 
     # Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".REACTION_NETWORK_pickle"))
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_REACTION_NETWORK"))
+    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry"))
+    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh"))
+    
+    if SOLVER_INPUT["OUTPUT_OPTIONS"]["create_gif_with_saved_data"] is True and SOLVER_INPUT["VARIABLES_TO_SAVE"]["save_concentrations"] is False:
+        raise ValueError("Cannot make the gif if the concentrations are not saved.")
+
+
     # Lookup to be able to match the species from the species name saved in .json files  
     SPECIES_LOOKUP = {sp.name: sp for sp in REACTION_NETWORK.species}
-    SYSTEM_GEOMETRY_DICT = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".SYSTEM_GEOMETRY_pickle"))
+
+    # Deal with case permeability vs enzymatic
     # Read out type of membrane
     if hasattr(REACTION_NETWORK.species[0], "permeability_constant"):
         MEMBRANE_TYPE = "permeability"
@@ -446,42 +455,24 @@ if __name__ == "__main__":
         MEMBRANE_TYPE = "enzymatic"
     else:
         raise ValueError("Membrane type not correctly specified.")
-
-    # Step 0: Get all solver parameters
+    if MEMBRANE_TYPE == "enzymatic":
+        PORE_DENSITY = SYSTEM_GEOMETRY_DICT["MEMBRANE_PROPERTIES"]["pore_density"]
     
-    SOLVER_PARAMS = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".solver_info_input_pickle"))
-    if SOLVER_PARAMS["OUTPUT_OPTIONS"]["create_gif_with_saved_data"] is True and SOLVER_PARAMS["VARIABLES_TO_SAVE"]["save_concentrations"] is False:
-        raise ValueError("Cannot make the gif if the concentrations are not saved.")
-
     # Step 1: Define all geometry variables
     R = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["outer_membrane_radius"]
     MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]
     NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]
     NUM_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_REGIONS"]
     MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MEMBRANE_RADII"]
-    if MEMBRANE_TYPE == "enzymatic":
-        PORE_DENSITY = SYSTEM_GEOMETRY_DICT["MEMBRANE_PROPERTIES"]["pore_density"]
-    
+   
     # Step 2: Define structures to access geometry information
-    POINT_IDS = build_point_ids_dict(REACTION_NETWORK, NUM_MESH_POINTS_IN_REGIONS)
-    REVERSE_POINT_IDS = build_reverse_point_ids_dict(POINT_IDS)
-    RADII = build_radii_dict(MESH_POINTS_IN_REGIONS, )
-    DELTA_R = RADII[0][1]-RADII[0][0] # the different points within a region are equally spaced
-    NUM_POINTS = len(REVERSE_POINT_IDS) # each point saves the concentration for one species at one node
-    POINT_INFOS = build_point_infos_dict(NUM_MESH_POINTS_IN_REGIONS)
-    NEIGHBORS = build_point_neighbor_dict(NUM_MESH_POINTS_IN_REGIONS)
-    # Save dictionaries in .json files for readability
-    if SOLVER_PARAMS["OUTPUT_OPTIONS"]["save_geometry_structure"]:
-        dump_json(FOLDER_TO_SOLVE, ".solver_POINT_IDS", POINT_IDS)
-        dump_json(FOLDER_TO_SOLVE, ".solver_REVERSE_POINT_IDS", REVERSE_POINT_IDS)
-        dump_json(FOLDER_TO_SOLVE, ".solver_RADII", RADII)
-        dump_json(FOLDER_TO_SOLVE, ".solver_POINT_INFOS", POINT_INFOS)
-        dump_json(FOLDER_TO_SOLVE, ".solver_NEIGHBORS", NEIGHBORS)
-
-    # Check that each region has at least 3 points
-    for region, radii in RADII.items():
-        if len(radii)<3:
-            raise ValueError(f"Region {region} has less than 3 points, such that the diffusion term does not work.")
+    POINT_IDS = SYSTEM_MESH_DICT["POINT_IDS"]
+    REVERSE_POINT_IDS = SYSTEM_MESH_DICT["REVERSE_POINT_IDS"]
+    RADII = SYSTEM_MESH_DICT["RADII"]
+    DELTA_R = SYSTEM_MESH_DICT["DELTA_R"]
+    NUM_POINTS = SYSTEM_MESH_DICT["NUM_POINTS"]
+    POINT_INFOS = SYSTEM_MESH_DICT["POINT_INFOS"]
+    NEIGHBORS = SYSTEM_MESH_DICT["NEIGHBORS"]
 
     # Step 3: Put enzyme location information
     ENZYMES_CONCENTRATIONS = {
@@ -502,6 +493,7 @@ if __name__ == "__main__":
             for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
         for region_idx in range(NUM_REGIONS)
     }
+    
     # Guess is used to find the order of magnitude of convergence conditions
     max_guess_concentration = nested_max(species_concentrations_guess)
     F_vector_guess, _, _ = compute_newton_step(species_concentrations_guess)

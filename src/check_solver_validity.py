@@ -1,8 +1,11 @@
 import sys
 import os
-from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary, closest_value
+from auxiliary_functions_using_standard_library import load_json
 
 def check_validity_file(case_directory, file_name):
+    """For a particular file (file_name, with ending) in the directory case_directory,
+    checks whether the input data is valid.
+    """
     solver_info_nested_dict = load_json(os.path.join(case_directory, file_name))
 
     for section, section_dict in solver_info_nested_dict.items():
@@ -16,11 +19,6 @@ def check_validity_file(case_directory, file_name):
                     if isinstance(value, float) and value.is_integer():
                         value = int(value)
                 elif isinstance(value, str):
-                    # Skip if it's clearly a boolean-looking string
-                    if value.lower() in ["true", "false"]:
-                        raise TypeError(
-                            f"Invalid type for '{key}' in '{section}': expected int, got str ('{value}')"
-                        )
                     try:
                         float_val = float(value)
                         if float_val.is_integer():
@@ -29,29 +27,16 @@ def check_validity_file(case_directory, file_name):
                             raise TypeError(
                                 f"Invalid numeric string for '{key}' in '{section}': expected int-like value, got '{value}'"
                             )
-                    except ValueError:
+                    except ValueError as exc:
                         raise TypeError(
                             f"Invalid type for '{key}' in '{section}': expected int, got str ('{value}')"
-                        )
-                else:
-                    raise TypeError(
-                        f"Invalid type for '{key}' in '{section}': expected int, got {type(value).__name__}"
-                    )
+                        ) from exc
 
                 section_dict[key] = value  # store possibly converted int
 
             # --- Rule 2: Keys with action verbs must be bool ---
             elif any(sub in key_lower for sub in ["plot", "save", "print", "override", "create", "delete"]):
-                if isinstance(value, str):
-                    if value.lower() == "true":
-                        value = True
-                    elif value.lower() == "false":
-                        value = False
-                    else:
-                        raise ValueError(
-                            f"Invalid string for boolean '{key}' in '{section}': expected 'True' or 'False', got '{value}'"
-                        )
-                elif not isinstance(value, bool):
+                if not isinstance(value, bool):
                     raise TypeError(
                         f"Invalid type for '{key}' in '{section}': expected bool, got {type(value).__name__}"
                     )
@@ -92,10 +77,10 @@ def check_validity_file(case_directory, file_name):
                     try:
                         min_val_f = float(min_val)
                         max_val_f = float(max_val)
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError) as exc:
                         raise TypeError(
                             f"Values for '{key}' and '{max_key}' in '{section}' must be numeric for comparison."
-                        )
+                        ) from exc
 
                     if min_val_f > max_val_f:
                         raise ValueError(
@@ -103,16 +88,7 @@ def check_validity_file(case_directory, file_name):
                         )
     return solver_info_nested_dict
 
-def check_validity_solver_parameters(case_directory):
-    """Checks that in the solver info, everything has the correct type
-    """
-    for file_name in ["solver_info_input", "solver_info_params"]:
-        solver_info_nested_dict = check_validity_file(case_directory, f"{file_name}.json")
-        pickle_dump_binary(
-            os.path.join(case_directory, f".{file_name}_pickle"),
-            solver_info_nested_dict
-        )
-
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
-    check_validity_solver_parameters(folder_to_check_validity)
+    for file_name in ["solver_input", "solver_params"]:
+        solver_info_nested_dict = check_validity_file(folder_to_check_validity, f"{file_name}.json")

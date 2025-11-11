@@ -38,41 +38,35 @@ def format_sci(x: float) -> str:
     return f"{base}e{'+' if exp_num >= 0 else '-'}{abs(exp_num):02d}"
 
 def load_json(path):
+    """path should have the .json extension.
+    in json files, the keys are converted to strings always.
+    When loading, the keys are converted to integers, if possible.
+    
+    """
     _, file_extension = os.path.splitext(os.path.basename(path))
     if not os.path.isfile(path) or file_extension != ".json":
         raise ValueError(f"The file {path} does not exist or is not a .json file.")
     with open(path, "r") as f:
         contents = json.load(f)
-    return contents
-
-def dump_json(dump_directory: str, file_basename: str, dict_to_dump: dict):
-    """
-    Dump a dictionary (possibly nested) as JSON, converting Species objects to their .name.
-    Handles Species in keys, values, lists, sets, tuples, etc.
-    """
     
-    def convert_species(obj):
-        # Convert Species objects (keys or values)
-        if hasattr(obj, "__class__") and obj.__class__.__name__ == "Species":
-            return obj.name
-
-        # Handle dictionaries (convert both keys and values)
-        elif isinstance(obj, dict):
-            return {str(convert_species(k)): convert_species(v) for k, v in obj.items()}
-
-        # Handle lists, tuples, sets
-        elif isinstance(obj, (list, tuple, set)):
-            return [convert_species(i) for i in obj]
-
-        # Base case: leave unchanged
+    def convert_keys(obj):
+        if isinstance(obj, dict):
+            new_dict = {}
+            for k, v in obj.items():
+                # Try converting the key to int
+                try:
+                    new_key = int(k)
+                except (ValueError, TypeError):
+                    new_key = k
+                # Recursively convert nested dictionaries
+                new_dict[new_key] = convert_keys(v)
+            return new_dict
+        elif isinstance(obj, list):
+            return [convert_keys(i) for i in obj]
         else:
             return obj
 
-    converted = convert_species(dict_to_dump)
-    os.makedirs(dump_directory, exist_ok=True)
-    path = os.path.join(dump_directory, f"{file_basename}.json")
-    with open(path, "w") as f:
-        json.dump(converted, f, indent=4)
+    return convert_keys(contents)
 
 def pickle_dump_binary(path, variable):
     with open(path, 'wb') as f:
