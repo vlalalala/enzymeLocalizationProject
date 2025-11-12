@@ -95,8 +95,8 @@ rule cleanup_old_iterations:
     """
     input:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_system_geometry",
-        solver_info = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
+        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json",
     output:
         touch("{df}/{bn}_{cn}/.validated_iterations")
     run:
@@ -117,31 +117,33 @@ rule solve_boundary_value_problem:
     """The max-iterations condition can be changed as required without deleting anything.
     Automatically finds the latest iteration saved.
     """
-    # snakemake -s Snakefile.smk data/exampleToManuallyCheck_0/.species_steady_state_concentrations.json --config max_iterations=1e6 --cores 1 --use-conda
+    # snakemake -s Snakefile.smk data/test_0/.species_steady_state_concentrations.json --config max_iterations=1e4 --cores 1 --use-conda
     input:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_system_geometry",
-        solver_info_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_pickle",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
+        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json",
+        system_mesh = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_mesh.json",
         cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_iterations",
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
         max_iterations = lambda wildcards: int(config.get("max_iterations", 1e6)),
-        solver_info_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.solver_info_params_pickle"
+        solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_params.json"
     conda:
         "config/environment.yaml"
     shell:
         """
-        python src/solve_boundary_value_problem.py \
+        python src/run_bvp_solver.py \
             {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
-            --max-iterations {params.max_iterations} \
-            --previous-solution {params.previous_solution}"
+            --max_iterations {params.max_iterations} \
+            --solver_input_file {input.solver_input} \
+            --solver_params_file {params.solver_params} \
         """
-
-
-
-        
-
+       
+### To have a specific iteration of the solver plotted, run on terminal ###
+# python src/plot_bvp_solution.py data/test_0 --plot_iteration 40
+### To have a gif of the iterations of the solver (already before the solver has converged), run on terminal ###
+# python src/plot_bvp_solution.py data/test_0
 
 
 

@@ -1,5 +1,5 @@
 {
-"GEOMETRY_CONFIG": [
+"geometry_config": [
     "internal_membrane_relative_radii",
     "outer_membrane_radius"
 ]

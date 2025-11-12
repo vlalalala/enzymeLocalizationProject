@@ -1,12 +1,11 @@
 {
-"GEOMETRY_PARAMETERS": [
+"geometry_parameters": [
     "num_mesh_points"
 ],
-"NEWTON_PARAMETERS": [
-    "check_convergence_every",
+"newton_parameters": [
     "override_adaptive_method"
 ],
-"ADAPTIVE_STEP_PARAMETERS": [
+"adaptive_step_parameters": [
     "initial_alpha",
     "alpha_min",
     "alpha_max",
@@ -15,7 +14,7 @@
     "max_num_backtrack",
     "max_num_accepted_successive_unsuccessful_steps"
 ],
-"OUTPUT_OPTIONS": [
+"output_options": [
     "print_convergence_progress",
     "save_data_every",
     "create_gif_with_saved_data",
@@ -23,7 +22,7 @@
     "delete_data_at_the_end",
     "plot_iteration_data_during_simulation"
 ],
-"VARIABLES_TO_SAVE":[
+"variables_to_save":[
     "save_F_vector",
     "save_F_vector_norm",
     "save_J_matrix",

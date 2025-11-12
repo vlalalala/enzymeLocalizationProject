@@ -261,20 +261,20 @@ def create_reaction_network(case_folder, csv_file_names):
         dataframes[csv_file_name] = pickle_load_binary(pickle_path)
     
     # Step 2: read rows for each dataframe and create an object for each; save each object in System
-    enzymes = [Enzyme(**row) for _, row in dataframes["ENZYMES"].iterrows()]
+    enzymes = [Enzyme(**row) for _, row in dataframes["enzymes"].iterrows()]
     system.enzymes = Collection(enzymes)
-    species = [Species(**row) for _, row in dataframes["SPECIES"].iterrows()]
+    species = [Species(**row) for _, row in dataframes["species"].iterrows()]
     system.species = Collection(species)
     # For the reactions, creates the .name attribute
     enzymatic_reactions = []
-    for _, row in dataframes["ENZYMATIC_REACTIONS"].iterrows():
+    for _, row in dataframes["enzymatic_reactions"].iterrows():
         enzymatic_reaction = EnzymaticReaction(**row)
         enzymatic_reaction.name = f"{enzymatic_reaction.start_species}->{enzymatic_reaction.end_species} {enzymatic_reaction.enzyme}"
         enzymatic_reactions.append(enzymatic_reaction)
     system.enzymatic_reactions = Collection(enzymatic_reactions)
     
     spontaneous_reactions = []
-    for _, row in dataframes["SPONTANEOUS_REACTIONS"].iterrows():
+    for _, row in dataframes["spontaneous_reactions"].iterrows():
         spontaneous_reaction = SpontaneousReaction(**row)
         spontaneous_reaction.name = f"{spontaneous_reaction.start_species}->{spontaneous_reaction.end_species}"
         spontaneous_reactions.append(spontaneous_reaction)
@@ -304,9 +304,9 @@ def create_reaction_network(case_folder, csv_file_names):
 
     # Step 5: draw the network graph and save a png file of it
     system.draw_network(case_folder)
-    pickle_dump_binary(os.path.join(case_folder, ".pickled_REACTION_NETWORK"), system)
+    pickle_dump_binary(os.path.join(case_folder, ".pickled_reaction_network"), system)
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
-    reaction_network_info_file_names = load_json("src/reaction_network_info.json").keys()
+    reaction_network_info_file_names = load_json("src/_template_reaction_network.json").keys()
     create_reaction_network(folder_to_check_validity, reaction_network_info_file_names)

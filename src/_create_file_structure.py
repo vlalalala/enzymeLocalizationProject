@@ -8,7 +8,7 @@ import os
 from itertools import product
 from pathlib import Path
 import pandas as pd
-from auxiliary_functions_using_standard_library import load_json, as_list, dump_json
+from auxiliary_functions_using_standard_library import load_json, as_list, dump_json_base
 
 def create_csv_header_file(file_path, header_list):
     """Creates a .csv file in the location file_path (which does not require the .csv ending)
@@ -37,13 +37,13 @@ def create_system_geometry_json_file(path_to_json_file_describing_dict_structure
     if membrane_type == "enzymatic":
         nested.update({"MEMBRANE_PROPERTIES": {"pore_density": None}})
     # Save the new nested dictionary to a new JSON file
-    dump_json(dump_directory, dump_basename, nested)
+    dump_json_base(dump_directory, dump_basename, nested)
 
 def create_json_file_with_None_values(path_to_json_file_describing_dict_structure, dump_directory, dump_basename):
     """Creates the json file with the solver parameters.
     """
     nested = get_nested_dict_with_None_values(path_to_json_file_describing_dict_structure)
-    dump_json(dump_directory, dump_basename, nested)
+    dump_json_base(dump_directory, dump_basename, nested)
 
 if __name__ == "__main__":
     # Take as an input on the command line which membrane model we are using
@@ -65,11 +65,11 @@ if __name__ == "__main__":
     padded_case_numbers = [str(n).zfill(digits_case_numbers) for n in case_numbers]
     solver_data_folder = config_info["solver_data_folder"]
     # Get information about .csv files to create
-    reaction_network_info_dict = load_json("src/reaction_network_info.json")
+    reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
     # Modify headers for information of species about interaction with semipermeable membranes 
-    reaction_network_info_dict["SPECIES"].remove("*membrane_parameters")
-    reaction_network_info_dict["SPECIES"] += membrane_type_header_map[membrane_type]
+    reaction_network_info_dict["species"].remove("*membrane_parameters")
+    reaction_network_info_dict["species"] += membrane_type_header_map[membrane_type]
 
     # Create all necessary files in which to fill in specific system data
     for df, bn, cn in product(data_folder, base_name, padded_case_numbers):
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         solver_iteration_data_folder = f"{df}/{bn}_{cn}/{solver_data_folder}"
         os.makedirs(solver_iteration_data_folder, exist_ok=True)
         create_system_geometry_json_file(
-            "src/geometry_info.json", membrane_type, f"{df}/{bn}_{cn}", "SYSTEM_GEOMETRY")
-        for file_name in ["solver_info_input", "solver_info_params"]:
-            create_json_file_with_None_values(f"src/{file_name}.json", f"{df}/{bn}_{cn}", f"{file_name}")
+            "src/_template_geometry.json", membrane_type, f"{df}/{bn}_{cn}", "system_geometry")
+        for file_name in ["solver_input", "solver_params"]:
+            create_json_file_with_None_values(f"src/_template_{file_name}.json", f"{df}/{bn}_{cn}", f"{file_name}")
 

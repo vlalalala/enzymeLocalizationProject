@@ -1,7 +1,7 @@
 import os
 import numpy as np
-from auxiliary_functions_using_standard_library import dump_json
-from auxiliary_functions import save_matrix_as_sparse_txt
+import ast
+from auxiliary_functions import save_matrix_as_sparse_txt, dump_json
 
 def get_species_concentrations_from_json_file(
         imported_concentrations_dict_from_json, species_lookup_dict) -> dict:
@@ -16,6 +16,35 @@ def get_species_concentrations_from_json_file(
             for region_idx, region_info in imported_concentrations_dict_from_json.items()
         }
     return dict_in_correct_concentrations_format
+
+def get_correct_point_ids_dict(imported_point_ids_dict, species_lookup_dict
+    ):
+    """Works exactly the same as get_species_concentrations_from_json_file, just that every
+    [region][n][species] maps to the point_id and not to the concentration
+    """
+    dict_in_correct_concentrations_format = get_species_concentrations_from_json_file(imported_point_ids_dict, species_lookup_dict)
+    return dict_in_correct_concentrations_format
+
+def get_correct_reverse_point_ids_dict(imported_reverse_point_ids_dict,
+        species_lookup_dict
+    ):
+    dict_inc_correct_format = {
+        int(k): [*v[:-1], species_lookup_dict[v[-1]]]
+        for k, v in imported_reverse_point_ids_dict.items()
+    }
+    return dict_inc_correct_format
+
+def get_correct_neighbors_dict(imported_neighbors_dict):
+    """From the json file, the neighbors tuple gets saved as a list. Convert back.
+    """
+    new_dict = {}
+    for k, v in imported_neighbors_dict.items():
+        # Parse the string "[0, 0]" into a real list [0, 0]
+        key_as_list = ast.literal_eval(k)
+        # Convert it to a tuple
+        key_as_tuple = tuple(key_as_list)
+        new_dict[key_as_tuple] = v
+    return new_dict
 
 def save_newton_iteration_data(
     folder_to_save_in, iter_string, J_to_save, F_to_save,

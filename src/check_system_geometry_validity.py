@@ -64,13 +64,13 @@ def check_validity_system_geometry_info(case_directory):
     membrane_input_radii = [relative * external_radius for relative in system_geometry_nested_dict["geometry_config"]["internal_membrane_relative_radii"] + [1]]
     system_geometry_nested_dict["geometry_config"]["membrane_input_radii"] = membrane_input_radii
     mesh_points = np.linspace(0, external_radius, num = solver_input_nested_dict["geometry_parameters"]["num_mesh_points"])
-    system_geometry_nested_dict["geometry_config"]["MESH_POINTS"] = mesh_points
+    system_geometry_nested_dict["geometry_config"]["mesh_points"] = mesh_points
     membrane_radii = [closest_value(mesh_points, membrane_input_radius) for membrane_input_radius in membrane_input_radii]
-    system_geometry_nested_dict["geometry_config"]["MEMBRANE_RADII"] = membrane_radii
+    system_geometry_nested_dict["geometry_config"]["membrane_radii"] = membrane_radii
     num_regions = len(membrane_radii)
-    system_geometry_nested_dict["geometry_config"]["NUM_REGIONS"]  = num_regions
+    system_geometry_nested_dict["geometry_config"]["num_regions"]  = num_regions
     boundary_radii = [0] + membrane_radii
-    system_geometry_nested_dict["geometry_config"]["BOUNDARY_RADII"]  = boundary_radii
+    system_geometry_nested_dict["geometry_config"]["boundary_radii"]  = boundary_radii
     mesh_points_in_regions = {
         region_idx : [mesh_point for mesh_point in mesh_points if boundary_radii[region_idx]<=mesh_point<=boundary_radii[region_idx+1]]
         for region_idx in range(num_regions)

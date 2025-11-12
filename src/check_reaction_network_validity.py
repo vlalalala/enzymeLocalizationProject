@@ -123,7 +123,7 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
-    reaction_network_info_file_names = load_json("src/reaction_network_info.json").keys()
+    reaction_network_info_file_names = load_json("src/_template_reaction_network.json").keys()
     system_geometry_dict = load_json(
         os.path.join(folder_to_check_validity, ".expanded_system_geometry.json"))
     num_regions = system_geometry_dict["geometry_config"]["num_regions"]

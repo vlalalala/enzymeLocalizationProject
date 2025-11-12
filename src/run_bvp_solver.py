@@ -4,6 +4,7 @@ import os
 import copy
 from typing import Dict, Any
 import time
+import math
 import glob
 import re
 from contextlib import redirect_stdout
@@ -13,16 +14,20 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
-from auxiliary_functions_using_standard_library import (rename_iteration_files,
-    nested_max, all_non_negative, format_sci, pickle_load_binary,
+from auxiliary_functions_using_standard_library import (
+    find_max_in_nested_dict, all_non_negative, format_sci, pickle_load_binary,
     load_json)
 from auxiliary_functions import dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-from plot_boundary_value_problem import plot_steady_state_concentrations, make_newton_iterations_gif
+from plot_bvp_solution import plot_steady_state_concentrations, make_newton_iterations_gif
 from auxiliary_functions_framework_organization import (
-    get_species_concentrations_from_json_file, save_newton_iteration_data)
-from create_system_mesh import (build_point_ids_dict, build_reverse_point_ids_dict, 
-    build_radii_dict, build_point_infos_dict, build_point_neighbor_dict)
+    get_species_concentrations_from_json_file, save_newton_iteration_data,
+    get_correct_point_ids_dict, get_correct_reverse_point_ids_dict, get_correct_neighbors_dict)
+from auxiliary_functions_framework_organization_using_standard_library import (
+    find_latest_solution, rename_iteration_files)
+
+
+
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i.
@@ -390,12 +395,18 @@ def solve_newton(
         # Save result if needed
         if save_data_every !=0 and (iter+1)%save_data_every==0:
             F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
-            iter_string = str(iter).zfill(NUM_NEWTON_ITERATIONS_DIGITS)
-            save_newton_iteration_data(iter_string, J_matrix, F_vector, current_species_concentrations, du, variables_to_save_dictionary)
+            iter_string = str(iter).zfill(num_iterations_digits)
+            save_newton_iteration_data(ITERATION_DATA_PATH, iter_string,
+                J_matrix, F_vector, current_species_concentrations, du, variables_to_save_dictionary)
             if plot_iteration_data_during_simulation:
                 plot_steady_state_concentrations(
-                    os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_plot.png"),
-                    current_species_concentrations,
+                    reaction_network=REACTION_NETWORK,
+                    num_regions=NUM_REGIONS,
+                    num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
+                    radii=RADII,
+                    membrane_radii=MEMBRANE_RADII,
+                    output_file_name=os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_iteration.png"),
+                    species_concentrations_to_plot=current_species_concentrations,
                     title = (
                             f"iteration #{iter}\n"
                             f"residual norm: {format_sci(np.linalg.norm(F_vector))}\n"
@@ -414,18 +425,14 @@ def solve_newton(
                 break
     return current_species_concentrations, early_convergence
 
-
-
-
-
 if __name__ == "__main__":
     # Parse arguments from command line
     parser = argparse.ArgumentParser()
     parser.add_argument("folder_to_solve", type=str, help="Path to folder with system info")
-    parser.add_argument("solver_input_file", type=str)
-    parser.add_argument("solver_params_file", type=str)
+    parser.add_argument("--solver_input_file", type=str)
+    parser.add_argument("--solver_params_file", type=str)
     # use int(float()) to be able to pass scientific notation
-    parser.add_argument("--max-iterations", type=lambda x: int(float(x)), help="Maximum Newton iterations") 
+    parser.add_argument("--max_iterations", type=lambda x: int(float(x)), help="Maximum Newton iterations") 
     args = parser.parse_args()
 
     # Load all the passed information, create folder for background info
@@ -434,18 +441,15 @@ if __name__ == "__main__":
     SOLVER_PARAMS = load_json(args.solver_params_file)
     SOLVER_INPUT = load_json(args.solver_input_file)
     MAX_NUM_NEWTON_ITERATIONS = args.max_iterations
+    min_num_iterations_digits = int(math.log10(MAX_NUM_NEWTON_ITERATIONS)+1)
 
     # Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_REACTION_NETWORK"))
-    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry"))
-    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh"))
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
+    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
+    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh.json"))
     
-    if SOLVER_INPUT["OUTPUT_OPTIONS"]["create_gif_with_saved_data"] is True and SOLVER_INPUT["VARIABLES_TO_SAVE"]["save_concentrations"] is False:
+    if SOLVER_INPUT["output_options"]["create_gif_with_saved_data"] is True and SOLVER_INPUT["variables_to_save"]["save_concentrations"] is False:
         raise ValueError("Cannot make the gif if the concentrations are not saved.")
-
-
-    # Lookup to be able to match the species from the species name saved in .json files  
-    SPECIES_LOOKUP = {sp.name: sp for sp in REACTION_NETWORK.species}
 
     # Deal with case permeability vs enzymatic
     # Read out type of membrane
@@ -456,30 +460,32 @@ if __name__ == "__main__":
     else:
         raise ValueError("Membrane type not correctly specified.")
     if MEMBRANE_TYPE == "enzymatic":
-        PORE_DENSITY = SYSTEM_GEOMETRY_DICT["MEMBRANE_PROPERTIES"]["pore_density"]
+        PORE_DENSITY = SYSTEM_GEOMETRY_DICT["membrane_properties"]["pore_density"]
     
     # Step 1: Define all geometry variables
-    R = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["outer_membrane_radius"]
-    MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]
-    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]
-    NUM_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_REGIONS"]
-    MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MEMBRANE_RADII"]
-   
-    # Step 2: Define structures to access geometry information
-    POINT_IDS = SYSTEM_MESH_DICT["POINT_IDS"]
-    REVERSE_POINT_IDS = SYSTEM_MESH_DICT["REVERSE_POINT_IDS"]
-    RADII = SYSTEM_MESH_DICT["RADII"]
-    DELTA_R = SYSTEM_MESH_DICT["DELTA_R"]
-    NUM_POINTS = SYSTEM_MESH_DICT["NUM_POINTS"]
-    POINT_INFOS = SYSTEM_MESH_DICT["POINT_INFOS"]
-    NEIGHBORS = SYSTEM_MESH_DICT["NEIGHBORS"]
+    R = SYSTEM_GEOMETRY_DICT["geometry_config"]["outer_membrane_radius"]
+    MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["mesh_points_in_regions"]
+    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_mesh_points_in_regions"]
+    NUM_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_regions"]
+    MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["geometry_config"]["membrane_radii"]
 
+    SPECIES_LOOKUP = {sp.name: sp for sp in REACTION_NETWORK.species}
+  
+    # Step 2: Define structures to access geometry information
+    POINT_IDS = get_correct_point_ids_dict(SYSTEM_MESH_DICT["point_ids"], SPECIES_LOOKUP)
+    REVERSE_POINT_IDS = get_correct_reverse_point_ids_dict(SYSTEM_MESH_DICT["reverse_point_ids"], SPECIES_LOOKUP)
+    RADII = SYSTEM_MESH_DICT["radii"]
+    DELTA_R = SYSTEM_MESH_DICT["delta_r"]
+    NUM_POINTS = SYSTEM_MESH_DICT["num_points"]
+    POINT_INFOS = SYSTEM_MESH_DICT["point_infos"] 
+    NEIGHBORS = get_correct_neighbors_dict(SYSTEM_MESH_DICT["neighbors"])
+    
     # Step 3: Put enzyme location information
     ENZYMES_CONCENTRATIONS = {
-    region_idx : {
-        enzyme : enzyme.concentration if region_idx in enzyme.regions else 0
-        for enzyme in REACTION_NETWORK.enzymes
-    }
+        region_idx : {
+            enzyme : enzyme.concentration if region_idx in enzyme.regions else 0
+            for enzyme in REACTION_NETWORK.enzymes
+        }
     for region_idx in range(NUM_REGIONS)
     }
 
@@ -494,56 +500,63 @@ if __name__ == "__main__":
         for region_idx in range(NUM_REGIONS)
     }
     
+    print("Computing order of magnitude of residual.")
     # Guess is used to find the order of magnitude of convergence conditions
-    max_guess_concentration = nested_max(species_concentrations_guess)
+    max_guess_concentration = find_max_in_nested_dict(species_concentrations_guess)
     F_vector_guess, _, _ = compute_newton_step(species_concentrations_guess)
-    # Load any previous solution
-    BASENAME_PREVIOUS_SOLUTION = os.path.basename(PREVIOUS_SOLUTION)
-    if "none" not in BASENAME_PREVIOUS_SOLUTION:
-        previous_solution_species_concentrations_dict_with_strings = load_json(PREVIOUS_SOLUTION)
+
+    # Find out whether there is any previous solution from which to continue
+    previous_solution = find_latest_solution(ITERATION_DATA_PATH)
+    if previous_solution is None:
+        print(f"Starting simulation for folder {FOLDER_TO_SOLVE} from scratch.")
+        species_concentrations_initial = species_concentrations_guess
+        initial_iteration_number = 0
+        num_iterations_digits = min_num_iterations_digits
+    else:
+        previous_solution_species_concentrations_dict_with_strings = load_json(previous_solution)
         species_concentrations_initial = get_species_concentrations_from_json_file(
-            previous_solution_species_concentrations_dict_with_strings)
-        match = re.search(r"(\d+)", BASENAME_PREVIOUS_SOLUTION)
+            previous_solution_species_concentrations_dict_with_strings, SPECIES_LOOKUP)
+        basename_previous_solution = os.path.basename(previous_solution)
+        match = re.search(r"(\d+)", basename_previous_solution)
         if match:
-            INITIAL_ITERATION_NUMBER = int(match.group(1))
+            initial_iteration_number = int(match.group(1))
         else:
             raise ValueError("Could not get the iter from the previous solution")
-        rename_iteration_files(ITERATION_DATA_PATH, max_digits=NUM_NEWTON_ITERATIONS_DIGITS, dry_run=False)
-        
-    else:
-        species_concentrations_initial = species_concentrations_guess
-        INITIAL_ITERATION_NUMBER = 0
+        num_iterations_digits = rename_iteration_files(ITERATION_DATA_PATH, min_digits=min_num_iterations_digits)
+        print(f"Continuing simulation for folder {FOLDER_TO_SOLVE} from iteration {initial_iteration_number}.")
+
     
     # Step 5: Define convergence criterion
     convergence_parameters = {
-        "tol_relative":SOLVER_PARAMS["CONVERGENCE_PARAMETERS"]["tol_relative_value"],
+        "tol_relative":SOLVER_PARAMS["convergence_parameters"]["tol_relative_value"],
         # tol_absolute is the tolerance of the maximum value of Delta u;
         # max_guess_concentration gives the order of magnitude in which solutions are expected to be
-        "tol_absolute":max_guess_concentration*SOLVER_PARAMS["CONVERGENCE_PARAMETERS"]["tol_absolute_factor"],
-        "tol_residual":np.linalg.norm(F_vector_guess)*SOLVER_PARAMS["CONVERGENCE_PARAMETERS"]["tol_residual_factor"],
+        "tol_absolute":max_guess_concentration*SOLVER_PARAMS["convergence_parameters"]["tol_absolute_factor"],
+        "tol_residual":np.linalg.norm(F_vector_guess)*SOLVER_PARAMS["convergence_parameters"]["tol_residual_factor"],
     }
 
     # Important: save output for checking. tqdm is excluded
+    print(f"Opening log file for {FOLDER_TO_SOLVE}.")
     with open(os.path.join(FOLDER_TO_SOLVE, ".newton_solver.log"), "a") as f, redirect_stdout(f):
-        print(f"Starting solver from iteration number {INITIAL_ITERATION_NUMBER} \n")
+        print(f"Starting solver from iteration number {initial_iteration_number} \n")
         print("convergence parameters",
             {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()}, "\n")
         # Step 6: Run solver (timed)
         start_time = time.time()
         species_concentrations_final, early_convergence = solve_newton(
             simulation_start_time=start_time,
-            initial_iteration_number=INITIAL_ITERATION_NUMBER,
+            initial_iteration_number=initial_iteration_number,
             max_num_newton_iterations=MAX_NUM_NEWTON_ITERATIONS,
             initial_species_concentrations=species_concentrations_initial,
-            adaptive_step_parameters=SOLVER_PARAMS["ADAPTIVE_STEP_PARAMETERS"],
+            adaptive_step_parameters=SOLVER_INPUT["adaptive_step_parameters"],
             convergence_parameters=convergence_parameters,
-            variables_to_save_dictionary = SOLVER_PARAMS["VARIABLES_TO_SAVE"],
-            save_data_every=SOLVER_PARAMS["OUTPUT_OPTIONS"]["save_data_every"],
-            check_convergence_every=SOLVER_PARAMS["NEWTON_PARAMETERS"]["check_convergence_every"],
-            adaptive = not SOLVER_PARAMS["NEWTON_PARAMETERS"]["override_adaptive_method"],
-            print_iteration_info_every = SOLVER_PARAMS["OUTPUT_OPTIONS"]["print_iteration_info_every"],
-            print_convergence_info = SOLVER_PARAMS["OUTPUT_OPTIONS"]["print_convergence_progress"],
-            plot_iteration_data_during_simulation = SOLVER_PARAMS["OUTPUT_OPTIONS"]["plot_iteration_data_during_simulation"]
+            variables_to_save_dictionary = SOLVER_INPUT["variables_to_save"],
+            save_data_every=SOLVER_INPUT["output_options"]["save_data_every"],
+            check_convergence_every=SOLVER_PARAMS["newton_parameters"]["check_convergence_every"],
+            adaptive = not SOLVER_INPUT["newton_parameters"]["override_adaptive_method"],
+            print_iteration_info_every = SOLVER_INPUT["output_options"]["print_iteration_info_every"],
+            print_convergence_info = SOLVER_INPUT["output_options"]["print_convergence_progress"],
+            plot_iteration_data_during_simulation = SOLVER_INPUT["output_options"]["plot_iteration_data_during_simulation"]
         )
         end_time = time.time()
 
@@ -557,13 +570,27 @@ if __name__ == "__main__":
 
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
     plot_steady_state_concentrations(
-        os.path.join(FOLDER_TO_SOLVE, "species_steady_state_concentrations.png"),
-        species_concentrations_final)
+        reaction_network=REACTION_NETWORK,
+        num_regions=NUM_REGIONS,
+        num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
+        radii=RADII,
+        membrane_radii=MEMBRANE_RADII,
+        output_file_name=os.path.join(FOLDER_TO_SOLVE, "species_steady_state_concentrations.png"),
+        species_concentrations_to_plot = species_concentrations_final)
 
     # Make gif
-    if SOLVER_PARAMS["OUTPUT_OPTIONS"]["create_gif_with_saved_data"]:
-        make_newton_iterations_gif(ITERATION_DATA_PATH, FOLDER_TO_SOLVE)
-    if SOLVER_PARAMS["OUTPUT_OPTIONS"]["delete_data_at_the_end"]:
-        files = glob.glob(os.path.join(ITERATION_DATA_PATH, "*"))
-        for f in files:
-            os.remove(f)
+    if SOLVER_INPUT["output_options"]["create_gif_with_saved_data"]:
+        make_newton_iterations_gif(
+            reaction_network=REACTION_NETWORK,
+            num_regions=NUM_REGIONS,
+            num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
+            radii=RADII,
+            membrane_radii=MEMBRANE_RADII,
+            iteration_data_folder=ITERATION_DATA_PATH,
+            gif_output_folder=FOLDER_TO_SOLVE,
+            species_lookup_dict=SPECIES_LOOKUP)
+
+    #if SOLVER_INPUT["output_options"]["delete_data_at_the_end"]:
+    #    files = glob.glob(os.path.join(ITERATION_DATA_PATH, "*"))
+    #    for f in files:
+    #        os.remove(f)

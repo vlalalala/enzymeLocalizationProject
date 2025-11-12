@@ -8,20 +8,26 @@ import json
 import pickle
 import glob
 
+def dump_json_base(dump_directory: str, file_basename: str, dict_to_dump: dict):
+    """
+    Dump a dictionary (possibly nested) as JSON. 
+    No type conversions.
+    Set file_basename without the .json ending.
+    """
+    os.makedirs(dump_directory, exist_ok=True)
+    path = os.path.join(dump_directory, f"{file_basename}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dict_to_dump, f, indent=4)
+
 def int_from_sci(x):
+    """Returns the integer out of scientific writing
+    (e.g. 1e2 is interpreted as a float)
+    """
     return int(float(x))
 
-def nested_max(dictionary):
-    max_val = float("-inf")
-    for v in dictionary.values():
-        if isinstance(v, dict):
-            max_val = max(max_val, nested_max(v))
-        else:
-            max_val = max(max_val, v)
-    return max_val
-
 def all_non_negative(dictionary):
-    """Checks in a nested dictionary whether all values are non-negative"""
+    """Checks in a nested dictionary whether all values are non-negative.
+    """
     for v in dictionary.values():
         if isinstance(v, dict):
             if not all_non_negative(v):
@@ -31,7 +37,9 @@ def all_non_negative(dictionary):
     return True
 
 def format_sci(x: float) -> str:
-    """Format a positive float as scientific notation with 1 decimal and 2-digit exponent."""
+    """Returns a string, which is a positive float shown through
+    scientific notation with 1 decimal and 2-digit exponent.
+    """
     s = f"{x:.1e}"           # e.g. "3.6e-16"
     base, exp = s.split("e")
     exp_num = int(exp)
@@ -41,14 +49,13 @@ def load_json(path):
     """path should have the .json extension.
     in json files, the keys are converted to strings always.
     When loading, the keys are converted to integers, if possible.
-    
     """
     _, file_extension = os.path.splitext(os.path.basename(path))
     if not os.path.isfile(path) or file_extension != ".json":
         raise ValueError(f"The file {path} does not exist or is not a .json file.")
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         contents = json.load(f)
-    
+
     def convert_keys(obj):
         if isinstance(obj, dict):
             new_dict = {}
@@ -61,23 +68,28 @@ def load_json(path):
                 # Recursively convert nested dictionaries
                 new_dict[new_key] = convert_keys(v)
             return new_dict
-        elif isinstance(obj, list):
+        if isinstance(obj, list):
             return [convert_keys(i) for i in obj]
-        else:
-            return obj
+        return obj
 
     return convert_keys(contents)
 
-def pickle_dump_binary(path, variable):
+def pickle_dump_binary(path, variable) -> None:
+    """Saves a variable in a path.
+    """
     with open(path, 'wb') as f:
         pickle.dump(variable, f)
 
 def pickle_load_binary(path):
+    """Returns a pickled file.
+    """
     with open(path, 'rb') as f:
         loaded_variable = pickle.load(f)
     return loaded_variable
 
 def closest_value(my_list, target):
+    """Returns the closest value within my_list to the target.
+    """
     return min(my_list, key=lambda x: abs(x - target))
 
 def as_list(value, type_cast=str):
@@ -183,11 +195,11 @@ def find_sorted_unique_files_with_max_digits_and_max_value(folder, pattern_to_fi
 
     return unique_files, max_digits
 
-
-
-def find_max_in_nested_dict(d):
+def find_max_in_nested_dict(dictionary):
+    """Finds the maximum value within a nested dictionary.
+    """
     max_val = float('-inf')
-    for v in d.values():
+    for v in dictionary.values():
         if isinstance(v, dict):
             # Recurse into nested dictionary
             max_val = max(max_val, find_max_in_nested_dict(v))

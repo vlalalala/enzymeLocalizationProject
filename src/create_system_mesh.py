@@ -108,13 +108,13 @@ def build_point_neighbor_dict(num_mesh_points_in_regions) -> dict:
 if __name__ == "__main__":
     FOLDER_TO_SOLVE = sys.argv[1]    
     # Step 0: Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_REACTION_NETWORK"))
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
     SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
     SOLVER_INPUT = load_json(os.path.join(FOLDER_TO_SOLVE, "solver_input.json"))
 
     # Step 1: Define all geometry variables
-    MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]
-    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]
+    MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["mesh_points_in_regions"]
+    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_mesh_points_in_regions"]
     
     # Step 2: Define structures to access geometry information
     POINT_IDS = build_point_ids_dict(REACTION_NETWORK, NUM_MESH_POINTS_IN_REGIONS)
@@ -132,14 +132,13 @@ if __name__ == "__main__":
 
     # Save dictionary in .json file for readability
     dict_to_dump = {
-        "POINT_IDS": POINT_IDS,
-        "REVERSE_POINT_IDS": REVERSE_POINT_IDS,
-        "RADII": RADII,
-        "DELTA_R": DELTA_R,
-        "NUM_POINTS": NUM_POINTS,
-        "POINT_INFOS": POINT_INFOS,
-        "NEIGHBORS": NEIGHBORS,
-
+        "point_ids": POINT_IDS,
+        "reverse_point_ids": REVERSE_POINT_IDS,
+        "radii": RADII,
+        "delta_r": DELTA_R,
+        "num_points": NUM_POINTS,
+        "point_infos": POINT_INFOS,
+        "neighbors": NEIGHBORS
     }
     dump_json(FOLDER_TO_SOLVE, ".expanded_system_mesh", dict_to_dump)
 

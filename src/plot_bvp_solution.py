@@ -1,43 +1,48 @@
 import sys
 import os
 import re
-from contextlib import redirect_stdout
+import glob
 import argparse
-from tqdm import tqdm
 import numpy as np
-from scipy.sparse.linalg import spsolve
-from scipy.sparse import lil_matrix
+from tqdm import tqdm
 import matplotlib.pyplot as plt
-from auxiliary_functions_using_standard_library import (rename_iteration_files,
-    nested_max, all_non_negative, format_sci, pickle_load_binary,
-    dump_json, find_sorted_unique_files_with_max_digits_and_max_value, load_json,
-    find_max_in_nested_dict)
+from auxiliary_functions_using_standard_library import (
+    format_sci, pickle_load_binary,
+    load_json, find_max_in_nested_dict)
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-from auxiliary_functions import save_matrix_as_sparse_txt
 from auxiliary_functions_framework_organization import get_species_concentrations_from_json_file
-
 import imageio.v3 as iio
 
 
-def plot_steady_state_concentrations(output_file_name, species_concentrations_to_plot, title = None, ymax = None):
-    """
+def plot_steady_state_concentrations(
+        reaction_network,
+        num_regions,
+        num_mesh_points_in_regions,
+        radii,
+        membrane_radii,
+        output_file_name, species_concentrations_to_plot, title = None, ymax = None):
+    """ Plots the concentrations at a specific time point.
+    output_file_name: should have .png or any other extension
+    species_concentrations_to_plot: dictionary with keys region, n, species,
+    title: string with title to put. Default to no title written.
+    ymax: maximum value on y axis. If None (default), automatically computed from data.
     """
     x_values = []
     y_values = {}
-    for species_idx, species in enumerate(REACTION_NETWORK.species):
+    for species_idx, species in enumerate(reaction_network.species):
         species_y_values = []
-        for region in range(NUM_REGIONS):
-            for n in range(NUM_MESH_POINTS_IN_REGIONS[region]):
+        for region in range(num_regions):
+            for n in range(num_mesh_points_in_regions[region]):
                 if species_idx == 0:
-                    x_values.append(RADII[region][n])
+                    x_values.append(radii[region][n])
                 species_y_values.append(species_concentrations_to_plot[region][n][species])
         y_values[species] = species_y_values
 
     fig, ax = plt.subplots(1,1, figsize = (5,3))
     for x_value in x_values:
         ax.axvline(x_value/max(x_values), ymin = 0.95, ymax = 1, color="k")
-    for species in REACTION_NETWORK.species:
-        curve, = ax.plot(x_values/max(x_values), y_values[species], label=species.name)
+    for species in reaction_network.species:
+        curve, = ax.plot(np.array(x_values)/max(x_values), y_values[species], label=species.name)
         color = curve.get_color()
         ax.hlines(species.external_concentration, xmin=1, xmax = 1.1, color = color)
     ax.set_ylabel("concentration / M")
@@ -48,10 +53,10 @@ def plot_steady_state_concentrations(output_file_name, species_concentrations_to
         ncol=3,                  # number of columns
         frameon=False
     )
-    for membrane_radius in MEMBRANE_RADII:
-        ax.axvline(membrane_radius/max(MEMBRANE_RADII), linestyle = "--", alpha = 0.5, c = "k")
+    for membrane_radius in membrane_radii:
+        ax.axvline(membrane_radius/max(membrane_radii), linestyle = "--", alpha = 0.5, c = "k")
 
-    max_value = max(max(y_values[species]) for species in REACTION_NETWORK.species)
+    max_value = max(max(y_values[species]) for species in reaction_network.species)
     if ymax == None:
         ymax = max_value * 1.05
     if title != None:
@@ -61,76 +66,153 @@ def plot_steady_state_concentrations(output_file_name, species_concentrations_to
     fig.savefig(output_file_name, dpi = 300, bbox_inches='tight')
     plt.close(fig)
 
-def make_newton_iterations_gif(iteration_data_folder, gif_output_folder):
+def make_newton_iterations_gif(
+        reaction_network,
+        num_regions,
+        num_mesh_points_in_regions,
+        radii,
+        membrane_radii,
+        iteration_data_folder, gif_output_folder, species_lookup_dict):
     """
     Important: delete any .json files from previous simulations that may not be overwritten.
+    (Should already automatically have been done by snakemake through cleanup_old_iterations rule)
     """
     file_to_create = os.path.join(gif_output_folder, "newton_iterations.gif")
-    sorted_files, max_digits = find_sorted_unique_files_with_max_digits_and_max_value(iteration_data_folder, ".iteration_nr_*_concentrations.json", max_iteration_value = MAX_NUM_NEWTON_ITERATIONS)
+    # Get concentration files from which to make the gif
+    files = glob.glob(os.path.join(iteration_data_folder, ".iteration_nr_*_concentrations.json"))
+    files.sort()
+    if not files:
+        print(f"No iterations in {iteration_data_folder} from which to create gif")
+        return   
+    # Find out number of leading zeros within folder
+    match = re.search(r'\.iteration_nr_(\d+)_concentrations\.json', os.path.basename(files[0]))
+    if match:
+        digit_count = len(match.group(1))
+        print(f"The filenames have {digit_count} digits.")
+    else:
+        raise ValueError(f"Could not find a number in the filename {os.path.basename(files[0])}.")
+
+    # Get the maximum concentration within the files (internal or external concentration)
     max_concentration_value = 0
-    for file in sorted_files:
+    for file in files:
         concentration_dict = load_json(file)
         max_value = find_max_in_nested_dict(concentration_dict)
-        if max_value > max_concentration_value:
-            max_concentration_value = max_value
-    for species in REACTION_NETWORK.species:
-        if species.external_concentration > max_concentration_value:
-            max_concentration_value = species.external_concentration
-    max_concentration_value *= 1.1
+        max_concentration_value = max(max_concentration_value, max_value)
+    for species in reaction_network.species:
+        max_concentration_value = max(max_concentration_value, species.external_concentration)
+    max_y = max_concentration_value * 1.1 # make space for some vertical padding
+    
+    # Read maximum y value previously used to create a gif
+    # If the new highest concentration is higher, previous png files have to be
+    # removed to then be rewritten with the higher y max
+    max_y_filename = os.path.join(gif_output_folder, ".gif_ymax")
+    if os.path.isfile(max_y_filename):
+        with open(max_y_filename, "r") as f:
+            previous_max_y = float(f.read().strip())
+        if previous_max_y > max_y:
+            max_y = previous_max_y
+        else:
+            for file in files:
+                png_file = png_file = os.path.splitext(file)[0] + ".png"
+                os.remove(png_file)
+
+    # Create concentration files
     png_files_created = []
     print("creating files for gif", file_to_create)
-    for file in tqdm(sorted_files, file=sys.stderr):
+    for file in tqdm(files, file=sys.stderr):
         png_file = os.path.splitext(file)[0] + ".png" # remove .json
+        if os.path.isfile(png_file):
+            continue
         number = int(re.findall(r"\d+", os.path.basename(png_file))[0])+1
-        number_with_max_digits = f"{number:0{max_digits}d}"
+        number_with_max_digits = f"{number:0{digit_count}d}"
         title_lines = [f"iteration #{number_with_max_digits}"]
         species_concentrations_to_plot_dict_with_strings = load_json(file)
-        if SOLVER_PARAMS["VARIABLES_TO_SAVE"]["save_F_vector_norm"]:
-            residual_norm_file= file.replace("_concentrations.json", "_F_vector_norm.json")
+        residual_norm_file= file.replace("_concentrations.json", "_F_vector_norm.json")
+        if os.path.isfile(residual_norm_file):
             residual_norm = load_json(residual_norm_file)
             title_lines.append(f"residual norm: {format_sci(residual_norm)}")
         species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
-            species_concentrations_to_plot_dict_with_strings)
+            species_concentrations_to_plot_dict_with_strings, species_lookup_dict)
         plot_steady_state_concentrations(
-            png_file, species_concentrations_to_plot_dict,
+            reaction_network=reaction_network,
+            num_regions=num_regions,
+            num_mesh_points_in_regions=num_mesh_points_in_regions,
+            radii=radii,
+            membrane_radii=membrane_radii,
+            output_file_name=png_file,
+            species_concentrations_to_plot=species_concentrations_to_plot_dict,
             title = "\n".join(title_lines),
-            ymax = max_concentration_value)
+            ymax = max_y)
         png_files_created.append(png_file)
-    
+    # Put all the pngs together
     print("creating gif", file_to_create)
     with iio.imopen(file_to_create, "w") as writer:
         for filename in tqdm(png_files_created, file=sys.stderr):
             image = iio.imread(filename)
             writer.write(image)
+    print("gif created!")
+    # Create file with maximum concentration (to know whether previous png files
+    #can be reused)
+    with open(max_y_filename, "w") as f:
+        f.write(str(max_y))
 
 if __name__ == "__main__":
     # Parse arguments from command line
     parser = argparse.ArgumentParser()
     parser.add_argument("folder_to_solve", type=str, help="Path to folder with system info")
-    # use int(float()) to be able to pass scientific notation
-    parser.add_argument("--max-iterations", type=lambda x: int(float(x)), help="Maximum Newton iterations") 
-    parser.add_argument("--previous-solution", type=str, default=None,
-                        help="Optional path to previous iteration solution file.")
+    parser.add_argument("--plot_iteration", type=str, default=None,
+                        help="Optional. Iteration number of which to plot the concentration.")
     args = parser.parse_args()
 
     # Load all the passed information
     FOLDER_TO_SOLVE = args.folder_to_solve
-    MAX_NUM_NEWTON_ITERATIONS = args.max_iterations
-    PREVIOUS_SOLUTION = args.previous_solution
+    PLOT_ITERATION = args.plot_iteration
 
     # Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".REACTION_NETWORK_pickle"))
-    # Lookup to be able to match the species from the species name saved in .json files  
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
+    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry"))
+    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh"))
+
     SPECIES_LOOKUP = {sp.name: sp for sp in REACTION_NETWORK.species}
 
-    # Step 1: Define all geometry variables
-    R = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["outer_membrane_radius"]
-    MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MESH_POINTS_IN_REGIONS"]
-    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_MESH_POINTS_IN_REGIONS"]
-    NUM_REGIONS = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["NUM_REGIONS"]
-    MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["GEOMETRY_CONFIG"]["MEMBRANE_RADII"]
+    R = SYSTEM_GEOMETRY_DICT["geometry_config"]["outer_membrane_radius"]
+    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_mesh_points_in_regions"]
+    NUM_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_regions"]
+    MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["geometry_config"]["membrane_radii"]
 
-    # Step 0: Get all solver parameters
-    SOLVER_PARAMS = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".solver_info_pickle"))
-    if SOLVER_PARAMS["OUTPUT_OPTIONS"]["create_gif_with_saved_data"] is True and SOLVER_PARAMS["VARIABLES_TO_SAVE"]["save_concentrations"] is False:
+    RADII = SYSTEM_MESH_DICT["radii"]
+
+    SOLVER_INPUT = load_json(os.path.join(FOLDER_TO_SOLVE, "solver_input.json"))
+    if SOLVER_INPUT["output_options"]["create_gif_with_saved_data"] is True and SOLVER_INPUT["variables_to_save"]["save_concentrations"] is False:
         raise ValueError("Cannot make the gif if the concentrations are not saved.")
+    
+    ITERATIONS_FOLDER = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
+    if PLOT_ITERATION is None:
+        make_newton_iterations_gif(
+            reaction_network=REACTION_NETWORK,
+            num_regions=NUM_REGIONS,
+            num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
+            radii=RADII,
+            membrane_radii=MEMBRANE_RADII,
+            iteration_data_folder=ITERATIONS_FOLDER,
+            gif_output_folder=FOLDER_TO_SOLVE,
+            species_lookup_dict=SPECIES_LOOKUP)
+    else:
+        # Find out concentrations file from the iteration number
+        pattern = os.path.join(ITERATIONS_FOLDER, ".iteration_nr_*_concentrations.json")
+        files = glob.glob(pattern)
+        regex = re.compile(rf"\.iteration_nr_*{PLOT_ITERATION}_concentrations\.json$")
+        matches = [f for f in files if regex.search(os.path.basename(f))]
+        match_file= matches[0]
+        species_concentrations_to_plot_with_strings = load_json(match_file)
+        species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
+            species_concentrations_to_plot_with_strings, SPECIES_LOOKUP)
+        file_to_create = os.path.splitext(match_file)[0] + "_individual.png" # remove .json
+        plot_steady_state_concentrations(
+            reaction_network=REACTION_NETWORK,
+            num_regions=NUM_REGIONS,
+            num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
+            radii=RADII,
+            membrane_radii=MEMBRANE_RADII,
+            output_file_name=file_to_create,
+            species_concentrations_to_plot=species_concentrations_to_plot_dict)
