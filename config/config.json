@@ -1,0 +1,7 @@
+{
+"data_folder": "data",
+"base_name": "test",
+"digits_case_numbers": 0,
+"case_numbers": [0],
+"solver_data_folder": "solver_iteration_data"
+}

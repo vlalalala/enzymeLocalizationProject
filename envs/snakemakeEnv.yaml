@@ -1,9 +1,0 @@
-name: snakemake_env
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - python=3.10
-  - numpy
-  - matplotlib
-  - snakemake  # optional: if you run inside this environment

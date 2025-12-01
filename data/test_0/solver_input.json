@@ -1,0 +1,33 @@
+{
+    "geometry_parameters": {
+        "num_mesh_points": 20
+    },
+    "newton_parameters": {
+        "override_adaptive_method": false
+    },
+    "adaptive_step_parameters": {
+        "initial_alpha": 1.0,
+        "alpha_min": 1e-4,
+        "alpha_max": 10,
+        "gamma_inc": 1.15,
+        "gamma_dec": 0.50,
+        "max_num_backtrack": 100,
+        "max_num_accepted_successive_unsuccessful_steps": 2
+    },
+    "output_options": {
+        "print_convergence_progress": false,
+        "save_data_every": 1e2,
+        "create_gif_with_saved_data": true,
+        "print_iteration_info_every": 1e2,
+        "delete_data_at_the_end": true,
+        "plot_iteration_data_during_simulation": false
+    },
+    "variables_to_save": {
+        "save_F_vector": false,
+        "save_F_vector_norm": true,
+        "save_J_matrix": false,
+        "save_du_vector": false,
+        "save_concentrations": true,
+        "save_du_vector_max": false
+    }
+}

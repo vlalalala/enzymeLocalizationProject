@@ -1,0 +1,23 @@
+# Ignore Python cache
+__pycache__/
+*.py[cod]
+
+# Ignore images that can be generated from the code
+*.png
+# Ignore all pdf files
+*.pdf
+# Ignore all gif files
+*.gif
+
+# Ignore editor VSCode/VSCodium settings
+.vscode/
+.history/
+*.code-workspace
+
+# Ignore any .snakemake folders at any level
+**/.snakemake/
+**/intermediate_files/
+
+# Ignore any files starting with . within any folder containing the data substring
+*data*/**/.*
+

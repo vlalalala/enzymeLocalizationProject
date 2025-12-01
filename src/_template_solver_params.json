@@ -1,0 +1,10 @@
+{
+"convergence_parameters": [
+    "tol_relative_value",
+    "tol_absolute_factor",
+    "tol_residual_factor"
+],
+"newton_parameters": [
+    "check_convergence_every"
+]
+}

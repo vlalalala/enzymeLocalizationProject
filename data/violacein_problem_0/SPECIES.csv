@@ -1,0 +1,13 @@
+﻿name,diffusion_constant,permeability_constant,external_concentration
+Trp,6.6e-8,90e-8,25e-6
+IPA_imine,6.6e-8,90e-8,0
+IPA_imine_dimer,6.6e-8,90e-8,0
+CPA,6.6e-8,90e-8,0
+PDVA,6.6e-8,90e-8,0
+DVA,6.6e-8,90e-8,0
+PDV,6.6e-9,90e-8,0
+DV,6.6e-8,90e-8,0
+PVA,6.6e-9,90e-8,0
+PV,6.6e-9,90e-8,0
+VA,6.6e-9,90e-8,0
+Violacein,6.6e-9,90e-8,0
