@@ -2,9 +2,9 @@
     "convergence_parameters": {
         "tol_relative_value": 1e-20,
         "tol_absolute_factor": 1e-8,
-        "tol_residual_factor": 1e-8
+        "tol_residual_factor": 1e-8 
     },
     "newton_parameters": {
-        "check_convergence_every": 1e4
+        "check_convergence_every": 1e2
     }
 }

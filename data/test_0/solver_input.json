@@ -15,7 +15,7 @@
         "max_num_accepted_successive_unsuccessful_steps": 2
     },
     "output_options": {
-        "print_convergence_progress": false,
+        "print_convergence_progress": true,
         "save_data_every": 1e2,
         "create_gif_with_saved_data": true,
         "print_iteration_info_every": 1e2,

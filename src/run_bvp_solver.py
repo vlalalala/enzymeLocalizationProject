@@ -2,10 +2,8 @@
 import sys
 import os
 import copy
-from typing import Dict, Any
 import time
 import math
-import glob
 import re
 from contextlib import redirect_stdout
 import argparse
@@ -27,10 +25,8 @@ from auxiliary_functions_framework_organization_using_standard_library import (
     find_latest_solution, rename_iteration_files)
 
 
-
-
 def calculate_reaction_term(current_species_concentrations, region, n, species):
-    """ Gives the reaction term for F_i.
+    """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
     """
     reaction_term = 0
     for reaction in species.as_reactant_in + species.as_product_in:
@@ -46,6 +42,7 @@ def calculate_reaction_term(current_species_concentrations, region, n, species):
 def calculate_reaction_partial_derivative(current_species_concentrations, reaction_to_check, partial_derivative_species, region, n):
     """ Gives the partial derivative of a reaction to a concentration of a species
     that is involved in the reaction.
+    Used for defining the jacobian.
     """
     if isinstance(reaction_to_check, SpontaneousReaction):
         derivative = reaction_to_check.k
@@ -56,7 +53,8 @@ def calculate_reaction_partial_derivative(current_species_concentrations, reacti
     return derivative
 
 def get_pore_density_occupation_information(current_species_concentrations, info_minus_side, info_plus_side):
-    """ Gives necessary information about the density of occupied pores by each species, when given the current
+    """ Used for the enzymatic membrane model.
+    Gives necessary information about the density of occupied pores by each species, when given the current
     concentrations of species dictionary. It also requires 
     info_minus_side and info_plus_side, which are each tuples (region, n).
     In case the info_plus_side is such that the region would correspond to the exterior (and thus the 
@@ -313,12 +311,16 @@ def adaptive_newton_step(
         
     return species_concentrations, alpha_current, successive_unsuccessful_steps, norm_F_to_return
 
-def check_convergence(current_species_concentrations, convergence_parameters, print_info):
+def check_convergence_via_jacobian_and_residual(
+        current_species_concentrations, convergence_parameters, get_full_info):
     """
     Returns true if convergence fulfilled (see below); false if not
     """
-    info = {"max_relative_change": 0, "max_Delta_u":0.0, "F_vector_norm":0.0}
-    convergence = True
+    if get_full_info:
+        info = {"max_relative_change": 0, "max_Delta_u":0.0, "F_vector_norm":0.0}
+    else:
+        info = {}
+    convergence = False ############# should be True
     # Step 0: Unpack parameters
     tol_rel = convergence_parameters.get("tol_relative", 1)
     tol_abs = convergence_parameters.get("tol_absolute", 1)
@@ -327,24 +329,69 @@ def check_convergence(current_species_concentrations, convergence_parameters, pr
     F_vector, _, du = compute_newton_step(current_species_concentrations)
     # Step 2: Check that the norm of the residual is small
     F_vector_norm = np.linalg.norm(F_vector)
-    if print_info:
+    if get_full_info:
         info["F_vector_norm"] = F_vector_norm
         info["max_Delta_u"] = max(du)
     if F_vector_norm > tol_res:
         convergence = False
+        if not get_full_info: # early return in case no convergence and no need for full info
+            return convergence, {}
     # Step 3: Check that each node has had a very small relative change
     # (In case the node has a very small value, have the change be smaller than some absolute value)
     for i, du_value in enumerate(du):
         (region, n, species) = REVERSE_POINT_IDS[i]
         node_u = current_species_concentrations[region][n][species]
         max_tolerated_relative_change = tol_rel * node_u
-        if print_info:
+        if get_full_info:
             info["max_relative_change"] = max(info["max_relative_change"], max_tolerated_relative_change)
         if du_value > max(tol_abs, max_tolerated_relative_change):
             convergence = False
-    if print_info:
-        print({k: f"{v:.2e}" for k, v in info.items()})
-    return convergence
+            if not get_full_info: # early return in case no convergence and no need for full info
+                return convergence, {}
+    return convergence, info
+
+
+def check_convergence_via_flux_equilibrium(
+        current_species_concentrations, convergence_parameters, get_full_info):
+    """
+    Returns True if the relative excess of flux in any direction is smaller than some
+    deviation, given as the value to the key tol_relative_flux_deviation in
+    the dictionary convergence_parameters
+    """
+    if get_full_info:
+        info = {species: 0 for species in REACTION_NETWORK.species}
+    else:
+        info = {}
+    convergence = True
+    tol_relative_flux_deviation = convergence_parameters.get("tol_relative_flux_deviation", 1)
+    # First, calculate net reaction fluxes within the sphere
+    reaction_fluxes = {species: 0
+        for species in REACTION_NETWORK.species}
+    for i in range(NUM_POINTS):
+        (region, n, species) = REVERSE_POINT_IDS[i]
+        r = RADII[region][n]
+        reaction_flux = calculate_reaction_term(current_species_concentrations, region, n, species)
+        reaction_fluxes[species] += 4 * np.pi * reaction_flux * r**2
+    # Second, calculate flux from boundary with exterior
+    # the flux is positive if the concentration on the exterior is larger than on the interior at r=R
+    boundary_fluxes = {species: 0
+        for species in REACTION_NETWORK.species}
+    for species in REACTION_NETWORK.species:
+        boundary_fluxes[species] = species.permeability_constant * (
+            species.external_concentration
+            - current_species_concentrations[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1][species])
+    # Since we are simulating the steady state, we want the total net flux to be 0 for each species
+    # Because of numerics, we need some tolerance
+    for species in REACTION_NETWORK.species:
+        relative_deviation = abs((reaction_fluxes[species] + boundary_fluxes[species]) / boundary_fluxes[species])
+        if get_full_info:
+            info[species] = relative_deviation
+        if relative_deviation > tol_relative_flux_deviation:
+            convergence = False
+            if not get_full_info: # if we do not need the full info, early return
+                return convergence, {}
+    return convergence, info
+
 
 def solve_newton(
         simulation_start_time,
@@ -354,12 +401,12 @@ def solve_newton(
         adaptive_step_parameters,
         convergence_parameters,
         variables_to_save_dictionary,
-        save_data_every=1000,
-        check_convergence_every=1000,
-        adaptive=True,
-        print_convergence_info=False,
-        print_iteration_info_every=0,
-        plot_iteration_data_during_simulation=False
+        save_data_every,
+        check_convergence_every,
+        adaptive,
+        print_convergence_info,
+        print_iteration_info_every,
+        plot_iteration_data_during_simulation
     ):
     """
     save_data_every and check_convergence_every N iterations. If not to be done, set each to 0.
@@ -367,7 +414,7 @@ def solve_newton(
     current_species_concentrations = initial_species_concentrations
     current_alpha = adaptive_step_parameters["initial_alpha"]
     current_successive_unsuccessful_steps = 0
-    early_convergence = False
+    early_convergence = False # tracks whether the system fin
     for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
                      file=sys.stderr,
                      total=int(max_num_newton_iterations),
@@ -415,15 +462,18 @@ def solve_newton(
                 )
         # Stop iterating if criterion for convergence fulfilled
         if check_convergence_every !=0 and iter%check_convergence_every==0:
-            convergence = check_convergence(
+            convergence, info = check_convergence_via_flux_equilibrium(
                 current_species_concentrations,
                 convergence_parameters,
-                print_info=print_convergence_info)
+                get_full_info=print_convergence_info)
+            if print_convergence_info:
+                print(f"Convergence information: \n", info, "\n", flush=True)
             if convergence:
                 print(f"Convergence after {iter} iterations.")
                 early_convergence = True
                 break
     return current_species_concentrations, early_convergence
+
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -491,6 +541,8 @@ if __name__ == "__main__":
 
     # Step 4: Define structure that saves concentrations at each point and which
     # is updated with every iteration of Newton
+    # currently, the concentration is initially set to increase linearly with the 
+    # radius up until its external concentration
     species_concentrations_guess = {
         region_idx : {
             mesh_point_idx : {
@@ -533,6 +585,7 @@ if __name__ == "__main__":
         # max_guess_concentration gives the order of magnitude in which solutions are expected to be
         "tol_absolute":max_guess_concentration*SOLVER_PARAMS["convergence_parameters"]["tol_absolute_factor"],
         "tol_residual":np.linalg.norm(F_vector_guess)*SOLVER_PARAMS["convergence_parameters"]["tol_residual_factor"],
+        "tol_relative_flux_deviation": 0.001,
     }
 
     # Important: save output for checking. tqdm is excluded

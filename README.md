@@ -30,3 +30,11 @@ if it does not work, edit path with `C:\Users\YourUsername\Anaconda3\Scripts` or
 Important:
 
 (Taken from https://github.com/snakemake/snakemake/issues/1619): Note that conda environments are only used with shell, script, notebook and the wrapper directive, not the run directive. The reason is that the run directive has access to the rest of the Snakefile (e.g. globally defined variables) and therefore must be executed in the same process as Snakemake itself.
+
+Previous work:
+- Optimal Compartmentalization Strategies for Metabolic Microcompartments
+
+
+NOTE: convergence 
+
+

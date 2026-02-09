@@ -1,6 +1,6 @@
 {
     "geometry_config": {
-        "internal_membrane_relative_radii": [0.25, 0.5, 0.75],
+        "internal_membrane_relative_radii": [ 0.25, 0.5, 0.75 ],
         "outer_membrane_radius": 1e-5
     }
 }
