@@ -35,6 +35,12 @@ Previous work:
 - Optimal Compartmentalization Strategies for Metabolic Microcompartments
 
 
-NOTE: convergence 
+NOTE: convergence
+
+
+TODO:
+- add code to be able to make phase diagrams
+- add default values to _template files
+- see whether it is possible to write into the code creating data files with specific values in the csv files, such that I am able to compare the numerics with analytical solutions (plot analytical solution too.)
 
 
