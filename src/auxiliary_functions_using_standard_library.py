@@ -8,6 +8,9 @@ import json
 import pickle
 import glob
 
+def is_int_value(value):
+    return float(int(value)) == float(value)
+
 def dump_json_base(dump_directory: str, file_basename: str, dict_to_dump: dict):
     """
     Dump a dictionary (possibly nested) as JSON. 

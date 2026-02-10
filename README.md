@@ -42,5 +42,8 @@ TODO:
 - add code to be able to make phase diagrams
 - add default values to _template files
 - see whether it is possible to write into the code creating data files with specific values in the csv files, such that I am able to compare the numerics with analytical solutions (plot analytical solution too.)
+- plot: x axis the iteration, y axis the convergence parameters
+- put the convergence information in a csv file. one column is the iteration and the other columns are the other observables
 
-
+- Step 1: phase diagrams & _template default
+- 

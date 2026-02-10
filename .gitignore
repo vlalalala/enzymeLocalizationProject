@@ -19,5 +19,15 @@ __pycache__/
 **/intermediate_files/
 
 # Ignore any files starting with . within any folder containing the data substring
-*data*/**/.*
+*data*/**/.
 
+data/newtest/
+
+**/.iteration_nr*
+
+**/*.log
+**/.pickled*
+**/.validated*
+**/.species_steady_state_concentrations.json
+**/.gif_ymax
+**/.expanded*

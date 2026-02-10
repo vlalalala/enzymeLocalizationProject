@@ -6,6 +6,18 @@ import pandas as pd
 import ast
 from scipy.sparse import csr_matrix, coo_matrix
 import csv
+import yaml
+
+def read_yaml_file(file_path):
+    with open(file_path) as stream:
+        try:
+            return yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+
+def dump_in_yaml_file(file_path, variable_to_dump):
+    with open(file_path, "w") as f:
+        yaml.safe_dump(variable_to_dump, f, sort_keys=False)
 
 def dump_json(dump_directory: str, file_basename: str, dict_to_dump: dict):
     """

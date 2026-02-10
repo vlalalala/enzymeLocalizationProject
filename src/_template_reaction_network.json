@@ -2,5 +2,5 @@
 "enzymatic_reactions": ["start_species", "end_species", "ratio_endtostart_species", "enzyme", "k_cat", "k_M", "hill"],
 "spontaneous_reactions": ["start_species", "end_species", "ratio_endtostart_species", "k"],
 "enzymes": ["name", "quantity", "regions"],
-"species": ["name", "diffusion_constant", "external_concentration", "*membrane_parameters"]
+"species": ["name", "diffusion_constant", "external_concentration", "permeability_constant"]
 }
