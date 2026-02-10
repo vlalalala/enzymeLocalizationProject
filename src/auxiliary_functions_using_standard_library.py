@@ -7,6 +7,7 @@ import ast
 import json
 import pickle
 import glob
+import csv
 
 def is_int_value(value):
     return float(int(value)) == float(value)
@@ -209,3 +210,30 @@ def find_max_in_nested_dict(dictionary):
         elif isinstance(v, (int, float)):
             max_val = max(max_val, v)
     return max_val
+
+
+
+class CSVLogger:
+    """Class written by ChatGPT."""
+    def __init__(self, path):
+        self.path = path
+        self._header_written = os.path.exists(path)
+
+    def log(self, iteration: int, values: dict):
+        """
+        Append one row to the CSV log.
+
+        iteration: int
+        values: dict[str, scalar]
+        """
+        fieldnames = ["iteration", *values.keys()]
+
+        with open(self.path, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+            if not self._header_written:
+                writer.writeheader()
+                self._header_written = True
+
+            row = {"iteration": iteration, **values}
+            writer.writerow(row)

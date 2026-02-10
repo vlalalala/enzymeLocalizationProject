@@ -31,3 +31,6 @@ data/newtest/
 **/.species_steady_state_concentrations.json
 **/.gif_ymax
 **/.expanded*
+data/**/combo*
+data/**/.convergence_logger.csv
+data/**/combined*/

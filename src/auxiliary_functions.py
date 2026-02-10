@@ -4,8 +4,6 @@ import numpy as np
 from math import gcd
 import pandas as pd
 import ast
-from scipy.sparse import csr_matrix, coo_matrix
-import csv
 import yaml
 
 def read_yaml_file(file_path):
@@ -181,19 +179,7 @@ def print_network_info(graph):
         print(f"    ↪ types: {type(u)}, {type(v)}")
         print(f"    ↪ attrs: {attrs}")
 
-def save_matrix_as_sparse_txt(matrix: np.ndarray, filepath: str):
-    """
-    Save a 2D NumPy array as a sparse matrix in .txt format (row, col, value).
-    Only nonzero entries are stored.
-    """
-    # Convert to CSR sparse matrix
-    sparse_mat = csr_matrix(matrix)
-    coo = sparse_mat.tocoo()
-    # Stack row, col, data
-    data = np.column_stack((coo.row, coo.col, coo.data))
-    # Save to .txt
-    np.savetxt(filepath+".txt", data, fmt=["%d", "%d", "%.15e"],
-               header="row\tcol\tvalue", delimiter="\t", comments='')
+
 
 def convert_sparse_txt_to_csv(filepath_txt: str, filepath_csv: str):
     """

@@ -1,12 +1,12 @@
 import sys
 import os
-from auxiliary_functions_using_standard_library import load_json
+from auxiliary_functions import read_yaml_file
 
 def check_validity_file(case_directory, file_name):
     """For a particular file (file_name, with ending) in the directory case_directory,
     checks whether the input data is valid.
     """
-    solver_info_nested_dict = load_json(os.path.join(case_directory, file_name))
+    solver_info_nested_dict = read_yaml_file(os.path.join(case_directory, file_name))
 
     for section, section_dict in solver_info_nested_dict.items():
         for key, value in section_dict.items():
@@ -90,5 +90,5 @@ def check_validity_file(case_directory, file_name):
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
-    for file_name in ["solver_input", "solver_params"]:
-        solver_info_nested_dict = check_validity_file(folder_to_check_validity, f"{file_name}.json")
+    for file_name in ["parameters_solver_input", "parameters_solver_params"]:
+        solver_info_nested_dict = check_validity_file(folder_to_check_validity, f"{file_name}.yaml")

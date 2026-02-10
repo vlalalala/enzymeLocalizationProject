@@ -6,6 +6,7 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from auxiliary_functions import read_yaml_file
 from auxiliary_functions_using_standard_library import (
     format_sci, pickle_load_binary,
     load_json, find_max_in_nested_dict)
@@ -182,7 +183,7 @@ if __name__ == "__main__":
 
     RADII = SYSTEM_MESH_DICT["radii"]
 
-    SOLVER_INPUT = load_json(os.path.join(FOLDER_TO_SOLVE, "solver_input.json"))
+    SOLVER_INPUT = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_solver_input.yaml"))
     if SOLVER_INPUT["output_options"]["create_gif_with_saved_data"] is True and SOLVER_INPUT["variables_to_save"]["save_concentrations"] is False:
         raise ValueError("Cannot make the gif if the concentrations are not saved.")
     

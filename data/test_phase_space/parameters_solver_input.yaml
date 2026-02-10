@@ -1,5 +1,5 @@
 geometry_parameters: 
-    num_mesh_points: [25]
+    num_mesh_points: [25, 40]
 
 newton_parameters:
     override_adaptive_method: [false]
@@ -15,9 +15,9 @@ adaptive_step_parameters:
 
 output_options:
     log_convergence_progress: [true]
-    save_data_every: [100]
+    save_data_every: [1000]
     create_gif_with_saved_data: [true]
-    log_iteration_info_every: [100]
+    log_iteration_info_every: [1000]
     delete_data_at_the_end: [true]
     plot_iteration_data_during_simulation: [false]
 

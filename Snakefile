@@ -1,9 +1,10 @@
-# conda activate snakemake-runner
+# conda activate snakemake_env
 
 ### Import libraries from Python standard libraries ###
 
 import os
 import re
+import glob
 from itertools import product
 from src.auxiliary_functions_using_standard_library import as_list, load_json
 from src.auxiliary_functions_framework_organization_using_standard_library import(
@@ -13,17 +14,34 @@ from src.auxiliary_functions_framework_organization_using_standard_library impor
 
 reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
-### Define rules to run. The templates must already have been created and all data filled in. ###
-# Create the template files through
-# python src/_create_file_structure.py permeability 
-# python src/_create_file_structure.py enzymatic
+############################################################
+# Step 1: Create a new folder
+# python src/_create_parameters_template.py path_to_new_folder
+
+# Step 2: Write in all of the parameters that should be tested out
+
+# Step 3: Create combination files
+# python src/_create_templates_expanded.py path_to_new_folder
+# python src/_create_phase_space.py path_to_new_folder
+
+# Step 4: Run rule all
+# snakemake --use-conda --cores 2
+############################################################
+
+df = "data/test_phase_space"
+sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
+all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
+
+rule all:
+    input:
+        all_outputs
 
 rule check_solver_info_validity:
     # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
     input:
         lambda wildcards: [
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_params.json"
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
         ]
     output:
         touch("{df}/{bn}_{cn}/.validated_solver")
@@ -39,7 +57,7 @@ rule check_system_geometry_info_validity:
     """
     # snakemake -s Snakefile.smk data/test_0/.system_geometry_expanded.json --cores 1 --use-conda
     input:
-        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/system_geometry.json",
+        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_geometry.yaml",
                            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver",
                            ]
     output:
@@ -80,7 +98,7 @@ rule create_system_mesh:
         lambda wildcards: [
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json"]
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml"]
     output:
         "{df}/{bn}_{cn}/.expanded_system_mesh.json"
     conda:
@@ -96,7 +114,7 @@ rule cleanup_old_iterations:
     input:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
         geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
-        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json",
+        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
     output:
         touch("{df}/{bn}_{cn}/.validated_iterations")
     run:
@@ -121,14 +139,14 @@ rule solve_boundary_value_problem:
     input:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
         geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
-        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_input.json",
+        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
         system_mesh = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_mesh.json",
         cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_iterations",
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 1e6)),
-        solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/solver_params.json"
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 1e5)),
+        solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
     conda:
         "config/environment.yaml"
     shell:
@@ -144,33 +162,3 @@ rule solve_boundary_value_problem:
 # python src/plot_bvp_solution.py data/test_0 --plot_iteration 40
 ### To have a gif of the iterations of the solver (already before the solver has converged), run on terminal ###
 # python src/plot_bvp_solution.py data/test_0
-
-
-
-"""
-# Get the absolute path to this script
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Go up to the project root (one or more levels as needed)
-PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
-
-# Access other folders relative to the root
-DATA_PATH = os.path.join(PROJECT_ROOT, "data", "case000")
-DATA_PATH
-
-case_folder = os.path.join(
-    data_folder,
-    f"case{str(config['case_number']).zfill(digits_case_numbers)}"
-)
-
-"""
-
-"""
-rule all:
-    # snakemake -s Snakefile.smk data/case_00/.chemical_network_validated --cores 1 --use-conda
-    input:
-        expand("data/{bn}_{cn}/.chemical_network_validated",
-               bn=["case"],
-               cn=["00"])
-"""    
-

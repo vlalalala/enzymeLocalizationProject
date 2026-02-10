@@ -2,7 +2,7 @@ import sys
 import os
 from itertools import count
 from auxiliary_functions_using_standard_library import pickle_load_binary, load_json
-from auxiliary_functions import dump_json
+from auxiliary_functions import dump_json, read_yaml_file
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 
 def build_point_ids_dict(reaction_network: System, num_mesh_points_in_regions: dict) -> dict:
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     # Step 0: Load inputs and define global parameters
     REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
     SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
-    SOLVER_INPUT = load_json(os.path.join(FOLDER_TO_SOLVE, "solver_input.json"))
+    SOLVER_INPUT = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_solver_input.yaml"))
 
     # Step 1: Define all geometry variables
     MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["mesh_points_in_regions"]

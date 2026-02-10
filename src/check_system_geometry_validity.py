@@ -3,14 +3,14 @@ import os
 from typing import Dict, Any, Union
 import numpy as np
 from auxiliary_functions_using_standard_library import load_json, closest_value
-from auxiliary_functions import dump_json
+from auxiliary_functions import dump_json, read_yaml_file
 
 def check_validity_system_geometry_info(case_directory):
     """
     """
     
-    system_geometry_nested_dict : Dict[Union[str, int], Dict[str, Any]] = load_json(os.path.join(case_directory, "system_geometry.json"))
-    solver_input_nested_dict : Dict[Union[str, int], Dict[str, Any]] = load_json(os.path.join(case_directory, "solver_input.json"))
+    system_geometry_nested_dict : Dict[Union[str, int], Dict[str, Any]] = read_yaml_file(os.path.join(case_directory, "parameters_geometry.yaml"))
+    solver_input_nested_dict : Dict[Union[str, int], Dict[str, Any]] = read_yaml_file(os.path.join(case_directory, "parameters_solver_input.yaml"))
     
     for section, section_dict in system_geometry_nested_dict.items():
         for key, value in section_dict.items():

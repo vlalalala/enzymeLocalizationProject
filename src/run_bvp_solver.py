@@ -14,16 +14,17 @@ from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
 from auxiliary_functions_using_standard_library import (
     find_max_in_nested_dict, all_non_negative, format_sci, pickle_load_binary,
-    load_json)
+    load_json, CSVLogger)
 from auxiliary_functions import dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from plot_bvp_solution import plot_steady_state_concentrations, make_newton_iterations_gif
 from auxiliary_functions_framework_organization import (
-    get_species_concentrations_from_json_file, save_newton_iteration_data,
+    get_species_concentrations_from_json_file,
     get_correct_point_ids_dict, get_correct_reverse_point_ids_dict, get_correct_neighbors_dict)
 from auxiliary_functions_framework_organization_using_standard_library import (
     find_latest_solution, rename_iteration_files)
-
+from auxiliary_functions_using_scipy import save_newton_iteration_data
+from auxiliary_functions import read_yaml_file
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
@@ -320,7 +321,7 @@ def check_convergence_via_jacobian_and_residual(
         info = {"max_relative_change": 0, "max_Delta_u":0.0, "F_vector_norm":0.0}
     else:
         info = {}
-    convergence = False ############# should be True
+    convergence = True
     # Step 0: Unpack parameters
     tol_rel = convergence_parameters.get("tol_relative", 1)
     tol_abs = convergence_parameters.get("tol_absolute", 1)
@@ -383,7 +384,7 @@ def check_convergence_via_flux_equilibrium(
     # Since we are simulating the steady state, we want the total net flux to be 0 for each species
     # Because of numerics, we need some tolerance
     for species in REACTION_NETWORK.species:
-        relative_deviation = abs((reaction_fluxes[species] + boundary_fluxes[species]) / boundary_fluxes[species])
+        relative_deviation = abs(reaction_fluxes[species] + boundary_fluxes[species]) / max(abs(boundary_fluxes[species]), abs(reaction_fluxes[species]))
         if get_full_info:
             info[species] = relative_deviation
         if relative_deviation > tol_relative_flux_deviation:
@@ -404,8 +405,9 @@ def solve_newton(
         save_data_every,
         check_convergence_every,
         adaptive,
-        print_convergence_info,
-        print_iteration_info_every,
+        log_convergence_info,
+        convergence_info_logger_path,
+        log_iteration_info_every,
         plot_iteration_data_during_simulation
     ):
     """
@@ -415,27 +417,28 @@ def solve_newton(
     current_alpha = adaptive_step_parameters["initial_alpha"]
     current_successive_unsuccessful_steps = 0
     early_convergence = False # tracks whether the system fin
+    convergence_info_logger = CSVLogger(convergence_info_logger_path)
     for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
                      file=sys.stderr,
                      total=int(max_num_newton_iterations),
                      initial=initial_iteration_number):
         # Improve species concentration estimate
         if adaptive == False:
-            current_F, _, du = compute_newton_step(current_species_concentrations)
+            _, _, du = compute_newton_step(current_species_concentrations)
             for i, du_value in enumerate(du):
                 (region, n, species) = REVERSE_POINT_IDS[i]
                 current_species_concentrations[region][n][species] +=  du_value
-            if print_iteration_info_every != 0 and iter%print_iteration_info_every==0 :
+            if log_iteration_info_every != 0 and iter%log_iteration_info_every==0 :
                 print(f"No step adaptation:\n"
-                      f"iteration: {iter}, norm of F: {format_sci(np.linalg.norm(current_F))}\n"
+                      f"iteration: {iter}\n"
                       f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
                 )
         else:
             current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, current_F_norm = adaptive_newton_step(
                 current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)
-            if print_iteration_info_every != 0 and iter%print_iteration_info_every==0 :
+            if log_iteration_info_every != 0 and iter%log_iteration_info_every==0 :
                 print(f"Step adaptation:\n"
-                      f"iteration: {iter}, norm of F: {current_F_norm},\n"
+                      f"iteration: {iter}\n"
                       f"alpha: {current_alpha}, current successive unsuccessful steps: {current_successive_unsuccessful_steps}\n",
                       f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
                 )
@@ -462,14 +465,20 @@ def solve_newton(
                 )
         # Stop iterating if criterion for convergence fulfilled
         if check_convergence_every !=0 and iter%check_convergence_every==0:
-            convergence, info = check_convergence_via_flux_equilibrium(
+            convergence_flux_equilibration, info_flux_equilibration = check_convergence_via_flux_equilibrium(
                 current_species_concentrations,
                 convergence_parameters,
-                get_full_info=print_convergence_info)
-            if print_convergence_info:
-                print(f"Convergence information: \n", info, "\n", flush=True)
-            if convergence:
-                print(f"Convergence after {iter} iterations.")
+                get_full_info=log_convergence_info
+            )
+            convergence_jacobian_residual, info_jacobian_residual = check_convergence_via_jacobian_and_residual(
+                current_species_concentrations,
+                convergence_parameters,
+                get_full_info=log_convergence_info
+            )
+            if log_convergence_info:
+                info = info_flux_equilibration | info_jacobian_residual
+                convergence_info_logger.log(iter, info)
+            if convergence_flux_equilibration and convergence_jacobian_residual:
                 early_convergence = True
                 break
     return current_species_concentrations, early_convergence
@@ -488,10 +497,11 @@ if __name__ == "__main__":
     # Load all the passed information, create folder for background info
     FOLDER_TO_SOLVE = args.folder_to_solve
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
-    SOLVER_PARAMS = load_json(args.solver_params_file)
-    SOLVER_INPUT = load_json(args.solver_input_file)
+    SOLVER_PARAMS = read_yaml_file(args.solver_params_file)
+    SOLVER_INPUT = read_yaml_file(args.solver_input_file)
     MAX_NUM_NEWTON_ITERATIONS = args.max_iterations
     min_num_iterations_digits = int(math.log10(MAX_NUM_NEWTON_ITERATIONS)+1)
+    os.makedirs(ITERATION_DATA_PATH, exist_ok=True)
 
     # Load inputs and define global parameters
     REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
@@ -585,7 +595,7 @@ if __name__ == "__main__":
         # max_guess_concentration gives the order of magnitude in which solutions are expected to be
         "tol_absolute":max_guess_concentration*SOLVER_PARAMS["convergence_parameters"]["tol_absolute_factor"],
         "tol_residual":np.linalg.norm(F_vector_guess)*SOLVER_PARAMS["convergence_parameters"]["tol_residual_factor"],
-        "tol_relative_flux_deviation": 0.001,
+        "tol_relative_flux_deviation": SOLVER_PARAMS["convergence_parameters"]["tol_relative_flux_deviation"],
     }
 
     # Important: save output for checking. tqdm is excluded
@@ -607,8 +617,9 @@ if __name__ == "__main__":
             save_data_every=SOLVER_INPUT["output_options"]["save_data_every"],
             check_convergence_every=SOLVER_PARAMS["newton_parameters"]["check_convergence_every"],
             adaptive = not SOLVER_INPUT["newton_parameters"]["override_adaptive_method"],
-            print_iteration_info_every = SOLVER_INPUT["output_options"]["print_iteration_info_every"],
-            print_convergence_info = SOLVER_INPUT["output_options"]["print_convergence_progress"],
+            log_iteration_info_every = SOLVER_INPUT["output_options"]["log_iteration_info_every"],
+            log_convergence_info = SOLVER_INPUT["output_options"]["log_convergence_progress"],
+            convergence_info_logger_path=os.path.join(FOLDER_TO_SOLVE, ".convergence_logger.csv"),
             plot_iteration_data_during_simulation = SOLVER_INPUT["output_options"]["plot_iteration_data_during_simulation"]
         )
         end_time = time.time()
