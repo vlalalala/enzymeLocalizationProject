@@ -4,6 +4,7 @@ import re
 import glob
 import argparse
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from auxiliary_functions import read_yaml_file
@@ -14,6 +15,7 @@ from create_reaction_network import System, Collection, EnzymaticReaction, Speci
 from auxiliary_functions_framework_organization import get_species_concentrations_from_json_file
 import imageio.v3 as iio
 
+#plt.rcParams['text.usetex'] = True
 
 def plot_steady_state_concentrations(
         reaction_network,
@@ -64,8 +66,9 @@ def plot_steady_state_concentrations(
         ax.set_title(title, loc="left")
     ax.set_ylim(ymin=0, ymax = ymax)
     ax.set_xlim(xmin=0, xmax = 1.1)
-    fig.savefig(output_file_name, dpi = 300, bbox_inches='tight')
-    plt.close(fig)
+    if output_file_name != None:
+        fig.savefig(output_file_name, dpi = 300, bbox_inches='tight')
+    return fig, ax
 
 def make_newton_iterations_gif(
         reaction_network,
@@ -134,7 +137,7 @@ def make_newton_iterations_gif(
             title_lines.append(f"residual norm: {format_sci(residual_norm)}")
         species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
             species_concentrations_to_plot_dict_with_strings, species_lookup_dict)
-        plot_steady_state_concentrations(
+        fig, ax = plot_steady_state_concentrations(
             reaction_network=reaction_network,
             num_regions=num_regions,
             num_mesh_points_in_regions=num_mesh_points_in_regions,
@@ -144,6 +147,7 @@ def make_newton_iterations_gif(
             species_concentrations_to_plot=species_concentrations_to_plot_dict,
             title = "\n".join(title_lines),
             ymax = max_y)
+        plt.close(fig)
         png_files_created.append(png_file)
     # Put all the pngs together
     print("creating gif", file_to_create)
@@ -156,6 +160,80 @@ def make_newton_iterations_gif(
     #can be reused)
     with open(max_y_filename, "w") as f:
         f.write(str(max_y))
+
+def plot_convergence_progress(
+        folder_to_solve,
+        reaction_network
+):
+    dataframe = pd.read_csv(os.path.join(folder_to_solve, ".convergence_logger.csv"))
+    fig, ax = plt.subplots(2,2, figsize=(6,6))
+    ax = np.ndarray.flatten(ax)
+    for species in reaction_network.species:
+        ax[0].plot(dataframe["iteration"], dataframe[species.name], label=species.name)
+    ax[1].plot(dataframe["iteration"], dataframe["max_relative_change"])
+    ax[2].plot(dataframe["iteration"], dataframe["max_Delta_u"])
+    ax[3].plot(dataframe["iteration"], dataframe["F_vector_norm"])
+    ax[2].set_xlabel("iteration")
+    ax[3].set_xlabel("iteration")
+    ax[0].set_ylabel("relative difference between \n reaction and boundary flux")
+    #ax[0].set_ylabel(
+    #    r"Relative difference $\frac{\lvert \Phi_{\text{react}} - \Phi_{\text{bound}} \rvert}"
+    #    r"{\max\!\left(\lvert \Phi_{\text{react}} \rvert, \lvert \Phi_{\text{bound}} \rvert\right)}$"
+    #)
+    ax[1].set_ylabel("max_relative_change")
+    ax[2].set_ylabel("max_Delta_u")
+    ax[3].set_ylabel("F_vector_norm")
+    ax[2].set_yscale('log')
+    ax[3].set_yscale('log')
+    ax[0].legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(folder_to_solve, "convergence.png"), bbox_inches = "tight", dpi=300)
+    plt.close()
+
+def plot_theory_curve(folder_to_solve,
+        species_lookup,
+        reaction_network,
+        num_regions,
+        num_mesh_points_in_regions,
+        radii,
+        membrane_radii,
+        external_radius,
+        ):
+    # Case of one spontaneous reaction
+    species_concentrations_to_plot_dict_with_strings = load_json(
+        os.path.join(folder_to_solve, ".species_steady_state_concentrations.json"))
+    species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
+            species_concentrations_to_plot_dict_with_strings, species_lookup)
+    fig, ax = plot_steady_state_concentrations(
+        reaction_network=reaction_network,
+        num_regions=num_regions,
+        num_mesh_points_in_regions=num_mesh_points_in_regions,
+        radii=radii,
+        membrane_radii=membrane_radii,
+        output_file_name=None,
+        species_concentrations_to_plot=species_concentrations_to_plot_dict,
+    )
+    if (len(reaction_network.spontaneous_reactions) == 1
+        and len(reaction_network.enzymatic_reactions) == 0
+        and num_regions == 1
+    ):  
+        s_reaction = reaction_network.spontaneous_reactions[0]
+        s = s_reaction.start_species
+        s_lambda = np.sqrt(s_reaction.k / s.diffusion_constant)
+        A = - ((s.permeability_constant / s.diffusion_constant * s.external_concentration * external_radius**2)
+            / (
+                np.exp(s_lambda * external_radius)*(s_lambda * external_radius - 1 + (s.permeability_constant * external_radius)/s.diffusion_constant)
+               + np.exp(-s_lambda * external_radius) * (s_lambda * external_radius + 1 - (s.permeability_constant * external_radius)/s.diffusion_constant) 
+              )
+        )
+        c = lambda r: 1/r * A *(np.exp(-s_lambda*r)-np.exp(s_lambda*r))
+        r_to_plot = np.linspace(external_radius*0.01, external_radius, num = 100)
+        ax.plot([r/external_radius for r in r_to_plot], [c(r) for r in r_to_plot], linestyle= "--",
+                label = f"theory for {s.name}", zorder = -1, 
+                linewidth = 2
+        )
+        ax.legend()
+        fig.savefig(os.path.join(folder_to_solve, "theory_steady_state.png"))
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -171,8 +249,8 @@ if __name__ == "__main__":
 
     # Load inputs and define global parameters
     REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
-    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry"))
-    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh"))
+    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
+    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh.json"))
 
     SPECIES_LOOKUP = {sp.name: sp for sp in REACTION_NETWORK.species}
 
@@ -188,6 +266,7 @@ if __name__ == "__main__":
         raise ValueError("Cannot make the gif if the concentrations are not saved.")
     
     ITERATIONS_FOLDER = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
+    
     if PLOT_ITERATION is None:
         make_newton_iterations_gif(
             reaction_network=REACTION_NETWORK,
@@ -217,3 +296,17 @@ if __name__ == "__main__":
             membrane_radii=MEMBRANE_RADII,
             output_file_name=file_to_create,
             species_concentrations_to_plot=species_concentrations_to_plot_dict)
+    
+    if SOLVER_INPUT["output_options"]["log_convergence_progress"]:
+        plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+
+    plot_theory_curve(
+        FOLDER_TO_SOLVE,
+        SPECIES_LOOKUP,
+        REACTION_NETWORK,
+        NUM_REGIONS,
+        NUM_MESH_POINTS_IN_REGIONS,
+        RADII,
+        MEMBRANE_RADII,
+        R
+    )

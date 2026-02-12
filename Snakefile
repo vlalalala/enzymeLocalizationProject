@@ -29,6 +29,7 @@ reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 ############################################################
 
 df = "data/test_phase_space"
+df = "examples/simple_decay_without_inner_boundaries"
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 
@@ -157,7 +158,23 @@ rule solve_boundary_value_problem:
             --solver_input_file {input.solver_input} \
             --solver_params_file {params.solver_params} \
         """
-       
+
+rule plot_boundary_value_problem:
+    """Rule is not meant to be chained to other rules.
+    """
+    # snakemake -s Snakefile data/test_phase_space/combined_000001/.completed_visualization --cores 1 --use-conda
+    output:
+        touch("{df}/{bn}_{cn}/.completed_visualization")
+    conda:
+        "config/environment.yaml"
+    shell:
+        """
+        python src/plot_bvp_solution.py \
+            {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+        """
+
+
+
 ### To have a specific iteration of the solver plotted, run on terminal ###
 # python src/plot_bvp_solution.py data/test_0 --plot_iteration 40
 ### To have a gif of the iterations of the solver (already before the solver has converged), run on terminal ###

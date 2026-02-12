@@ -17,7 +17,7 @@ from auxiliary_functions_using_standard_library import (
     load_json, CSVLogger)
 from auxiliary_functions import dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-from plot_bvp_solution import plot_steady_state_concentrations, make_newton_iterations_gif
+from plot_bvp_solution import plot_theory_curve, plot_steady_state_concentrations, make_newton_iterations_gif, plot_convergence_progress
 from auxiliary_functions_framework_organization import (
     get_species_concentrations_from_json_file,
     get_correct_point_ids_dict, get_correct_reverse_point_ids_dict, get_correct_neighbors_dict)
@@ -28,6 +28,7 @@ from auxiliary_functions import read_yaml_file
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
+
     """
     reaction_term = 0
     for reaction in species.as_reactant_in + species.as_product_in:
@@ -372,18 +373,20 @@ def check_convergence_via_flux_equilibrium(
         (region, n, species) = REVERSE_POINT_IDS[i]
         r = RADII[region][n]
         reaction_flux = calculate_reaction_term(current_species_concentrations, region, n, species)
-        reaction_fluxes[species] += 4 * np.pi * reaction_flux * r**2
+        reaction_fluxes[species] += 4 * np.pi * reaction_flux * r**2 * DELTA_R
     # Second, calculate flux from boundary with exterior
     # the flux is positive if the concentration on the exterior is larger than on the interior at r=R
     boundary_fluxes = {species: 0
         for species in REACTION_NETWORK.species}
     for species in REACTION_NETWORK.species:
-        boundary_fluxes[species] = species.permeability_constant * (
+        #print(species.name, species.permeability_constant, species.external_concentration, current_species_concentrations[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1][species])
+        boundary_fluxes[species] = 4 * np.pi * R**2 * species.permeability_constant * (
             species.external_concentration
             - current_species_concentrations[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1][species])
     # Since we are simulating the steady state, we want the total net flux to be 0 for each species
     # Because of numerics, we need some tolerance
     for species in REACTION_NETWORK.species:
+        #print(species.name, reaction_fluxes[species], boundary_fluxes[species], flush=True)
         relative_deviation = abs(reaction_fluxes[species] + boundary_fluxes[species]) / max(abs(boundary_fluxes[species]), abs(reaction_fluxes[species]))
         if get_full_info:
             info[species] = relative_deviation
@@ -654,7 +657,16 @@ if __name__ == "__main__":
             gif_output_folder=FOLDER_TO_SOLVE,
             species_lookup_dict=SPECIES_LOOKUP)
 
-    #if SOLVER_INPUT["output_options"]["delete_data_at_the_end"]:
-    #    files = glob.glob(os.path.join(ITERATION_DATA_PATH, "*"))
-    #    for f in files:
-    #        os.remove(f)
+    if SOLVER_INPUT["output_options"]["log_convergence_progress"]:
+        plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+    
+    plot_theory_curve(
+        FOLDER_TO_SOLVE,
+        SPECIES_LOOKUP,
+        REACTION_NETWORK,
+        NUM_REGIONS,
+        NUM_MESH_POINTS_IN_REGIONS,
+        RADII,
+        MEMBRANE_RADII,
+        R
+    )

@@ -2,13 +2,6 @@
 __pycache__/
 *.py[cod]
 
-# Ignore images that can be generated from the code
-*.png
-# Ignore all pdf files
-*.pdf
-# Ignore all gif files
-*.gif
-
 # Ignore editor VSCode/VSCodium settings
 .vscode/
 .history/
@@ -18,19 +11,23 @@ __pycache__/
 **/.snakemake/
 **/intermediate_files/
 
-# Ignore any files starting with . within any folder containing the data substring
-*data*/**/.
-
-data/newtest/
-
-**/.iteration_nr*
-
-**/*.log
-**/.pickled*
-**/.validated*
-**/.species_steady_state_concentrations.json
+# Ignore images that can be generated from the code
+*.png
+*.gif
+*.log
+.pickled*
+.validated*
 **/.gif_ymax
 **/.expanded*
+**/.iteration_nr*
+**/.species_steady_state_concentrations.json
 data/**/combo*
 data/**/.convergence_logger.csv
 data/**/combined*/
+*data*/**/.
+
+# Ignore all pdf files
+*.pdf
+
+examples/**/options*/
+examples/**/combined*/
