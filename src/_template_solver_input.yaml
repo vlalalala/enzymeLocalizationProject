@@ -6,7 +6,7 @@ newton_parameters:
 
 adaptive_step_parameters: 
     initial_alpha: [1.0]
-    alpha_min: [1.0e-4]
+    alpha_min: [1.0e-3]
     alpha_max: [10]
     gamma_inc: [1.15]
     gamma_dec: [0.5]

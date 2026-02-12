@@ -1,0 +1,25 @@
+geometry_parameters:
+  num_mesh_points: 25
+newton_parameters:
+  override_adaptive_method: false
+adaptive_step_parameters:
+  initial_alpha: 1.0
+  alpha_min: 0.001
+  alpha_max: 10
+  gamma_inc: 1.15
+  gamma_dec: 0.5
+  max_num_accepted_successive_unsuccessful_steps: 10
+output_options:
+  log_convergence_progress: true
+  save_data_every: 100
+  create_gif_with_saved_data: true
+  log_iteration_info_every: 100
+  delete_data_at_the_end: true
+  plot_iteration_data_during_simulation: false
+variables_to_save:
+  save_F_vector: false
+  save_F_vector_norm: false
+  save_J_matrix: false
+  save_du_vector: false
+  save_concentrations: true
+  save_du_vector_max: false

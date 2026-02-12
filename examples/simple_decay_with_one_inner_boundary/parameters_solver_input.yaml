@@ -14,9 +14,9 @@ adaptive_step_parameters:
 
 output_options:
     log_convergence_progress: [true]
-    save_data_every: [1000]
+    save_data_every: [100]
     create_gif_with_saved_data: [true]
-    log_iteration_info_every: [1000]
+    log_iteration_info_every: [100]
     delete_data_at_the_end: [false]
     plot_iteration_data_during_simulation: [false]
 

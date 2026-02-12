@@ -228,7 +228,6 @@ def adaptive_newton_step(
     alpha_max = adaptive_step_parameters.get("alpha_max")
     gamma_inc = adaptive_step_parameters.get("gamma_inc")
     gamma_dec = adaptive_step_parameters.get("gamma_dec")
-    max_backtrack = adaptive_step_parameters.get("max_num_backtrack")
     max_accepted_successive_unsuccessful_steps = adaptive_step_parameters.get("max_num_accepted_successive_unsuccessful_steps")
     # Steps 1-3: Compute du (see compute_newton_step)
     F_vector, _, du = compute_newton_step(species_concentrations)
@@ -270,6 +269,7 @@ def adaptive_newton_step(
     # If the backtracking never worked, add 1 to number of unsuccessful steps
     if success is False:
         successive_unsuccessful_steps += 1
+        print("An unsuccessful step occurred", flush = True)
         # If there are many unsuccessful steps, that means that it is not possible
         # to decrease the residual more given the mesh step size
         if successive_unsuccessful_steps > max_accepted_successive_unsuccessful_steps: #######################################################
@@ -436,7 +436,7 @@ def solve_newton(
                     num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
                     radii=RADII,
                     membrane_radii=MEMBRANE_RADII,
-                    output_file_name=os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_iteration.png"),
+                    output_file_name=os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_concentrations.png"),
                     species_concentrations_to_plot=current_species_concentrations,
                     system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"],
                     title = f"iteration #{iter}\n"

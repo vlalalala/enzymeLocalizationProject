@@ -29,5 +29,10 @@ data/**/combined*/
 # Ignore all pdf files
 *.pdf
 
-examples/**/options*/
-examples/**/combined*/
+examples/simple_decay_without_inner_boundaries/
+examples/simple_decay_with_one_inner_boundary/
+#examples/**/combined*/
+
+!examples/simple_decay_with_two_inner_boundaries/combined_000001/newton_iterations.gif
+
+notes/*

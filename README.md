@@ -1,6 +1,7 @@
 # Numerical solver of chemical reactions within concentric spherical semi-permeable membranes
 
 This code is for calculating the steady state concentrations of substances placed in a spherically symmetrical system of semi-permeable membranes, where the concentration of  each of substances outside the exterior membrane is kept constant. Spontaneous and enzymatic reactions can be defined (enzymes can be placed in the regions between semi-permeable membranes) and an arbitrary number of semi-permeable membranes can be used. The boundary problem is solved numerically through the Newton method.
+![alt text](examples/simple_decay_with_two_inner_boundaries/combined_000001/newton_iterations.gif)
 
 ## Summary
 
