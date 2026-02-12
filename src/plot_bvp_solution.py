@@ -14,6 +14,7 @@ from auxiliary_functions_using_standard_library import (
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from auxiliary_functions_framework_organization import get_species_concentrations_from_json_file
 import imageio.v3 as iio
+import imageio
 
 #plt.rcParams['text.usetex'] = True
 
@@ -168,10 +169,10 @@ def make_newton_iterations_gif(
         png_files_created.append(png_file)
     # Put all the pngs together
     print("creating gif", file_to_create)
-    with iio.imopen(file_to_create, "w") as writer:
+    with imageio.get_writer(file_to_create, mode="I", loop=0, duration=0.1) as writer:
         for filename in tqdm(png_files_created, file=sys.stderr):
-            image = iio.imread(filename)
-            writer.write(image)
+            writer.append_data(imageio.imread(filename))
+
     print("gif created!")
     # Create file with maximum concentration (to know whether previous png files
     #can be reused)
