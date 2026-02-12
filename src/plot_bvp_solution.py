@@ -198,8 +198,9 @@ def plot_theory_curve(folder_to_solve,
         radii,
         membrane_radii,
         external_radius,
+        system_geometry_dict
         ):
-    # Case of one spontaneous reaction
+
     species_concentrations_to_plot_dict_with_strings = load_json(
         os.path.join(folder_to_solve, ".species_steady_state_concentrations.json"))
     species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
@@ -213,6 +214,7 @@ def plot_theory_curve(folder_to_solve,
         output_file_name=None,
         species_concentrations_to_plot=species_concentrations_to_plot_dict,
     )
+    # Case of one spontaneous reaction with no inner boundaries
     if (len(reaction_network.spontaneous_reactions) == 1
         and len(reaction_network.enzymatic_reactions) == 0
         and num_regions == 1
@@ -234,6 +236,80 @@ def plot_theory_curve(folder_to_solve,
         )
         ax.legend()
         fig.savefig(os.path.join(folder_to_solve, "theory_steady_state.png"))
+    
+    # Case of one spontaneous reaction with one inner boundary
+    elif (len(reaction_network.spontaneous_reactions) == 1
+        and len(reaction_network.enzymatic_reactions) == 0
+        and num_regions == 2
+    ):   
+        reaction = reaction_network.spontaneous_reactions[0]
+        X = reaction.start_species
+        X_lambda = np.sqrt(reaction.k / X.diffusion_constant)
+        r_inner = membrane_radii[0]
+        s = np.sinh(X_lambda * r_inner)
+        c = np.cosh(X_lambda * r_inner)
+        beta = X.permeability_constant / X.diffusion_constant
+        alpha = X.permeability_constant * external_radius / X.diffusion_constant
+        
+        rho = np.exp(-2 * X_lambda * r_inner) * (
+            X.diffusion_constant * (r_inner**2 * X_lambda**2 * c + r_inner * X_lambda * (c - s) - s)
+            + X.permeability_constant * r_inner**2 * X_lambda * (s + c)
+        ) / (
+            X.diffusion_constant * (r_inner**2 * X_lambda**2 * c - r_inner * X_lambda * (s + c) + s)
+            + X.permeability_constant * r_inner**2 * X_lambda * (s - c)
+        )
+
+        A = (beta * X.external_concentration * external_radius**2)/(
+            np.exp(-X_lambda * external_radius)*(alpha - X_lambda * external_radius - 1) + rho * np.exp(X_lambda * external_radius)*(alpha + X_lambda*external_radius -1)
+        )
+        
+        B = rho * A
+
+        S = (
+            beta * r_inner * (A * np.exp(-X_lambda * r_inner) + B * np.exp(X_lambda * r_inner))
+        ) / (
+            X_lambda * r_inner * np.cosh(X_lambda * r_inner)
+            - np.sinh(X_lambda * r_inner)
+            + beta * r_inner * np.sinh(X_lambda * r_inner)
+        )
+
+        mesh_points_in_regions = system_geometry_dict["mesh_points_in_regions"]
+        c_1 = lambda r : S * np.sinh(X_lambda * r) / r
+        c_2 = lambda r : (A * np.exp(-X_lambda * r) + B * np.exp(X_lambda * r))/r
+        c = [c_1, c_2]
+        for region_idx in [0,1]:
+            region_radii = mesh_points_in_regions[region_idx]
+            # region_radii[0] skipped to avoid division by 0
+            r_to_plot = np.linspace(region_radii[1], region_radii[-1], num = 100)
+            if region_idx == 0:
+                label = f"theory for {X.name}"
+            else:
+                label = None
+            ax.plot([r/external_radius for r in r_to_plot],
+                [c[region_idx](r) for r in r_to_plot], linestyle= "--",
+                label = label, zorder = -1, 
+                linewidth = 2
+            )
+        ax.legend()
+        fig.savefig(os.path.join(folder_to_solve, "theory_steady_state.png"))
+
+    # Case of one spontaneous reaction with two inner boundaries
+    #elif (len(reaction_network.spontaneous_reactions) == 1
+    #    and len(reaction_network.enzymatic_reactions) == 0
+    #    and num_regions == 3
+    #):   
+
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -308,5 +384,6 @@ if __name__ == "__main__":
         NUM_MESH_POINTS_IN_REGIONS,
         RADII,
         MEMBRANE_RADII,
-        R
+        R,
+        SYSTEM_GEOMETRY_DICT["geometry_config"]
     )

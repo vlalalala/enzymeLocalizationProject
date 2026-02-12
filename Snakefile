@@ -30,6 +30,7 @@ reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
 df = "data/test_phase_space"
 df = "examples/simple_decay_without_inner_boundaries"
+df = "examples/simple_decay_with_one_inner_boundary"
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 

@@ -668,5 +668,6 @@ if __name__ == "__main__":
         NUM_MESH_POINTS_IN_REGIONS,
         RADII,
         MEMBRANE_RADII,
-        R
+        R,
+        SYSTEM_GEOMETRY_DICT["geometry_config"]
     )

@@ -185,8 +185,49 @@ $$ c^\prime(0) = 0$$
 $$ c^\prime(R^*_-) = c^\prime(R^*_+) = p / D \cdot (c(R^*_+)- c(R^*_-))$$
 $$ c^\prime(R) = p/D \cdot (c_\mathrm{ext} - c(R))$$
 
-to be continued...
+We define 
+$$ c(r)=
+\begin{cases}
+c_1(r), & 0\le r<R^*\\[6pt]
+c_2(r), & R^*<r\le R
+\end{cases}$$
 
+Similarly to above, reflexion at $r=0$ leads to
+$$ c_1(r)=\frac{S\,\sinh(\lambda r)}{r} $$
+
+$$ c_2(r)=\frac{A e^{-\lambda r}+B e^{\lambda r}}{r} $$
+
+We define
+$$ s=\sinh(\lambda R^*), 
+\qquad
+c=\cosh(\lambda R^*), 
+\qquad
+\beta=\frac{p}{D},
+\qquad
+\alpha=\frac{pR}{D}.
+$$
+The final expression is given by
+$$ B=\rho A $$
+
+$$ \rho
+=
+e^{-2\lambda R^*}
+\frac{
+D\left(R^{*2}\lambda^2 c+R^*\lambda(c-s)-s\right)
++pR^{*2}\lambda(s+c)
+}{
+D\left(R^{*2}\lambda^2 c-R^*\lambda(s+c)+s\right)
++pR^{*2}\lambda(s-c)
+}. $$
+
+$$ A
+=
+\frac{\beta c_{\mathrm{ext}} R^2}{
+e^{-\lambda R}(\alpha-\lambda R-1)
++
+\rho e^{\lambda R}(\alpha+\lambda R-1)
+},
+$$
 
 
 ## How to run
