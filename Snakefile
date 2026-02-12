@@ -31,6 +31,7 @@ reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 df = "data/test_phase_space"
 df = "examples/simple_decay_without_inner_boundaries"
 df = "examples/simple_decay_with_one_inner_boundary"
+df = "examples/simple_decay_with_two_inner_boundaries"
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 
@@ -147,7 +148,7 @@ rule solve_boundary_value_problem:
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 1e5)),
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 1e6)),
         solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
     conda:
         "config/environment.yaml"

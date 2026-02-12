@@ -17,7 +17,7 @@ from auxiliary_functions_using_standard_library import (
     load_json, CSVLogger)
 from auxiliary_functions import dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-from plot_bvp_solution import plot_theory_curve, plot_steady_state_concentrations, make_newton_iterations_gif, plot_convergence_progress
+from plot_bvp_solution import plot_steady_state_concentrations, make_newton_iterations_gif, plot_convergence_progress
 from auxiliary_functions_framework_organization import (
     get_species_concentrations_from_json_file,
     get_correct_point_ids_dict, get_correct_reverse_point_ids_dict, get_correct_neighbors_dict)
@@ -94,9 +94,6 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
         r = RADII[region][n]
         diff = species.diffusion_constant
         point_type = POINT_INFOS[region][n]
-        if MEMBRANE_TYPE == "enzymatic":
-            k_on = species.k_on
-            k_off = species.k_off
         # CONSTRUCT F_i
         # FOR EACH POINT WITHIN THE BULK
         if point_type == "i":
@@ -151,82 +148,53 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
                 c_prev_region_last = current_species_concentrations[prev_region][prev_region_last_n][species]
                 c_region_first = current_species_concentrations[region][0][species]
                 c_region_second = current_species_concentrations[region][1][species]
-                if MEMBRANE_TYPE == "permeability":
-                    F[i] = diff  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
-                    if not fill_jacobian:
-                        continue
-                    for j in range(NUM_POINTS):
-                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        # Contributions from diffusion
-                        if j_region == region and j_n == n and j_species == species:
-                            J[i,j] += -diff/DELTA_R - species.permeability_constant
-                        elif j_region == region and j_species == species and j_n == 1:
-                            J[i,j] += diff/DELTA_R
-                        elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
-                            J[i,j] += -species.permeability_constant
-                        # No contributions from reactions (flux considered)
-                elif MEMBRANE_TYPE == "enzymatic":
-                    # membrane is at the left of the segment, dM_+/dt
-                    (concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor,
-                        occupied_pore_density, total_occupied_pore_density) = get_pore_density_occupation_information(current_species_concentrations, (prev_region, prev_region_last_n), (region, 0))
-                    flux_term = -k_on * (PORE_DENSITY - total_occupied_pore_density) * current_species_concentrations[region][0][species] + k_off * occupied_pore_density[species]
-                    F[i] = diff * (c_region_second - c_region_first) / DELTA_R - flux_term
-                    if not fill_jacobian:
-                        continue
-                    for j in range(NUM_POINTS):
-                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        # Diffusion contribution
-                        if j_region == region and j_n == n and j_species == species: # derivative of c_region_first
-                            J[i,j] += -diff/DELTA_R
-                        elif j_region == region and j_species == species and j_n == 1: # derivative of c_region_second
-                            J[i,j] += diff/DELTA_R
-                        # Flux contribution
-                        if j_region == region and j_n == n and j_species == species: # derivative to concentration on right of flux term
-                            derivative_occupied_pore_density = 1 ##########
-                            complete_derivative = (
-                                -k_on * (PORE_DENSITY - total_occupied_pore_density) # product rule!
-                                -k_on * current_species_concentrations[region][0][species] * (-1) #################################
-                            )
-                            J[i,j] += complete_derivative
+                F[i] = diff  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
+                if not fill_jacobian:
+                    continue
+                for j in range(NUM_POINTS):
+                    (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    # Contributions from diffusion
+                    if j_region == region and j_n == n and j_species == species:
+                        J[i,j] += -diff/DELTA_R - species.permeability_constant
+                    elif j_region == region and j_species == species and j_n == 1:
+                        J[i,j] += diff/DELTA_R
+                    elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
+                        J[i,j] += -species.permeability_constant
+                    # No contributions from reactions (flux considered)
 
-                    
         else: # point_type == "r"
             if region == NUM_REGIONS-1: # deal with r=R point
                 (_, rR_neighbor_n), (_, rR_n) = NEIGHBORS[(region, n)]
                 c_rR_neighbor = current_species_concentrations[region][rR_neighbor_n][species]
                 c_rR = current_species_concentrations[region][rR_n][species]
-                if MEMBRANE_TYPE == "permeability":
-                    F[i] = diff * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
-                    if not fill_jacobian:
-                        continue
-                    # CONSTRUCT J_ij
-                    for j in range(NUM_POINTS):
-                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        if j_region == region and j_n == n and j_species == species: # basically i=j
-                            J[i,j] += diff/DELTA_R + species.permeability_constant
-                        elif j_region == region and j_species == species and j_n == rR_neighbor_n:
-                            J[i,j] += -diff/DELTA_R
-                elif MEMBRANE_TYPE == "enzymatic":
-                    raise NotImplementedError("Enzymatic")
+                F[i] = diff * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
+                if not fill_jacobian:
+                    continue
+                # CONSTRUCT J_ij
+                for j in range(NUM_POINTS):
+                    (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    if j_region == region and j_n == n and j_species == species: # basically i=j
+                        J[i,j] += diff/DELTA_R + species.permeability_constant
+                    elif j_region == region and j_species == species and j_n == rR_neighbor_n:
+                        J[i,j] += -diff/DELTA_R
+
             else: # deal with right-most point within region (except r=R)
                 (_, _), (_, _), (next_region, _) = NEIGHBORS[(region, n)]
                 c_second_to_last = current_species_concentrations[region][n-1][species]
                 c_last = current_species_concentrations[region][n][species]
                 c_next_region_first = current_species_concentrations[next_region][0][species]
-                if MEMBRANE_TYPE == "permeability":
-                    F[i] = diff * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
-                    if not fill_jacobian:
-                        continue
-                    for j in range(NUM_POINTS):
-                        (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
-                        if j_region == region and j_n == n and j_species == species: # basically i=j
-                            J[i,j] += diff/DELTA_R + species.permeability_constant
-                        elif j_region == region and j_species == species and j_n == n-1:
-                            J[i,j] += -diff/DELTA_R
-                        elif j_region == next_region and j_species == species and j_n == 0:
-                            J[i,j] += species.permeability_constant
-                elif MEMBRANE_TYPE == "enzymatic":
-                    raise NotImplementedError("Enzymatic")
+                F[i] = diff * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
+                if not fill_jacobian:
+                    continue
+                for j in range(NUM_POINTS):
+                    (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    if j_region == region and j_n == n and j_species == species: # basically i=j
+                        J[i,j] += diff/DELTA_R + species.permeability_constant
+                    elif j_region == region and j_species == species and j_n == n-1:
+                        J[i,j] += -diff/DELTA_R
+                    elif j_region == next_region and j_species == species and j_n == 0:
+                        J[i,j] += species.permeability_constant
+
     if fill_jacobian:
         return F, J
     else:
@@ -270,7 +238,7 @@ def adaptive_newton_step(
     # Step 4: Attempt alpha > 1 first (grow from previous alpha_current)
     alpha_try = min(alpha_current * gamma_inc, alpha_max)
     success = False
-    for _ in range(max_backtrack):
+    while True:
         species_concentrations_try = copy.deepcopy(species_concentrations)
         for i, du_value in enumerate(du):
             (i_region, i_n, i_species) = REVERSE_POINT_IDS[i]
@@ -290,7 +258,7 @@ def adaptive_newton_step(
         # Step 7: Accept if residual decreased
         if norm_F_vector_try < norm_F_vector:
             species_concentrations = species_concentrations_try
-            alpha_current = min(alpha_current * gamma_inc, alpha_max)
+            alpha_current = min(alpha_try * gamma_inc, alpha_max)
             success = True
             successive_unsuccessful_steps = 0
             norm_F_to_return = norm_F_vector_try
@@ -299,11 +267,13 @@ def adaptive_newton_step(
         alpha_try *= gamma_dec
         if alpha_try < alpha_min:
             break
-
+    # If the backtracking never worked, add 1 to number of unsuccessful steps
     if success is False:
         successive_unsuccessful_steps += 1
-        if successive_unsuccessful_steps > max_accepted_successive_unsuccessful_steps:
-            raise ValueError("Newton failed")
+        # If there are many unsuccessful steps, that means that it is not possible
+        # to decrease the residual more given the mesh step size
+        if successive_unsuccessful_steps > max_accepted_successive_unsuccessful_steps: #######################################################
+            raise ValueError("Newton could not decrease the norm of the residual any more.")
         # in case that the backtracking did not work, set alpha_current to initial value
         alpha_current = initial_alpha
         for i, du_value in enumerate(du):
@@ -312,6 +282,7 @@ def adaptive_newton_step(
         norm_F_to_return = norm_F_vector
         
     return species_concentrations, alpha_current, successive_unsuccessful_steps, norm_F_to_return
+
 
 def check_convergence_via_jacobian_and_residual(
         current_species_concentrations, convergence_parameters, get_full_info):
@@ -371,6 +342,9 @@ def check_convergence_via_flux_equilibrium(
         for species in REACTION_NETWORK.species}
     for i in range(NUM_POINTS):
         (region, n, species) = REVERSE_POINT_IDS[i]
+        point_type = POINT_INFOS[region][n]
+        if point_type != "i":
+            continue
         r = RADII[region][n]
         reaction_flux = calculate_reaction_term(current_species_concentrations, region, n, species)
         reaction_fluxes[species] += 4 * np.pi * reaction_flux * r**2 * DELTA_R
@@ -437,8 +411,12 @@ def solve_newton(
                       f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
                 )
         else:
-            current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, current_F_norm = adaptive_newton_step(
-                current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)
+            try:
+                current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, current_F_norm = adaptive_newton_step(
+                    current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)
+            except: # once the adaptive method cannot further decrease the norm of the residual, break
+                early_convergence = "Newton failed to decrease the norm any further"
+                break
             if log_iteration_info_every != 0 and iter%log_iteration_info_every==0 :
                 print(f"Step adaptation:\n"
                       f"iteration: {iter}\n"
@@ -452,7 +430,7 @@ def solve_newton(
             save_newton_iteration_data(ITERATION_DATA_PATH, iter_string,
                 J_matrix, F_vector, current_species_concentrations, du, variables_to_save_dictionary)
             if plot_iteration_data_during_simulation:
-                plot_steady_state_concentrations(
+                fig, ax = plot_steady_state_concentrations(
                     reaction_network=REACTION_NETWORK,
                     num_regions=NUM_REGIONS,
                     num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
@@ -460,12 +438,10 @@ def solve_newton(
                     membrane_radii=MEMBRANE_RADII,
                     output_file_name=os.path.join(ITERATION_DATA_PATH, f".iteration_nr_{iter_string}_iteration.png"),
                     species_concentrations_to_plot=current_species_concentrations,
-                    title = (
-                            f"iteration #{iter}\n"
-                            f"residual norm: {format_sci(np.linalg.norm(F_vector))}\n"
-                            f"max absolute step: {format_sci(max(du))}"
-                        )
+                    system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"],
+                    title = f"iteration #{iter}\n"
                 )
+                plt.close(fig)
         # Stop iterating if criterion for convergence fulfilled
         if check_convergence_every !=0 and iter%check_convergence_every==0:
             convergence_flux_equilibration, info_flux_equilibration = check_convergence_via_flux_equilibrium(
@@ -559,7 +535,7 @@ if __name__ == "__main__":
     species_concentrations_guess = {
         region_idx : {
             mesh_point_idx : {
-                species : species.external_concentration * RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
+                species : species.external_concentration #* RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
                 for species in REACTION_NETWORK.species}
             for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
         for region_idx in range(NUM_REGIONS)
@@ -627,7 +603,7 @@ if __name__ == "__main__":
         )
         end_time = time.time()
 
-        # Log relevant data (if given)
+        # Log data of final step
         F_vector_final, _, du_final = compute_newton_step(species_concentrations_final)
 
         print(f"Runtime was {end_time - start_time:.3f} s\n"
@@ -636,6 +612,7 @@ if __name__ == "__main__":
             f"with early convergence: {early_convergence}")
 
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
+    
     plot_steady_state_concentrations(
         reaction_network=REACTION_NETWORK,
         num_regions=NUM_REGIONS,
@@ -643,9 +620,10 @@ if __name__ == "__main__":
         radii=RADII,
         membrane_radii=MEMBRANE_RADII,
         output_file_name=os.path.join(FOLDER_TO_SOLVE, "species_steady_state_concentrations.png"),
-        species_concentrations_to_plot = species_concentrations_final)
+        species_concentrations_to_plot = species_concentrations_final,
+        system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"]
+    )
 
-    # Make gif
     if SOLVER_INPUT["output_options"]["create_gif_with_saved_data"]:
         make_newton_iterations_gif(
             reaction_network=REACTION_NETWORK,
@@ -655,19 +633,8 @@ if __name__ == "__main__":
             membrane_radii=MEMBRANE_RADII,
             iteration_data_folder=ITERATION_DATA_PATH,
             gif_output_folder=FOLDER_TO_SOLVE,
-            species_lookup_dict=SPECIES_LOOKUP)
+            species_lookup_dict=SPECIES_LOOKUP,
+            system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"])
 
     if SOLVER_INPUT["output_options"]["log_convergence_progress"]:
         plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
-    
-    plot_theory_curve(
-        FOLDER_TO_SOLVE,
-        SPECIES_LOOKUP,
-        REACTION_NETWORK,
-        NUM_REGIONS,
-        NUM_MESH_POINTS_IN_REGIONS,
-        RADII,
-        MEMBRANE_RADII,
-        R,
-        SYSTEM_GEOMETRY_DICT["geometry_config"]
-    )

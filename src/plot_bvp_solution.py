@@ -23,7 +23,12 @@ def plot_steady_state_concentrations(
         num_mesh_points_in_regions,
         radii,
         membrane_radii,
-        output_file_name, species_concentrations_to_plot, title = None, ymax = None):
+        output_file_name,
+        species_concentrations_to_plot,
+        system_geometry_dict,
+        title = None,
+        ymax = None
+    ):
     """ Plots the concentrations at a specific time point.
     output_file_name: should have .png or any other extension
     species_concentrations_to_plot: dictionary with keys region, n, species,
@@ -48,6 +53,16 @@ def plot_steady_state_concentrations(
         curve, = ax.plot(np.array(x_values)/max(x_values), y_values[species], label=species.name)
         color = curve.get_color()
         ax.hlines(species.external_concentration, xmin=1, xmax = 1.1, color = color)
+
+    fig, ax = add_theory_curve_to_ax(
+                fig,
+                ax,
+                reaction_network,
+                num_regions,
+                membrane_radii,
+                system_geometry_dict
+            )
+    
     ax.set_ylabel("concentration / M")
     ax.set_xlabel("relative distance to origin / r/R")
     ax.legend(
@@ -66,6 +81,7 @@ def plot_steady_state_concentrations(
         ax.set_title(title, loc="left")
     ax.set_ylim(ymin=0, ymax = ymax)
     ax.set_xlim(xmin=0, xmax = 1.1)
+    fig.tight_layout()
     if output_file_name != None:
         fig.savefig(output_file_name, dpi = 300, bbox_inches='tight')
     return fig, ax
@@ -76,7 +92,11 @@ def make_newton_iterations_gif(
         num_mesh_points_in_regions,
         radii,
         membrane_radii,
-        iteration_data_folder, gif_output_folder, species_lookup_dict):
+        iteration_data_folder,
+        gif_output_folder,
+        species_lookup_dict,
+        system_geometry_dict
+    ):
     """
     Important: delete any .json files from previous simulations that may not be overwritten.
     (Should already automatically have been done by snakemake through cleanup_old_iterations rule)
@@ -129,12 +149,7 @@ def make_newton_iterations_gif(
             continue
         number = int(re.findall(r"\d+", os.path.basename(png_file))[0])+1
         number_with_max_digits = f"{number:0{digit_count}d}"
-        title_lines = [f"iteration #{number_with_max_digits}"]
         species_concentrations_to_plot_dict_with_strings = load_json(file)
-        residual_norm_file= file.replace("_concentrations.json", "_F_vector_norm.json")
-        if os.path.isfile(residual_norm_file):
-            residual_norm = load_json(residual_norm_file)
-            title_lines.append(f"residual norm: {format_sci(residual_norm)}")
         species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
             species_concentrations_to_plot_dict_with_strings, species_lookup_dict)
         fig, ax = plot_steady_state_concentrations(
@@ -143,10 +158,12 @@ def make_newton_iterations_gif(
             num_mesh_points_in_regions=num_mesh_points_in_regions,
             radii=radii,
             membrane_radii=membrane_radii,
-            output_file_name=png_file,
+            output_file_name=None,
             species_concentrations_to_plot=species_concentrations_to_plot_dict,
-            title = "\n".join(title_lines),
+            system_geometry_dict=system_geometry_dict,
+            title = f"iteration #{number_with_max_digits}",
             ymax = max_y)
+        fig.savefig(png_file, dpi = 300)
         plt.close(fig)
         png_files_created.append(png_file)
     # Put all the pngs together
@@ -190,30 +207,14 @@ def plot_convergence_progress(
     fig.savefig(os.path.join(folder_to_solve, "convergence.png"), bbox_inches = "tight", dpi=300)
     plt.close()
 
-def plot_theory_curve(folder_to_solve,
-        species_lookup,
+def add_theory_curve_to_ax(
+        fig,
+        ax,
         reaction_network,
         num_regions,
-        num_mesh_points_in_regions,
-        radii,
         membrane_radii,
-        external_radius,
         system_geometry_dict
-        ):
-
-    species_concentrations_to_plot_dict_with_strings = load_json(
-        os.path.join(folder_to_solve, ".species_steady_state_concentrations.json"))
-    species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
-            species_concentrations_to_plot_dict_with_strings, species_lookup)
-    fig, ax = plot_steady_state_concentrations(
-        reaction_network=reaction_network,
-        num_regions=num_regions,
-        num_mesh_points_in_regions=num_mesh_points_in_regions,
-        radii=radii,
-        membrane_radii=membrane_radii,
-        output_file_name=None,
-        species_concentrations_to_plot=species_concentrations_to_plot_dict,
-    )
+    ):
     # Case of one spontaneous reaction with no inner boundaries
     if (len(reaction_network.spontaneous_reactions) == 1
         and len(reaction_network.enzymatic_reactions) == 0
@@ -222,6 +223,7 @@ def plot_theory_curve(folder_to_solve,
         s_reaction = reaction_network.spontaneous_reactions[0]
         s = s_reaction.start_species
         s_lambda = np.sqrt(s_reaction.k / s.diffusion_constant)
+        external_radius = membrane_radii[-1]
         A = - ((s.permeability_constant / s.diffusion_constant * s.external_concentration * external_radius**2)
             / (
                 np.exp(s_lambda * external_radius)*(s_lambda * external_radius - 1 + (s.permeability_constant * external_radius)/s.diffusion_constant)
@@ -232,10 +234,11 @@ def plot_theory_curve(folder_to_solve,
         r_to_plot = np.linspace(external_radius*0.01, external_radius, num = 100)
         ax.plot([r/external_radius for r in r_to_plot], [c(r) for r in r_to_plot], linestyle= "--",
                 label = f"theory for {s.name}", zorder = -1, 
-                linewidth = 2
+                linewidth = 1,
+                color = "k",
+                alpha = 0.5
         )
         ax.legend()
-        fig.savefig(os.path.join(folder_to_solve, "theory_steady_state.png"))
     
     # Case of one spontaneous reaction with one inner boundary
     elif (len(reaction_network.spontaneous_reactions) == 1
@@ -246,6 +249,7 @@ def plot_theory_curve(folder_to_solve,
         X = reaction.start_species
         X_lambda = np.sqrt(reaction.k / X.diffusion_constant)
         r_inner = membrane_radii[0]
+        external_radius = membrane_radii[-1]
         s = np.sinh(X_lambda * r_inner)
         c = np.cosh(X_lambda * r_inner)
         beta = X.permeability_constant / X.diffusion_constant
@@ -280,7 +284,7 @@ def plot_theory_curve(folder_to_solve,
         for region_idx in [0,1]:
             region_radii = mesh_points_in_regions[region_idx]
             # region_radii[0] skipped to avoid division by 0
-            r_to_plot = np.linspace(region_radii[1], region_radii[-1], num = 100)
+            r_to_plot = np.linspace(region_radii[0]+external_radius*0.01, region_radii[-1], num = 100)
             if region_idx == 0:
                 label = f"theory for {X.name}"
             else:
@@ -288,16 +292,151 @@ def plot_theory_curve(folder_to_solve,
             ax.plot([r/external_radius for r in r_to_plot],
                 [c[region_idx](r) for r in r_to_plot], linestyle= "--",
                 label = label, zorder = -1, 
-                linewidth = 2
+                linewidth = 1,
+                color = "k",
+                alpha = 0.5
             )
         ax.legend()
-        fig.savefig(os.path.join(folder_to_solve, "theory_steady_state.png"))
-
+    
     # Case of one spontaneous reaction with two inner boundaries
-    #elif (len(reaction_network.spontaneous_reactions) == 1
-    #    and len(reaction_network.enzymatic_reactions) == 0
-    #    and num_regions == 3
-    #):   
+    elif (len(reaction_network.spontaneous_reactions) == 1
+        and len(reaction_network.enzymatic_reactions) == 0
+        and num_regions == 3
+    ):  
+        """This below was written by ChatGPT."""
+        reaction = reaction_network.spontaneous_reactions[0]
+        X = reaction.start_species
+
+        lam = np.sqrt(reaction.k / X.diffusion_constant)  # lambda
+        D = X.diffusion_constant
+        p = X.permeability_constant
+        beta = p / D
+
+        # Two inner membranes
+        R1 = membrane_radii[0]
+        R2 = membrane_radii[1]
+        R  = membrane_radii[2]
+
+        c_ext = X.external_concentration
+
+        # --- Helpers for evaluating c and c' for the basis solutions ---
+        # For region 1: c1(r) = S1*sinh(lam r)/r
+        def c1_val(r, S1):
+            return S1 * np.sinh(lam * r) / r
+
+        def c1_der(r, S1):
+            # d/dr [ S1*sinh(lam r)/r ] = S1*(lam*cosh(lam r)/r - sinh(lam r)/r^2)
+            return S1 * (lam * np.cosh(lam * r) / r - np.sinh(lam * r) / (r**2))
+
+        # For region j>=2: cj(r) = (A*e^{-lam r} + B*e^{lam r})/r
+        def cAB_val(r, A, B):
+            return (A * np.exp(-lam * r) + B * np.exp(lam * r)) / r
+
+        def cAB_der(r, A, B):
+            # derivative of (f(r)/r) with f=A e^{-lam r}+B e^{lam r}
+            f  = A * np.exp(-lam * r) + B * np.exp(lam * r)
+            fp = -lam * A * np.exp(-lam * r) + lam * B * np.exp(lam * r)
+            return fp / r - f / (r**2)
+
+        # --- Build the 5x5 linear system M x = b for x=[S1, A2, B2, A3, B3] ---
+        # Conditions:
+        # (1) c1'(R1) = c2'(R1)
+        # (2) c1'(R1) = beta*(c2(R1) - c1(R1))
+        # (3) c2'(R2) = c3'(R2)
+        # (4) c2'(R2) = beta*(c3(R2) - c2(R2))
+        # (5) c3'(R)  = beta*(c_ext - c3(R))
+
+        M = np.zeros((5, 5), dtype=float)
+        b = np.zeros(5, dtype=float)
+
+        # Row 0: c1'(R1) - c2'(R1) = 0
+        # coefficients for S1, A2, B2, A3, B3
+        M[0, 0] = c1_der(R1, 1.0)
+        # -c2'(R1) contributions:
+        # c2'(R1) is linear in A2,B2 so put negatives
+        # We'll get coeffs by evaluating derivative with A=1,B=0 and A=0,B=1
+        M[0, 1] = -cAB_der(R1, 1.0, 0.0)
+        M[0, 2] = -cAB_der(R1, 0.0, 1.0)
+        # A3,B3 not in this equation
+        b[0] = 0.0
+
+        # Row 1: c1'(R1) - beta*(c2(R1) - c1(R1)) = 0
+        # => c1'(R1) + beta*c1(R1) - beta*c2(R1) = 0
+        M[1, 0] = c1_der(R1, 1.0) + beta * c1_val(R1, 1.0)
+        M[1, 1] = -beta * cAB_val(R1, 1.0, 0.0)
+        M[1, 2] = -beta * cAB_val(R1, 0.0, 1.0)
+        b[1] = 0.0
+
+        # Row 2: c2'(R2) - c3'(R2) = 0
+        M[2, 1] = cAB_der(R2, 1.0, 0.0)
+        M[2, 2] = cAB_der(R2, 0.0, 1.0)
+        M[2, 3] = -cAB_der(R2, 1.0, 0.0)
+        M[2, 4] = -cAB_der(R2, 0.0, 1.0)
+        b[2] = 0.0
+
+        # Row 3: c2'(R2) - beta*(c3(R2) - c2(R2)) = 0
+        # => c2'(R2) + beta*c2(R2) - beta*c3(R2) = 0
+        M[3, 1] = cAB_der(R2, 1.0, 0.0) + beta * cAB_val(R2, 1.0, 0.0)
+        M[3, 2] = cAB_der(R2, 0.0, 1.0) + beta * cAB_val(R2, 0.0, 1.0)
+        M[3, 3] = -beta * cAB_val(R2, 1.0, 0.0)
+        M[3, 4] = -beta * cAB_val(R2, 0.0, 1.0)
+        b[3] = 0.0
+
+        # Row 4: c3'(R) = beta*(c_ext - c3(R))
+        # => c3'(R) + beta*c3(R) = beta*c_ext
+        M[4, 3] = cAB_der(R, 1.0, 0.0) + beta * cAB_val(R, 1.0, 0.0)
+        M[4, 4] = cAB_der(R, 0.0, 1.0) + beta * cAB_val(R, 0.0, 1.0)
+        b[4] = beta * c_ext
+
+        # Solve
+        S1, A2, B2, A3, B3 = np.linalg.solve(M, b)
+
+        # --- Define concentration functions for each region (compatible with your plotting pattern) ---
+        def c_1(r):
+            r = np.asarray(r, dtype=float)
+            out = np.empty_like(r)
+            # safe near 0: limit S1*sinh(lam r)/r -> S1*lam
+            small = np.isclose(r, 0.0)
+            out[small] = S1 * lam
+            out[~small] = S1 * np.sinh(lam * r[~small]) / r[~small]
+            return out
+
+        def c_2(r):
+            r = np.asarray(r, dtype=float)
+            return (A2 * np.exp(-lam * r) + B2 * np.exp(lam * r)) / r
+
+        def c_3(r):
+            r = np.asarray(r, dtype=float)
+            return (A3 * np.exp(-lam * r) + B3 * np.exp(lam * r)) / r
+
+        c = [c_1, c_2, c_3]
+
+        # --- Plot using your mesh_points_in_regions structure (now 3 regions) ---
+        mesh_points_in_regions = system_geometry_dict["mesh_points_in_regions"]
+
+        for region_idx in [0, 1, 2]:
+            region_radii = mesh_points_in_regions[region_idx]
+            # skip first point in region 0 to avoid r=0 if present
+            start_idx = 1 if (region_idx == 0 and np.isclose(region_radii[0], 0.0)) else 0
+
+            r_to_plot = np.linspace(region_radii[start_idx], region_radii[-1], num=100)
+
+            label = f"theory for {X.name}" if region_idx == 0 else None
+            ax.plot([rr / R for rr in r_to_plot],
+                    [float(c[region_idx](rr)) for rr in r_to_plot],
+                    linestyle="--",
+                    label=label,
+                    zorder=-1,
+                    linewidth=1,
+                    color = "k",
+                    alpha = 0.5
+            )
+    
+    
+    
+    return fig, ax
+
+       
 
 
 
@@ -352,7 +491,8 @@ if __name__ == "__main__":
             membrane_radii=MEMBRANE_RADII,
             iteration_data_folder=ITERATIONS_FOLDER,
             gif_output_folder=FOLDER_TO_SOLVE,
-            species_lookup_dict=SPECIES_LOOKUP)
+            species_lookup_dict=SPECIES_LOOKUP,
+            )
     else:
         # Find out concentrations file from the iteration number
         pattern = os.path.join(ITERATIONS_FOLDER, ".iteration_nr_*_concentrations.json")
@@ -371,19 +511,9 @@ if __name__ == "__main__":
             radii=RADII,
             membrane_radii=MEMBRANE_RADII,
             output_file_name=file_to_create,
-            species_concentrations_to_plot=species_concentrations_to_plot_dict)
+            species_concentrations_to_plot=species_concentrations_to_plot_dict,
+            system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"]
+        )
     
     if SOLVER_INPUT["output_options"]["log_convergence_progress"]:
         plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
-
-    plot_theory_curve(
-        FOLDER_TO_SOLVE,
-        SPECIES_LOOKUP,
-        REACTION_NETWORK,
-        NUM_REGIONS,
-        NUM_MESH_POINTS_IN_REGIONS,
-        RADII,
-        MEMBRANE_RADII,
-        R,
-        SYSTEM_GEOMETRY_DICT["geometry_config"]
-    )

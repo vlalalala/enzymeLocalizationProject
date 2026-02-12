@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 
 def get_concentrations_files_within_folder(folder):
     """Returns a list with the complete paths of files that correspond to
@@ -30,9 +31,14 @@ def rename_iteration_files(folder, min_digits) -> int:
         Minimum desired number of digits.
     """
     files = get_concentrations_files_within_folder(folder)
+    folder = Path(folder)
 
     if not files:
         print(f"No files found in {folder} matching iterations pattern.")
+        return min_digits
+
+    # Ensure full paths
+    files = [Path(f) if os.path.isabs(f) else folder / f for f in files]
 
     # Detect maximum existing digit count in filenames
     max_found_digits = 0
@@ -47,6 +53,8 @@ def rename_iteration_files(folder, min_digits) -> int:
     for f in files:
         basename = os.path.basename(f)
         match = re.search(r"(\d+)", basename)
+        if not match:
+            continue
         old_num_str = match.group(1)
         num = int(old_num_str)
         old_digits = len(old_num_str)
@@ -58,7 +66,8 @@ def rename_iteration_files(folder, min_digits) -> int:
         new_basename = re.sub(r"(\d+)", new_num_str, basename, count=1)
         new_path = os.path.join(folder, new_basename)
         if f != new_path:
-            os.rename(f, new_path)
+            old_path = os.path.join(folder, basename)   # <-- add this
+            os.rename(old_path, new_path)
             print(f"Renamed: {basename} → {new_basename}")
     return final_digits
 

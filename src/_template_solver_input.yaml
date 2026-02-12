@@ -10,8 +10,7 @@ adaptive_step_parameters:
     alpha_max: [10]
     gamma_inc: [1.15]
     gamma_dec: [0.5]
-    max_num_backtrack: [100]
-    max_num_accepted_successive_unsuccessful_steps: [100]
+    max_num_accepted_successive_unsuccessful_steps: [10]
 
 output_options:
     log_convergence_progress: [true]
