@@ -1,10 +1,10 @@
 # Numerical solver of chemical reactions within concentric spherical semi-permeable membranes
 
+This code is for calculating the steady state concentrations of substances placed in a spherically symmetrical system of semi-permeable membranes, where the concentration of  each of substances outside the exterior membrane is kept constant. Spontaneous and enzymatic reactions can be defined (enzymes can be placed in the regions between semi-permeable membranes) and an arbitrary number of semi-permeable membranes can be used. The boundary problem is solved numerically through the Newton method.
+
 ## Summary
 
-This is a piece of modular code for defining reaction networks, placing enzymes within a spherical object and computing the steady state spatial distribution of the reactants, intermediates, and products.
-
-The work is based on
+This work continues previous work by Hinzpeter et al
 - Optimal Compartmentalization Strategies for Metabolic Microcompartments, by Hinzpeter et al. (Biophysical Journal, 2017)
 
 The governing equations for each species $q$ are reaction-diffusion equations of the form
