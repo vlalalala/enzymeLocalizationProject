@@ -25,6 +25,8 @@ The solution is assumed to have converged well enough if the net flux computed (
 
 This work continues previous work by Hinzpeter et al: Optimal Compartmentalization Strategies for Metabolic Microcompartments, by Hinzpeter et al. (Biophysical Journal, 2017)
 
+**IMPORTANT**: ratios different to 1:1 between reactants and products is not yet implemented!
+
 ## How to use the code
 The code uses `snakemake` for system management in order to be able to run reproducible and scalable data analyses. 
 It is easy to use in combination with Anaconda/Miniconda. For usage with Miniconda:
@@ -82,55 +84,66 @@ Automatic checks are included such that it is ensured that all species and enzym
 ```yaml
 # parameters_geometry.yaml
 geometry_config:
-    internal_membrane_relative_radii: [ 0.3, 0.7 ]
-    outer_membrane_radius: 1.0e-5
+    internal_membrane_relative_radii: [ 0.3, 0.7 ] # the positions of inner membranes in terms of the outer-most radius. list
+    outer_membrane_radius: 1.0e-5 # given in meters
 ```
 
 ```yaml
 # parameters_solver_input.yaml
 
 geometry_parameters: 
-    num_mesh_points: 25
+    num_mesh_points: 25 # number of different mesh positions
+                        # (the total number of mesh points is larger due to
+                        # duplicate mesh points at inner boundaries)
 
 newton_parameters:
-    override_adaptive_method: false
+    override_adaptive_method: false # an adaptive method for the step in concentrations
+                                    # is used as the default
 
 adaptive_step_parameters: 
-    initial_alpha: 1.0
+    initial_alpha: 1.0 # alpha is the scaling factor for the computed step 
+                        # in concentrations via the Newton method
     alpha_min: 1.0e-3
     alpha_max: 10
     gamma_inc: 1.15
-    gamma_dec: 0.5
-    max_num_accepted_successive_unsuccessful_steps: 10
+    gamma_dec: 0.5 # factor by which alpha is multiplied when the residual norm does not decrease
+    max_num_accepted_successive_unsuccessful_steps: 10 # used to stop iterations of Newton once the
+        # most accurate solution with the given number of mesh points is found
 
 output_options:
-    log_convergence_progress: true
-    save_data_every: 100
-    create_gif_with_saved_data: true
-    log_iteration_info_every: 100
-    delete_data_at_the_end: true
-    plot_iteration_data_during_simulation: false
+    log_convergence_progress: true # if true, logs relative net flux for each species
+    save_data_every: 100 # save quantities specified by variables_to_save given 
+                            # this number of iterations; if nothing should be saved, set to 0
+    create_gif_with_saved_data: true # to create a gif with the saved concentrations
+                                     # at the end of the simulation
+    log_iteration_info_every: 100 # log inforation about (adaptive) step size and 
+                                    # number of successive unsuccessful steps
+    delete_data_at_the_end: true # if true, deletes files specified by variables_to_save at the end
+    plot_iteration_data_during_simulation: false # if true, plots the .png file for the latest
+                                                # saved iteration with the latest calculated concentration
 
 variables_to_save:
-    save_F_vector: false
-    save_F_vector_norm: false
-    save_J_matrix: false
-    save_du_vector: false
-    save_concentrations: true
-    save_du_vector_max: false
+    save_F_vector: false # save residual vector as a .txt
+    save_F_vector_norm: false # save norm of residual vector as a .txt
+    save_J_matrix: false # save the (sparse) jacobian matrix as a .txt
+                            # (saves only the non-zero elements with their value and position)
+    save_du_vector: false # save the vector that encodes the change in the concentrations
+    save_concentrations: true # save the concentrations (needed for creating the gif)
+    save_du_vector_max: false # save the maximum step change in the concentrations 
 ```
 
 ```yaml
 # parameters_solver_params.yaml 
 
 convergence_parameters:
-    tol_relative_value: 1
-    tol_absolute_factor: 1
-    tol_residual_factor: 1
-    tol_relative_flux_deviation: 0.01
+    tol_relative_value: 1 # factor by which the initial norm of the residual must be reduced 
+    tol_absolute_factor: 1 # obsolete, similar to above; read code
+    tol_residual_factor: 1 # obsolete, similar to above; read code
+    tol_relative_flux_deviation: 0.01 # upper threshold for the relative net flux
+                                        # with which the balance condition is accepted
 
 newton_parameters:
-    check_convergence_every: 100
+    check_convergence_every: 100 # every how many iterations to check the convergence coditions
 ```
 
 The source code defined in the snakemake rules runs on files with this format.
@@ -187,25 +200,23 @@ and at $r=R$ we have
 ```
 such that
 ```math
-y_1(R) = (u_{ext} - y_0(R)) \cdot \frac{p_u}{D_u}
+y_1(R) = \left(u_{ext} - y_0(R)\right) \cdot \frac{p_u}{D_u}
 ```
 with $p_u$ and $D_u$ the permeability to each membrane and diffusion constant for substance $u$, respectively.
 
-**Generally**:
+**Matrix formulation**:
 
 Given $m$ species and $n$ compartments (i.e. $n-1$ inner membranes at $r_i$ with $i \in \{1,2,...,n-1\} $) we have $m \cdot [2 + (n-1)\cdot 2] = 2mn$ boundary conditions (since for each species we have one BC at $r=0$, one BC at $r=R$, one BC at each side of each inner membrane).
 
 In order to use the Newton method to solve the whole system, we define $2\cdot m\cdot n$ variables, with $k\in \{0, 1, ..., n-1\}$
 
 ```math
-v_k^{(m)} = u_k^{(m)}
+v_k^{(m)} \coloneqq u_k^{(m)}
 ```
 ```math
-w_k^{(m)} = \frac{\mathrm{d}u_k^{(m)}}{\mathrm{d}r}
+w_k^{(m)} \coloneqq \frac{\mathrm{d}u_k^{(m)}}{\mathrm{d}r}
 ```
-
-with 
-
+with their derivatives given by
 ```math
 \frac{\mathrm{d}v_k^{(m)}}{\mathrm{d}r} = w_k^{(m)}
 ```
@@ -213,65 +224,58 @@ with
 \frac{\mathrm{d}w_k^{(m)}}{\mathrm{d}r} = -\frac{2}{r} w_k^{(m)}-\frac{1}{D}R(\vec{v}_k)
 ```
 
-Boundary conditions are given by
+The boundary conditions are then given by
 ```math
 w^{(m)}(0) = 0
 ```
-(Neumann no-flux BC)
+for the interior boundary condition, (Neumann, no-flux BC),
 ```math
-w^{(m)}(R) = \left(u_\mathrm{ext} - v^{(m)}(R)\right) \cdot \frac{p^{(m)}}{D}
+w^{(m)}(R) = \left(u_\mathrm{ext} - v^{(m)}(R)\right) \cdot \frac{p^{(m)}}{D^{(m)}}
 ```
-(Robin BC)
+for the condition at the outer-most membrane, and
 ```math
 w_i^{(m)}(r_i^+) =  \frac{p^{(m)}}{D} \cdot \left( v_{i}^{(m)}(r_i^+) - v_{i-1}^{(m)}(r_i^-)\right)
 ```
 ```math
 w_{i-1}^{(m)}(r_i^-) =  \frac{p^{(m)}}{D} \cdot \left( v_{i}^{(m)}(r_i^+) - v_{i-1}^{(m)}(r_i^-)\right)
 ```
+for the inner membranes (i.e. Robin BC).
 
-The concentration is not continuous at the membranes, but the flux is continuous!
+There is a concentration jump at the membranes, but the flux is continuous.
 
-We used
+For the discretization, we used
 
 ```math
 f'(x_i) = \frac{1}{2h}(f_{i+1}-f_{i-1}) + O(h^2)
 ```
+
+**Calculating the net flux**
+
+As a convergence condition, we establish that the (total) net flux should be close to 0.
+
+We define the flux coming through the exterior membrane to be
 ```math
-f''(x_i) \approx \frac{1}{h^2}(f_{i+1}-2f_i + 
-f_{i-1})
+\Phi_\mathrm{ext}^{(m)} = 4 \cdot \pi \cdot p_u\cdot (v_\mathrm{ext}^{(m)} - v^{(m)}(R))
 ```
-for the discretization.
+such that it is positive if there is a flux into the sphere and negative if there is a flux towards the outside of the sphere.
 
-**Given multiple regions**:
-
-In each region $k$ we have 
-
+We estimate the reaction flux for each region by calculating the reaction fluxes caused by the local concentrations at each mesh point (including the mesh points at either end of the interval), interpolating the reaction fluxes at the positions between each of these mesh points and adding these reaction fluxes, weighted by the volume of the hollow sphere spanned by the two elements from which the interpolation was calculated.
 ```math
-\frac{1}{r^2} \frac{d}{dr} \left( r^2 \frac{du_k}{dr} \right) + \frac{1}{D_k} R(u) = 0 ,
+\Phi_\mathrm{react}^{(m)} = \sum_{i=0}^{N-1} \frac{R^{(m)}_i + R^{(m)}_{i+1}} {2}\cdot \frac{4}{3} \cdot \pi \cdot \left(r_{i+1}^3 - r_i^3\right)
 ```
+with the index $i$ traversing through the mesh points within a region with increasing $r$ and $R_i^{(m)}$ the computed reaction term from the local concentrations of all species and enzymes.
+The total reaction flux is the sum from the reaction fluxes within each region.
 
+We define a relative net flux $\Phi^{(m)}$ for each species $m$ through
 ```math
-D_k \, \frac{\mathrm{d}u_k}{\mathrm{d}r} \big|_{r = R_k^-}
-= D_{k+1} \, \frac{\mathrm{d}u_{k+1}}{\mathrm{d}r} \big|_{r = R_k^+}
-= p_k \left( u_{k+1}(R_k^+) - u_k(R_k^-) \right)
+\Phi^{(m)} = \frac{|\Phi_\mathrm{ext}^{(m)} + \Phi_\mathrm{react}^{(m)}|}{\mathrm{max}(|\Phi_\mathrm{ext}^{(m)}|, |\Phi_\mathrm{react}^{(m)}|)}
 ```
+Balance between the flux created through interaction with the outside and the flux created through reactions within the sphere must be ensured for the steady state. We consider that the steady state has been found numerically once this balance is smaller than some small $\epsilon > 0$.
+
+It is important to note that the net flux may not cross the threshold given by $\epsilon$ if the step size between neighboring mesh points is too large.
 
 
-**Fluxes**
 
-**Finding 
-To find the total number of moles $n$ within the volume with radius R, calculate
-```math
-n = \int_0^R C(r) \cdot 4\pi r^2 \mathrm{d}r
-```
-
-Reminder that to convert $C(r)$ from $M$ (moles per litre) to moles per $m^{3}$: $M = \frac{moles}{m^3}\cdot 10^{-3}$.
-
-So 
-```math
-n = \int_0^R C(r) \cdot 10^{3}\cdot 4\pi r^2 \mathrm{d}r
-```
-with $n$ in moles and $C(r)$ in $M$.
 
 ## Typical values
 
@@ -395,24 +399,8 @@ e^{-\lambda R}(\alpha-\lambda R-1)
 
 
 
-## TODO:
-- add ratios end_to_start_species
-- add comparison to analytic solutions
-
-## README Under construction
 
 
-is below some predefined threshold (e.g. 0.01).
-reaction_flux = calculate_reaction_term(current_species_concentrations, region, n, species)
-        reaction_fluxes[species] += 4 * np.pi * reaction_flux * r**2 * DELTA_R
-    # Second, calculate flux from boundary with exterior
-    # the flux is positive if the concentration on the exterior is larger than on the interior at r=R
-    boundary_fluxes = {species: 0
-        for species in REACTION_NETWORK.species}
-    for species in REACTION_NETWORK.species:
-        #print(species.name, species.permeability_constant, species.external_concentration, current_species_concentrations[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1][species])
-        boundary_fluxes[species] = 4 * np.pi * R**2 * species.permeability_constant * (
-            species.external_concentration
-            - current_species_concentrations[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1][species])
 
-relative_deviation = abs(reaction_fluxes[species] + boundary_fluxes[species]) / max(abs(boundary_fluxes[species]), abs(reaction_fluxes[species]))
+
+

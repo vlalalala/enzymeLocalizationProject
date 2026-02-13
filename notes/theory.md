@@ -374,3 +374,32 @@ MassTransferValue is a special case of a MassFluxValue.
 
 https://reference.wolfram.com/language/ref/MassTransferValue.html
 https://reference.wolfram.com/language/ref/MassFluxValue.html
+
+
+**Given multiple regions**:
+
+In each region $k$ we have 
+
+```math
+\frac{1}{r^2} \frac{d}{dr} \left( r^2 \frac{du_k}{dr} \right) + \frac{1}{D_k} R(u) = 0 ,
+```
+
+```math
+D_k \, \frac{\mathrm{d}u_k}{\mathrm{d}r} \big|_{r = R_k^-}
+= D_{k+1} \, \frac{\mathrm{d}u_{k+1}}{\mathrm{d}r} \big|_{r = R_k^+}
+= p_k \left( u_{k+1}(R_k^+) - u_k(R_k^-) \right)
+```
+
+
+To find the total number of moles $n$ within the volume with radius R, calculate
+```math
+n = \int_0^R C(r) \cdot 4\pi r^2 \mathrm{d}r
+```
+
+Reminder that to convert $C(r)$ from $M$ (moles per litre) to moles per $m^{3}$: $M = \frac{moles}{m^3}\cdot 10^{-3}$.
+
+So 
+```math
+n = \int_0^R C(r) \cdot 10^{3}\cdot 4\pi r^2 \mathrm{d}r
+```
+with $n$ in moles and $C(r)$ in $M$.
