@@ -234,7 +234,7 @@ def add_theory_curve_to_ax(
         c = lambda r: 1/r * A *(np.exp(-s_lambda*r)-np.exp(s_lambda*r))
         r_to_plot = np.linspace(external_radius*0.01, external_radius, num = 100)
         ax.plot([r/external_radius for r in r_to_plot], [c(r) for r in r_to_plot], linestyle= "--",
-                label = f"theory for {s.name}", zorder = -1, 
+                label = f"analytical solution for {s.name}", zorder = -1, 
                 linewidth = 1,
                 color = "k",
                 alpha = 0.5
