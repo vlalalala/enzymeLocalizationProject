@@ -10,8 +10,8 @@ The governing equations for each species $q$ are reaction-diffusion equations of
 ```math
 \frac{\partial q}{\partial t} = D_q \nabla^2 q + R_q
 ```
-with $D_q$ the diffusion constant and $R_q$ the reaction term resulting from interactions between the different species,
-and with boundary conditions given by
+with $D_q$ the diffusion constant and $R_q$ the reaction term resulting from chemical reactions between the different species and/or enzymes,
+and with the flux at the boundaries given by
 ```math
 J = p \cdot (q(r^-) - q(r^+))
 ```
@@ -21,19 +21,138 @@ The steady state distribution of $q$ is computed numerically.
 
 The interval $[0, R]$ is discretized by setting equally spaced mesh points. The position of each inner membrane is set to the closest mesh point position. For $N$ inner membranes defined, there are $N+1$ regions. Each region is defined by the mesh points within its bounds, including those at the bounding membranes. (Therefore, at the mesh positions where a inner boundary is at, there are in actuality 2 mesh points.)
 
-The solution is assumed to have converged well enough if the net flux computed (reaction flux - flux through boundary) is close to zero for each species (i.e. mass conservation for each species).
+The solution is assumed to have converged well enough if the net flux computed (the reaction flux minus the flux through the boundary) is close to zero for each species (i.e. mass conservation for each species, see theory part).
 
 This work continues previous work by Hinzpeter et al: Optimal Compartmentalization Strategies for Metabolic Microcompartments, by Hinzpeter et al. (Biophysical Journal, 2017)
+
+## How to use the code
+The code uses `snakemake` for system management in order to be able to run reproducible and scalable data analyses. 
+It is easy to use in combination with Anaconda/Miniconda. For usage with Miniconda:
+
+1. make a new environment (e.g. named `snakemake_env`) and install snakemake
+    ```bash
+    conda create -n snakemake_env -c conda-forge -c bioconda snakemake
+    ```
+2. activate the new environment
+    ```bash
+    conda activate snakemake_env
+    ```
+3. follow the instructions in the Snakefile to run the scripts
+
+## Parameters in the model
+The parameters in the model are those defined in the following files (with example values introduced):
+
+```yaml
+# species.csv
+```
+| name    | diffusion_constant | external_concentration | permeability_constant |
+| -------- | ----------------- | ---------------------- | --------------------- | 
+| X  |  6.6e-10   | 90e-8 | 25e-6|
+| Y  |  8.2e-10   | 0 | 15e-6|
+| Z  |  4.2e-10   | 0 | 5e-6| 
+
+
+```yaml
+# spontaneous_reactions.csv
+```
+| start_species    | end_species | ratio_endtostart_species | k |
+| -------- | ----------------- | ---------------------- | --------------------- | 
+|  X |  Y   | 1:1| 1e-3| 
+
+
+```yaml
+# enzymes.csv
+```
+| name    | quantity | regions |
+| -------- | ------- | -------- |
+|  A  | 25e-2| [0,1] |
+
+(A given quantity of) enzymes are placed within the regions specified. The concentration (in volume) is uniform.
+```yaml
+# enzymatic_reactions.csv
+```
+| start_species    | end_species | ratio_endtostart_species | enzyme | k_cat | k_M | hill |
+| -------- | ------- | -------- | -------- | ------- | -------- | -------- |
+| X |  Z   | 1:1| A  |  0.75   | 1.25e-4 | 1 |
+
+Enzymatic reaction are defined given Michaelis-Menten kinetics. Hill exponents are added for cooperativity.
+
+Automatic checks are included such that it is ensured that all species and enzymes that take place in reactions have their properties defined.
+
+```yaml
+# parameters_geometry.yaml
+geometry_config:
+    internal_membrane_relative_radii: [ 0.3, 0.7 ]
+    outer_membrane_radius: 1.0e-5
+```
+
+```yaml
+# parameters_solver_input.yaml
+
+geometry_parameters: 
+    num_mesh_points: 25
+
+newton_parameters:
+    override_adaptive_method: false
+
+adaptive_step_parameters: 
+    initial_alpha: 1.0
+    alpha_min: 1.0e-3
+    alpha_max: 10
+    gamma_inc: 1.15
+    gamma_dec: 0.5
+    max_num_accepted_successive_unsuccessful_steps: 10
+
+output_options:
+    log_convergence_progress: true
+    save_data_every: 100
+    create_gif_with_saved_data: true
+    log_iteration_info_every: 100
+    delete_data_at_the_end: true
+    plot_iteration_data_during_simulation: false
+
+variables_to_save:
+    save_F_vector: false
+    save_F_vector_norm: false
+    save_J_matrix: false
+    save_du_vector: false
+    save_concentrations: true
+    save_du_vector_max: false
+```
+
+```yaml
+# parameters_solver_params.yaml 
+
+convergence_parameters:
+    tol_relative_value: 1
+    tol_absolute_factor: 1
+    tol_residual_factor: 1
+    tol_relative_flux_deviation: 0.01
+
+newton_parameters:
+    check_convergence_every: 100
+```
+
+The source code defined in the snakemake rules runs on files with this format.
+
+**Defining the phase space spanned by combinations of parameter values:**
+
+In order to efficiently run simulations testing out different regions in phase space, it is possible to provide a set of values for each of the parameters in the model. Individual simulations can then be run with each combination from the cartesian product of all these sets. 
+
+To do so:
+1. Create copies of the template files in the `/src` folder by running `python src/_create_parameters_template.py path_to_new_folder`.
+2. Modify the entries in the `.yaml` and `.csv` files such that each entry contains a list of all the values that entry must take. (If all simulations share one same value for a given parameter, the list has length 1).
+3. Create the files with the same format as above by running `python src/_create_templates_expanded.py path_to_new_folder` and `python src/_create_phase_space.py path_to_new_folder`. The different combinations are in folders that start with `combination*`.
 
 ## Theory
 In spherical symmetry (assuming no angular dependence), the steady-state reaction-diffusion equation becomes
 
 ```math
-\frac{1}{r^2} \frac{d}{dr} \left( r^2 \frac{du}{dr} \right) + \frac{1}{D} R(u) = 0 ,
+\frac{1}{r^2} \frac{d}{dr} \left( r^2 \frac{du}{dr} \right) + \frac{1}{D_u} R_u(u,v...) = 0 \ ,
 ```
 which simplifies to
 ```math
-\frac{d^2u}{dr^2} + \frac{2}{r} \frac{du}{dr} + \frac{1}{D} R(u) = 0
+\frac{d^2u}{dr^2} + \frac{2}{r} \frac{du}{dr} + \frac{1}{D_u} R_u(u,v...) = 0 \ .
 ```
 
 (Note the singularity at $r=0$).
@@ -44,12 +163,11 @@ Using
 y_0 = u \\
 y_1 = \frac{du}{dr} \\\end{cases}
 ```
-
-this leads to 
+we define each of the $2^\mathrm{nd}$ order differential equations (one for each species) as 2 $1^\mathrm{st}$ order differential equations of the form
 ```math
 \begin{cases}
 \frac{dy_0}{dr} = y_1 \\
-\frac{dy_1}{dr} = -\frac{2}{r} y_1 - \frac{1}{D} R(y_0)
+\frac{dy_1}{dr} = -\frac{2}{r} y_1 - \frac{1}{D} R_y(y_0, z_0...)
 \end{cases}
 ```
 
@@ -65,24 +183,19 @@ such that
 ```
 and at $r=R$ we have
 ```math
-\frac{du}{dr}(R) = [u_\mathrm{ext} − u(R)] \cdot \frac{p}{D}
+\frac{du}{dr}(R) = [u_\mathrm{ext} − u(R)] \cdot \frac{p_u}{D_u}
 ```
 such that
 ```math
-y_1(R) = (u_{ext} - y_0(R)) \cdot \frac{p}{D}
+y_1(R) = (u_{ext} - y_0(R)) \cdot \frac{p_u}{D_u}
 ```
-with $p$ the permeability to the outer membrane for substance $u$.
+with $p_u$ and $D_u$ the permeability to each membrane and diffusion constant for substance $u$, respectively.
 
 **Generally**:
 
-For
+Given $m$ species and $n$ compartments (i.e. $n-1$ inner membranes at $r_i$ with $i \in \{1,2,...,n-1\} $) we have $m \cdot [2 + (n-1)\cdot 2] = 2mn$ boundary conditions (since for each species we have one BC at $r=0$, one BC at $r=R$, one BC at each side of each inner membrane).
 
-- $m$ species
-- $n$ compartments i.e. $n-1$ inner membranes at $r_i$ with $i \in \{1,2,...,n-1\} $
-- $m \cdot [2 + (n-1)\cdot 2] = 2mn$ boundary conditions (for each species: one BC at r=0, one BC at r=R, one BC at each end of each inner membrane)
-
-
-Define $2\cdot m\cdot n$ variables, with $k\in \{0, 1, ..., n-1\}$
+In order to use the Newton method to solve the whole system, we define $2\cdot m\cdot n$ variables, with $k\in \{0, 1, ..., n-1\}$
 
 ```math
 v_k^{(m)} = u_k^{(m)}
@@ -279,17 +392,7 @@ e^{-\lambda R}(\alpha-\lambda R-1)
 ```
 
 
-## How to run
-Best to use conda:
-1. make a new environment e.g. named snakemake_env
-    ```bash
-    conda create -n snakemake_env -c conda-forge -c bioconda snakemake
-    ```
-2. activate the new environment
-    ```bash
-    conda activate snakemake_env
-    ```
-3. follow the instructions in the Snakefile to run the scripts
+
 
 
 ## TODO:

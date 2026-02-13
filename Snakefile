@@ -10,10 +10,6 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 from src.auxiliary_functions_framework_organization_using_standard_library import(
     find_latest_solution)
 
-### Get template for input files about reaction network ###
-
-reaction_network_info_dict = load_json("src/_template_reaction_network.json")
-
 ############################################################
 # Step 1: Create a new folder
 # python src/_create_parameters_template.py path_to_new_folder
@@ -38,6 +34,10 @@ all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for 
 rule all:
     input:
         all_outputs
+
+### Get template for input files about reaction network ###
+reaction_network_info_dict = load_json("src/_template_reaction_network.json")
+
 
 rule check_solver_info_validity:
     # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
