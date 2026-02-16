@@ -1,0 +1,10 @@
+executor: slurm
+jobs: 50
+use-conda: true
+
+# Optional but common:
+default-resources:
+  #slurm_partition: "compute"
+  #slurm_account: "myacct"
+  runtime: 5          # minutes
+  mem_mb_per_cpu: 2000 # MB per CPU

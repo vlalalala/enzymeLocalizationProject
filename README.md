@@ -41,6 +41,25 @@ It is easy to use in combination with Anaconda/Miniconda. For usage with Minicon
     ```
 3. follow the instructions in the Snakefile to run the scripts
 
+**Running on a SLURM cluster** (not tested yet):
+1. make an environment
+    ```bash
+    mamba install -c conda-forge -c bioconda snakemake snakemake-executor-plugin-slurm
+    ```
+2. Run Snakemake from a SLURM login/head node (or any node that has access to sbatch). The plugin submits jobs via SLURM.
+3. Run once from the command line:
+    ```bash
+    snakemake \
+    --executor slurm \
+    --jobs 100 \
+    --use-conda \
+    --default-resources \
+    --rerun-incomplete
+    ```
+    or using profile data, run using `snakemake --profile profiles/slurm`
+
+
+
 ## Parameters in the model
 The parameters in the model are those defined in the following files (with example values introduced):
 
@@ -156,6 +175,8 @@ To do so:
 1. Create copies of the template files in the `/src` folder by running `python src/_create_parameters_template.py path_to_new_folder`.
 2. Modify the entries in the `.yaml` and `.csv` files such that each entry contains a list of all the values that entry must take. (If all simulations share one same value for a given parameter, the list has length 1).
 3. Create the files with the same format as above by running `python src/_create_templates_expanded.py path_to_new_folder` and `python src/_create_phase_space.py path_to_new_folder`. The different combinations are in folders that start with `combination*`.
+
+IMPORTANT: it is very important that the ratios between end and start species are written in `" " ` in order that it is read as a string and not a sexagesimal number.
 
 ## Theory
 In spherical symmetry (assuming no angular dependence), the steady-state reaction-diffusion equation becomes

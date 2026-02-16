@@ -14,7 +14,7 @@ from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
 from auxiliary_functions_using_standard_library import (
     find_max_in_nested_dict, all_non_negative, format_sci, pickle_load_binary,
-    load_json, CSVLogger)
+    load_json, CSVLogger, pickle_dump_binary)
 from auxiliary_functions import dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from plot_bvp_solution import plot_steady_state_concentrations, make_newton_iterations_gif, plot_convergence_progress
@@ -25,6 +25,11 @@ from auxiliary_functions_framework_organization_using_standard_library import (
     find_latest_solution, rename_iteration_files)
 from auxiliary_functions_using_scipy import save_newton_iteration_data
 from auxiliary_functions import read_yaml_file
+from enforce_parameter_value_conditions import (
+    return_reaction_network_with_total_fixed_quantity_asserted,
+    return_enzyme_concentrations,
+    assert_no_conflicts_in_enzyme_positioning
+)
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
@@ -478,6 +483,7 @@ if __name__ == "__main__":
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
     SOLVER_PARAMS = read_yaml_file(args.solver_params_file)
     SOLVER_INPUT = read_yaml_file(args.solver_input_file)
+    PARAMETER_VALUE_CONDITIONS = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_value_conditions.yaml")) 
     MAX_NUM_NEWTON_ITERATIONS = args.max_iterations
     min_num_iterations_digits = int(math.log10(MAX_NUM_NEWTON_ITERATIONS)+1)
     os.makedirs(ITERATION_DATA_PATH, exist_ok=True)
@@ -519,14 +525,35 @@ if __name__ == "__main__":
     POINT_INFOS = SYSTEM_MESH_DICT["point_infos"] 
     NEIGHBORS = get_correct_neighbors_dict(SYSTEM_MESH_DICT["neighbors"])
     
-    # Step 3: Put enzyme location information
-    ENZYMES_CONCENTRATIONS = {
-        region_idx : {
-            enzyme : enzyme.concentration if region_idx in enzyme.regions else 0
-            for enzyme in REACTION_NETWORK.enzymes
-        }
-    for region_idx in range(NUM_REGIONS)
-    }
+    # Step 3: Put enzyme location information and assert that conditions are met
+    try:
+        REACTION_NETWORK = return_reaction_network_with_total_fixed_quantity_asserted(
+            PARAMETER_VALUE_CONDITIONS["enzyme_total_fixed_quantity"],
+            REACTION_NETWORK,
+            PARAMETER_VALUE_CONDITIONS["enzyme_whose_quantity_to_modify_when_total_fixed_quantity"]
+        )
+        assert assert_no_conflicts_in_enzyme_positioning(
+            REACTION_NETWORK,
+            NUM_REGIONS,
+            PARAMETER_VALUE_CONDITIONS["enzyme_impossible_combinations"]
+        )
+        ENZYME_CONCENTRATIONS, REACTION_NETWORK = return_enzyme_concentrations(
+            REACTION_NETWORK,
+            MEMBRANE_RADII,
+            PARAMETER_VALUE_CONDITIONS["enzyme_maximum_concentration"]
+        )
+        pickle_dump_binary(
+            os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network_final"),
+            REACTION_NETWORK
+        )
+
+    except Exception as e:
+        # EARLY TERMINATION
+        dump_json(FOLDER_TO_SOLVE,
+                  ".species_steady_state_concentrations",
+                  {"error": f"{e}"})
+        sys.exit()
+
 
     # Step 4: Define structure that saves concentrations at each point and which
     # is updated with every iteration of Newton

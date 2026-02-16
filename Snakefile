@@ -28,6 +28,8 @@ df = "data/test_phase_space"
 df = "examples/simple_decay_without_inner_boundaries"
 df = "examples/simple_decay_with_one_inner_boundary"
 df = "examples/simple_decay_with_two_inner_boundaries"
+df = "data/simple_cycle_system"
+df = "examples/slurm_test"
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 
@@ -134,6 +136,20 @@ rule cleanup_old_iterations:
         with open(output[0], "w") as f:
             f.write("done\n")
 
+rule check_conditions_to_run_met:
+    """Creates a .yaml file with condition: true/false.
+    """
+    input:
+        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
+        conditions = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameter_value_conditions.yaml",
+    output:
+        "{df}/{bn}_{cn}/.validated_conditions"
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/enforce_parameter_value_conditions.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+
 rule solve_boundary_value_problem:
     """The max-iterations condition can be changed as required without deleting anything.
     Automatically finds the latest iteration saved.
@@ -152,6 +168,10 @@ rule solve_boundary_value_problem:
         solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
     conda:
         "config/environment.yaml"
+    threads: 16
+    resources:
+        mem_mb=64000,
+        runtime=240
     shell:
         """
         python src/run_bvp_solver.py \
@@ -181,3 +201,7 @@ rule plot_boundary_value_problem:
 # python src/plot_bvp_solution.py data/test_0 --plot_iteration 40
 ### To have a gif of the iterations of the solver (already before the solver has converged), run on terminal ###
 # python src/plot_bvp_solution.py data/test_0
+
+
+#https://collab.dvb.bayern/spaces/TUMnat/pages/431097554/SLURM+Queuing+system
+#https://collab.dvb.bayern/pages/viewpage.action?spaceKey=TUMnat&title=PH+Theory+Cluster

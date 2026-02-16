@@ -30,9 +30,9 @@ class Participant:
         return f"{self.name}"
 
 class Enzyme(Participant):
-    def __init__(self, name: str, concentration: float, regions: list) -> None:
+    def __init__(self, name: str, quantity: float, regions: list) -> None:
         super().__init__(name)
-        self.concentration = concentration
+        self.quantity = quantity
         self.regions = regions
 
     def __str__(self):
@@ -247,7 +247,6 @@ class System:
         fig.savefig(os.path.join(case_folder,"reaction_network_graph.png"), dpi = 300, bbox_inches='tight')
         plt.close(fig)
 
-#%%
 def create_reaction_network(case_folder, csv_file_names):
     """
     """
