@@ -36,3 +36,4 @@ examples/simple_decay_with_one_inner_boundary/
 !examples/simple_decay_with_two_inner_boundaries/combined_000001/newton_iterations.gif
 
 notes/*
+examples/slurm_test/

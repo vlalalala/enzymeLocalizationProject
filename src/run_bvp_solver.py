@@ -40,7 +40,7 @@ def calculate_reaction_term(current_species_concentrations, region, n, species):
         if isinstance(reaction, SpontaneousReaction):
             term = reaction.k * current_species_concentrations[region][n][reaction.start_species]
         else:
-            term = reaction.k_cat * ENZYMES_CONCENTRATIONS[region][reaction.enzyme] * current_species_concentrations[region][n][reaction.start_species] / (reaction.k_M + current_species_concentrations[region][n][reaction.start_species])
+            term = reaction.k_cat * ENZYME_CONCENTRATIONS[region][reaction.enzyme] * current_species_concentrations[region][n][reaction.start_species] / (reaction.k_M + current_species_concentrations[region][n][reaction.start_species])
         if reaction in species.as_reactant_in: # if acts as reactant, diminishes
             term *= -1
         reaction_term += term
@@ -54,7 +54,7 @@ def calculate_reaction_partial_derivative(current_species_concentrations, reacti
     if isinstance(reaction_to_check, SpontaneousReaction):
         derivative = reaction_to_check.k
     elif isinstance(reaction_to_check, EnzymaticReaction):
-        derivative = reaction_to_check.k_cat * ENZYMES_CONCENTRATIONS[region][reaction_to_check.enzyme] * reaction_to_check.k_M / ( reaction_to_check.k_M + current_species_concentrations[region][n][partial_derivative_species])
+        derivative = reaction_to_check.k_cat * ENZYME_CONCENTRATIONS[region][reaction_to_check.enzyme] * reaction_to_check.k_M / ( reaction_to_check.k_M + current_species_concentrations[region][n][partial_derivative_species])
     if partial_derivative_species == reaction_to_check.start_species:
         derivative *= -1
     return derivative
