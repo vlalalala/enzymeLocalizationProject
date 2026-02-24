@@ -8,6 +8,7 @@ import json
 import pickle
 import glob
 import csv
+import math
 
 def is_int_value(value):
     return float(int(value)) == float(value)
@@ -44,6 +45,8 @@ def format_sci(x: float) -> str:
     """Returns a string, which is a positive float shown through
     scientific notation with 1 decimal and 2-digit exponent.
     """
+    if not math.isfinite(x):
+        return str(x)
     s = f"{x:.1e}"           # e.g. "3.6e-16"
     base, exp = s.split("e")
     exp_num = int(exp)

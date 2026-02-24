@@ -37,3 +37,4 @@ examples/simple_decay_with_one_inner_boundary/
 
 notes/*
 examples/slurm_test/
+data_private/

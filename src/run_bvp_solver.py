@@ -23,17 +23,17 @@ from auxiliary_functions_framework_organization import (
     get_correct_point_ids_dict, get_correct_reverse_point_ids_dict, get_correct_neighbors_dict)
 from auxiliary_functions_framework_organization_using_standard_library import (
     find_latest_solution, rename_iteration_files)
-from auxiliary_functions_using_scipy import save_newton_iteration_data
 from auxiliary_functions import read_yaml_file
 from enforce_parameter_value_conditions import (
     return_reaction_network_with_total_fixed_quantity_asserted,
     return_enzyme_concentrations,
     assert_no_conflicts_in_enzyme_positioning
 )
+from auxiliary_functions_using_scipy import save_newton_iteration_data
+
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
-
     """
     reaction_term = 0
     for reaction in species.as_reactant_in + species.as_product_in:
@@ -54,7 +54,7 @@ def calculate_reaction_partial_derivative(current_species_concentrations, reacti
     if isinstance(reaction_to_check, SpontaneousReaction):
         derivative = reaction_to_check.k
     elif isinstance(reaction_to_check, EnzymaticReaction):
-        derivative = reaction_to_check.k_cat * ENZYME_CONCENTRATIONS[region][reaction_to_check.enzyme] * reaction_to_check.k_M / ( reaction_to_check.k_M + current_species_concentrations[region][n][partial_derivative_species])
+        derivative = reaction_to_check.k_cat * ENZYME_CONCENTRATIONS[region][reaction_to_check.enzyme] * reaction_to_check.k_M / ( reaction_to_check.k_M + current_species_concentrations[region][n][partial_derivative_species])**2
     if partial_derivative_species == reaction_to_check.start_species:
         derivative *= -1
     return derivative
@@ -117,9 +117,9 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
                 # Contributions from diffusion
                 if j_region == region and j_n == n and j_species == species: # j == i, basically
                     J[i,j] += diff * (1/DELTA_R**2 * (-2))
-                elif j_region==region and j==right_n and j_species == species: # same species, right or left
+                elif j_region==region and j_n==right_n and j_species == species: # same species, right or left ###################
                     J[i,j] += diff * (1/DELTA_R**2 + 1/(DELTA_R*r))
-                elif j_region==region and j==left_n and j_species == species: # same species, right or left
+                elif j_region==region and j_n==left_n and j_species == species: # same species, right or left #####################
                     J[i,j] += diff * (1/DELTA_R**2 - 1/(DELTA_R*r))
                 # Contributions from reactions
                 if j_region == region and j_n == center_n: # if on the same place but not necessarily the same species
@@ -524,6 +524,7 @@ if __name__ == "__main__":
     NUM_POINTS = SYSTEM_MESH_DICT["num_points"]
     POINT_INFOS = SYSTEM_MESH_DICT["point_infos"] 
     NEIGHBORS = get_correct_neighbors_dict(SYSTEM_MESH_DICT["neighbors"])
+    print(NUM_POINTS)
     
     # Step 3: Put enzyme location information and assert that conditions are met
     try:

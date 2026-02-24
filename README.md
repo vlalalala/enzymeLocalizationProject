@@ -179,7 +179,7 @@ To do so:
 IMPORTANT: it is very important that the ratios between end and start species are written in `" " ` in order that it is read as a string and not a sexagesimal number.
 
 ## Theory
-In spherical symmetry (assuming no angular dependence), the steady-state reaction-diffusion equation becomes
+In spherical symmetry (assuming no angular dependence), the steady-state reaction-diffusion equation for one species becomes
 
 ```math
 \frac{1}{r^2} \frac{d}{dr} \left( r^2 \frac{du}{dr} \right) + \frac{1}{D_u} R_u(u,v...) = 0 \ ,

@@ -22,6 +22,16 @@ from src.auxiliary_functions_framework_organization_using_standard_library impor
 
 # Step 4: Run rule all
 # snakemake --use-conda --cores 2
+
+# or
+"""
+snakemake \
+--executor slurm \
+--jobs 8 \
+--use-conda \
+--default-resources \
+--rerun-incomplete
+"""
 ############################################################
 
 df = "data/test_phase_space"
@@ -30,7 +40,10 @@ df = "examples/simple_decay_with_one_inner_boundary"
 df = "examples/simple_decay_with_two_inner_boundaries"
 #df = "data/simple_cycle_system"
 #df = "examples/slurm_test"
+df = "data_private/slurm_test"
+
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
+all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 
 rule all:

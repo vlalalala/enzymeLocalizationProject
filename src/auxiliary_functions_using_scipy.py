@@ -1,7 +1,8 @@
-import os
 from scipy.sparse import csr_matrix, coo_matrix
 import numpy as np
+import os
 from auxiliary_functions import dump_json
+
 
 def save_matrix_as_sparse_txt(matrix: np.ndarray, filepath: str):
     """
@@ -16,7 +17,7 @@ def save_matrix_as_sparse_txt(matrix: np.ndarray, filepath: str):
     # Save to .txt
     np.savetxt(filepath+".txt", data, fmt=["%d", "%d", "%.15e"],
                header="row\tcol\tvalue", delimiter="\t", comments='')
-    
+
 def save_newton_iteration_data(
     folder_to_save_in, iter_string, J_to_save, F_to_save,
     species_concentrations_to_save, du_to_save, variables_to_save_dictionary):
