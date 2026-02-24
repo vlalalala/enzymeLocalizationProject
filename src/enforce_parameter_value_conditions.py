@@ -3,6 +3,7 @@ from auxiliary_functions import read_yaml_file
 
 """
 incompatible_enzyme_groups_list: [[A,B], [A,B,C]] # for example
+or null
 """
 
 def return_reaction_network_with_total_fixed_quantity_asserted(enzyme_total_fixed_quantity, reaction_network, enzyme_whose_quantity_to_modify):
@@ -25,6 +26,8 @@ def return_reaction_network_with_total_fixed_quantity_asserted(enzyme_total_fixe
     return reaction_network
 
 def assert_no_conflicts_in_enzyme_positioning(reaction_network, num_regions, enzyme_impossible_combinations):
+    if enzyme_impossible_combinations is None:
+        return True
     enzymes_in_regions = {region_idx: [] for region_idx in range(num_regions)}
     for enzyme in reaction_network.enzymes:
         for region in enzyme.regions:

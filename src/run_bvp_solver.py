@@ -1,4 +1,3 @@
-#%%
 import sys
 import os
 import copy
@@ -30,7 +29,7 @@ from enforce_parameter_value_conditions import (
     assert_no_conflicts_in_enzyme_positioning
 )
 from auxiliary_functions_using_scipy import save_newton_iteration_data
-
+from study_bvp_solution import get_outward_fluxes
 
 def calculate_reaction_term(current_species_concentrations, region, n, species):
     """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
@@ -662,7 +661,10 @@ if __name__ == "__main__":
             iteration_data_folder=ITERATION_DATA_PATH,
             gif_output_folder=FOLDER_TO_SOLVE,
             species_lookup_dict=SPECIES_LOOKUP,
-            system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"])
-
+            system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"]
+        )
     if SOLVER_INPUT["output_options"]["log_convergence_progress"]:
         plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+    
+    fluxes = get_outward_fluxes(species_concentrations_final, REACTION_NETWORK, NUM_REGIONS, NUM_MESH_POINTS_IN_REGIONS)
+    dump_json(FOLDER_TO_SOLVE, "fluxes", fluxes)

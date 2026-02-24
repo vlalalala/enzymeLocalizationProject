@@ -302,8 +302,12 @@ def create_reaction_network(case_folder, csv_file_names):
     system.fill_network()
 
     # Step 5: draw the network graph and save a png file of it
-    system.draw_network(case_folder)
+    #try:
+    #    system.draw_network(case_folder)
+    #except:
+    #    print("Unable to draw network.")
     pickle_dump_binary(os.path.join(case_folder, ".pickled_reaction_network"), system)
+
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]

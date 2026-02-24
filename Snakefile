@@ -26,12 +26,15 @@ from src.auxiliary_functions_framework_organization_using_standard_library impor
 # or
 """
 snakemake \
---executor slurm \
---jobs 8 \
---use-conda \
---default-resources \
---rerun-incomplete
+  --profile config/slurm \
+  --jobs 800 \
+  --rerun-incomplete \
+  --keep-going \
+  --use-conda
 """
+# Get the number of jobs running through squeue --me -h | wc -l
+# --keep-going stops snakemake from submitting jobs once one has not worked
+
 ############################################################
 
 df = "data/test_phase_space"
@@ -40,7 +43,7 @@ df = "examples/simple_decay_with_one_inner_boundary"
 df = "examples/simple_decay_with_two_inner_boundaries"
 #df = "data/simple_cycle_system"
 #df = "examples/slurm_test"
-df = "data_private/slurm_test"
+df = "data_private/slurm_test2"
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
@@ -53,6 +56,7 @@ rule all:
 ### Get template for input files about reaction network ###
 reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
+# Maximum resident set size (kbytes) computed with 2500 mesh points, 4 species, 3 enzymes and 6 reactions.
 
 rule check_solver_info_validity:
     # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
@@ -63,6 +67,10 @@ rule check_solver_info_validity:
         ]
     output:
         touch("{df}/{bn}_{cn}/.validated_solver")
+    threads: 1
+    resources:
+        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71480
+        runtime=6 # 3 minutes
     conda:
         "config/environment.yaml"
     shell:
@@ -80,6 +88,10 @@ rule check_system_geometry_info_validity:
                            ]
     output:
         "{df}/{bn}_{cn}/.expanded_system_geometry.json"
+    threads: 1
+    resources:
+        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71900
+        runtime=10 # 1 minute
     conda:
         "config/environment.yaml"
     shell:
@@ -94,6 +106,10 @@ rule check_reaction_network_info_validity:
             ] + [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json"]
     output:
         touch("{df}/{bn}_{cn}/.validated_reaction_network")
+    threads: 1
+    resources:
+        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 73560
+        runtime=7 # 1 minute
     conda:
         "config/environment.yaml"
     shell:
@@ -104,7 +120,11 @@ rule create_reaction_network:
     input:
         lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_reaction_network"
     output:
-        ["{df}/{bn}_{cn}/.pickled_reaction_network", "{df}/{bn}_{cn}/reaction_network_graph.png"]
+        ["{df}/{bn}_{cn}/.pickled_reaction_network"]
+    threads: 1
+    resources:
+        mem_mb=500, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 136612
+        runtime=10 # 1 minute
     conda:
         "config/environment.yaml"
     shell:
@@ -119,6 +139,10 @@ rule create_system_mesh:
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml"]
     output:
         "{df}/{bn}_{cn}/.expanded_system_mesh.json"
+    threads: 1
+    resources:
+        mem_mb=400, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 112888
+        runtime=10 # 1 minute
     conda:
         "config/environment.yaml"
     shell:
@@ -135,6 +159,10 @@ rule cleanup_old_iterations:
         solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
     output:
         touch("{df}/{bn}_{cn}/.validated_iterations")
+    threads: 1
+    resources:
+        mem_mb=1000, # estimating based on the others.
+        runtime=10 # 1 minute
     run:
         import os, glob
         folder = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
@@ -148,20 +176,6 @@ rule cleanup_old_iterations:
         # mark cleanup as done
         with open(output[0], "w") as f:
             f.write("done\n")
-
-rule check_conditions_to_run_met:
-    """Creates a .yaml file with condition: true/false.
-    """
-    input:
-        network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
-        conditions = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameter_value_conditions.yaml",
-    output:
-        "{df}/{bn}_{cn}/.validated_conditions"
-    conda:
-        "config/environment.yaml"
-    shell:
-        "python src/enforce_parameter_value_conditions.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
 rule solve_boundary_value_problem:
     """The max-iterations condition can be changed as required without deleting anything.
@@ -177,14 +191,14 @@ rule solve_boundary_value_problem:
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 1e6)),
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 100)),
         solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
     conda:
         "config/environment.yaml"
-    threads: 16
+    threads: 1
     resources:
-        mem_mb=64000,
-        runtime=240
+        mem_mb=1000,
+        runtime= 10
     shell:
         """
         python src/run_bvp_solver.py \

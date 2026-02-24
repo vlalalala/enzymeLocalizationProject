@@ -464,7 +464,7 @@ if __name__ == "__main__":
     PLOT_ITERATION = args.plot_iteration
 
     # Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network_final"))
     SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
     SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh.json"))
 
@@ -493,6 +493,7 @@ if __name__ == "__main__":
             iteration_data_folder=ITERATIONS_FOLDER,
             gif_output_folder=FOLDER_TO_SOLVE,
             species_lookup_dict=SPECIES_LOOKUP,
+            system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"]
             )
     else:
         # Find out concentrations file from the iteration number
