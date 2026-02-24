@@ -10,6 +10,19 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 from src.auxiliary_functions_framework_organization_using_standard_library import(
     find_latest_solution)
 
+from snakemake.jobs import Job
+
+def on_success_hook(job: Job):
+    """Print a modified output"""
+    if job.rule == "solve_boundary_value_problem":
+        outputs = " ".join(str(o) for o in job.output)
+        print(f"Finished jobid: {job.jobid} (Rule: {job.rule}) -> {outputs}")
+    else:
+        # For all other rules, print exactly what Snakemake normally prints
+        print(f"Finished jobid: {job.jobid} (Rule: {job.rule})")
+
+onsuccess(on_success_hook)
+
 ############################################################
 # Step 1: Create a new folder
 # python src/_create_parameters_template.py path_to_new_folder
@@ -30,7 +43,8 @@ snakemake \
   --jobs 800 \
   --rerun-incomplete \
   --keep-going \
-  --use-conda
+  --use-conda \
+  --forcerun solve_boundary_value_problem
 """
 # Get the number of jobs running through squeue --me -h | wc -l
 # --keep-going stops snakemake from submitting jobs once one has not worked
@@ -191,14 +205,14 @@ rule solve_boundary_value_problem:
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 100)),
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 1000)),
         solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
     conda:
         "config/environment.yaml"
     threads: 1
     resources:
         mem_mb=1000,
-        runtime= 10
+        runtime= 15
     shell:
         """
         python src/run_bvp_solver.py \

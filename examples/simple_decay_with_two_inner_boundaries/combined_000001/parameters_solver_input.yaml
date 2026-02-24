@@ -1,5 +1,5 @@
 geometry_parameters:
-  num_mesh_points: 25
+  num_mesh_points: 200
 newton_parameters:
   override_adaptive_method: false
 adaptive_step_parameters:

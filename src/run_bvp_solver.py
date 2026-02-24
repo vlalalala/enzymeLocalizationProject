@@ -280,9 +280,9 @@ def adaptive_newton_step(
             raise ValueError("Newton could not decrease the norm of the residual any more.")
         # in case that the backtracking did not work, set alpha_current to initial value
         alpha_current = initial_alpha
-        for i, du_value in enumerate(du):
-            (region, n, species) = REVERSE_POINT_IDS[i]
-            species_concentrations[region][n][species] += alpha_current * du_value
+        #for i, du_value in enumerate(du):
+        #    (region, n, species) = REVERSE_POINT_IDS[i]
+        #    species_concentrations[region][n][species] += alpha_current * du_value
         norm_F_to_return = norm_F_vector
         
     return species_concentrations, alpha_current, successive_unsuccessful_steps, norm_F_to_return
@@ -559,10 +559,11 @@ if __name__ == "__main__":
     # is updated with every iteration of Newton
     # currently, the concentration is initially set to increase linearly with the 
     # radius up until its external concentration
+    max_external_concentration = max([species.external_concentration for species in REACTION_NETWORK.species])
     species_concentrations_guess = {
         region_idx : {
             mesh_point_idx : {
-                species : species.external_concentration #* RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
+                species : max_external_concentration #* RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
                 for species in REACTION_NETWORK.species}
             for mesh_point_idx in range(NUM_MESH_POINTS_IN_REGIONS[region_idx])}
         for region_idx in range(NUM_REGIONS)

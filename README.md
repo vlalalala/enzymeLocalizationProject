@@ -46,9 +46,7 @@ It is easy to use in combination with Anaconda/Miniconda. For usage with Minicon
     ```bash
     mamba install -c conda-forge -c bioconda snakemake snakemake-executor-plugin-slurm
     ```
-2. Run Snakemake from a SLURM login/head node (or any node that has access to sbatch). The plugin submits jobs via SLURM.
-(Reminder to run through a screen `screen -S snakemake` and detatch `screen -r snakemake`)
-3. Run once from the command line:
+2. Run once from the command line:
     ```bash
     snakemake \
     --executor slurm \
@@ -58,6 +56,7 @@ It is easy to use in combination with Anaconda/Miniconda. For usage with Minicon
     --rerun-incomplete
     ```
     or using profile data, run using `snakemake --profile profiles/slurm`
+Alternatively to step 2, if ssh connection can break, submit through `squeue run_all.sh`
 
 
 
