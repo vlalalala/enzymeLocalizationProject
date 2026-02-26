@@ -45,7 +45,7 @@ df = "examples/simple_decay_with_one_inner_boundary"
 df = "examples/simple_decay_with_two_inner_boundaries"
 #df = "data/simple_cycle_system"
 df = "data_private/slurm_test1"
-#df = "data_private/slurm_test2"
+#df = "data_private/test1"
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
@@ -183,7 +183,7 @@ rule solve_boundary_value_problem:
     """The max-iterations condition can be changed as required without deleting anything.
     Automatically finds the latest iteration saved.
     """
-    # snakemake -s Snakefile.smk data/test_0/.species_steady_state_concentrations.json --config max_iterations=1e4 --cores 1 --use-conda
+    # snakemake -s Snakefile data/test_0/.species_steady_state_concentrations.json --config max_iterations=1e4 --cores 1 --use-conda
     input:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
         geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
@@ -193,7 +193,7 @@ rule solve_boundary_value_problem:
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 10000)),
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 1000)),
         solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
     conda:
         "config/environment.yaml"

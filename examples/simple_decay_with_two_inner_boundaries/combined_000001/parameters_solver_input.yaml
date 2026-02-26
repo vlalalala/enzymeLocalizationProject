@@ -1,19 +1,17 @@
 geometry_parameters:
-  num_mesh_points: 200
+  num_mesh_points: 500
 newton_parameters:
   override_adaptive_method: false
 adaptive_step_parameters:
-  initial_alpha: 1.0
-  alpha_min: 0.001
-  alpha_max: 10
+  tau_min: 1.0e-20
+  tau_max: 1.0e-1
   gamma_inc: 1.15
   gamma_dec: 0.5
-  max_num_accepted_successive_unsuccessful_steps: 10
 output_options:
   log_convergence_progress: true
-  save_data_every: 100
+  save_data_every: 10
   create_gif_with_saved_data: true
-  log_iteration_info_every: 100
+  log_iteration_info_every: 10
   delete_data_at_the_end: true
   plot_iteration_data_during_simulation: false
 variables_to_save:

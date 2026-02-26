@@ -1,8 +1,5 @@
 convergence_parameters:
-    tol_relative_value: [1]
-    tol_absolute_factor: [1]
-    tol_residual_factor: [1]
-    tol_relative_flux_deviation: [0.01]
+    tol_relative_flux_deviation: [0.001]
 
 newton_parameters:
-    check_convergence_every: [100]
+    check_convergence_every: [10]

@@ -1,19 +1,85 @@
 import yaml
 from pathlib import Path
 
-def index_options_folder(folder: str | Path, file_ext=".yaml"):
+def get_options_dict(folder: str | Path, file_ext=".yaml"):
+    #index_options_folder
     """
+    Returns a (nested) dictionary for the given folder
+    where the first key is the name of each file with the given extension within that folder
     e.g.
-    alpha_index = index_options_folder("options_alpha")
-    alpha_index["combo_000002.yaml"]["geometry_config"]["outer_membrane_radius"] → 0.5
+    geometry_dict = get_options_dict("options_parameters_geometry")
+    geometry_dict["combo_000002.yaml"]["geometry_config"]["outer_membrane_radius"] → 0.5
     """
     folder = Path(folder)
-    index = {}
+    options_info = {}
     for f in folder.glob(f"*{file_ext}"):
         with open(f) as fd:
             data = yaml.safe_load(fd)
-        index[f.name] = data
-    return index
+        options_info[f.name] = data
+    return options_info
+
+def filter_files_by_param(options_dict, param_path, target_value):
+    """
+    Returns the file names (without the path) of the files where the target value is found
+    within a specific file within a specific path of nested dictionaries.
+
+    options_dict is the output of the function get_options_dict
+    param_path: list of nested keys, e.g., ["geometry_config", "outer_membrane_radius"]
+    target_value: the value we want to filter by
+    
+    e.g. filter_files_by_param(geometry_dict, ["geometry_config", "outer_membrane_radius"], 0.5)
+    can return e.g. ["combo_000002"]
+    """
+    result = []
+    for fname, data in options_dict.items():
+        value = data
+        try:
+            for key in param_path:
+                value = value[key]
+        except KeyError:
+            continue
+        if value == target_value:
+            result.append(fname)
+    return result
+
+
+def filter_combined_folders(combined_root: str | Path, criteria: dict):
+    """
+    combined_root: path containing options_* and combined_* folders
+    criteria: dict like {"options_parameters_geometry": {"geometry_config": {"outer_membrane_radius": 0.5}},
+                          "options_parameters_solver_input": {"some_param": 10}}
+    Returns: list of Path objects to combined folders satisfying all criteria
+    """
+    combined_root = Path(combined_root)
+    result = []
+
+    for folder in sorted(combined_root.glob("combined_*")):
+        match = True
+        for opt_basename, param_dict in criteria.items():
+            opt_file = folder / f"{opt_basename}.yaml"
+            if not opt_file.exists():
+                match = False
+                break
+            with open(opt_file) as f:
+                data = yaml.safe_load(f)
+            # recursive check
+            def check_params(d, p):
+                for k, v in p.items():
+                    if isinstance(v, dict):
+                        if not check_params(d.get(k, {}), v):
+                            return False
+                    else:
+                        if d.get(k) != v:
+                            return False
+                return True
+            if not check_params(data, param_dict):
+                match = False
+                break
+        if match:
+            result.append(folder)
+    return result
+
+
 
 def csv_file_matches_criteria(csv_path: str, conditions: dict) -> bool:
     """
@@ -51,59 +117,7 @@ def filter_option_csv_folder(folder: str, conditions: dict, combo_prefix="combo_
             matches.append(f.name)
     return matches
 
-def filter_files_by_param(index, param_path, target_value):
-    """
-    param_path: list of nested keys, e.g., ["geometry_config", "outer_membrane_radius"]
-    
-    e.g. filter_files_by_param(alpha_index, ["geometry_config", "outer_membrane_radius"], 0.5)
-    """
-    result = []
-    for fname, data in index.items():
-        value = data
-        try:
-            for key in param_path:
-                value = value[key]
-        except KeyError:
-            continue
-        if value == target_value:
-            result.append(fname)
-    return result
 
-def filter_combined_folders(combined_root: str | Path, criteria: dict):
-    """
-    combined_root: path containing combined_* folders
-    criteria: dict like {"alpha": {"geometry_config": {"outer_membrane_radius": 0.5}},
-                          "beta": {"some_param": 10}}
-    Returns: list of Path objects to combined folders satisfying all criteria
-    """
-    combined_root = Path(combined_root)
-    result = []
-
-    for folder in sorted(combined_root.glob("combined_*")):
-        match = True
-        for opt_basename, param_dict in criteria.items():
-            opt_file = folder / f"{opt_basename}.yaml"
-            if not opt_file.exists():
-                match = False
-                break
-            with open(opt_file) as f:
-                data = yaml.safe_load(f)
-            # recursive check
-            def check_params(d, p):
-                for k, v in p.items():
-                    if isinstance(v, dict):
-                        if not check_params(d.get(k, {}), v):
-                            return False
-                    else:
-                        if d.get(k) != v:
-                            return False
-                return True
-            if not check_params(data, param_dict):
-                match = False
-                break
-        if match:
-            result.append(folder)
-    return result
 
 def filter_combined_csv_folders(combined_root: str, criteria_per_option_csv: dict):
     """

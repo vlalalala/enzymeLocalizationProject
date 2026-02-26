@@ -182,28 +182,34 @@ def make_newton_iterations_gif(
 def plot_convergence_progress(
         folder_to_solve,
         reaction_network
-):
+):  
+    # load data from convergence .csv file
     dataframe = pd.read_csv(os.path.join(folder_to_solve, ".convergence_logger.csv"))
-    fig, ax = plt.subplots(2,2, figsize=(6,6))
+    fig, ax = plt.subplots(1,3, figsize=(8,2))
     ax = np.ndarray.flatten(ax)
+
+    # curves in ax[0] should converge to 0
     for species in reaction_network.species:
         ax[0].plot(dataframe["iteration"], dataframe[species.name], label=species.name)
-    ax[1].plot(dataframe["iteration"], dataframe["max_relative_change"])
-    ax[2].plot(dataframe["iteration"], dataframe["max_Delta_u"])
-    ax[3].plot(dataframe["iteration"], dataframe["F_vector_norm"])
-    ax[2].set_xlabel("iteration")
-    ax[3].set_xlabel("iteration")
     ax[0].set_ylabel("relative difference between \n reaction and boundary flux")
+    ax[0].set_xlabel("iteration")
+    ax[0].legend()
+
+    ax[1].plot(dataframe["iteration"], dataframe["F_vector_norm"])
+    ax[1].set_ylabel("residual vector norm")
+    ax[1].set_xlabel("iteration")
+    ax[1].set_yscale('log')
+
+    ax[2].plot(dataframe["iteration"], dataframe["tau"])
+    ax[2].set_ylabel("step size")
+    ax[2].set_xlabel("iteration")
+    ax[2].set_yscale('log')
+
     #ax[0].set_ylabel(
     #    r"Relative difference $\frac{\lvert \Phi_{\text{react}} - \Phi_{\text{bound}} \rvert}"
     #    r"{\max\!\left(\lvert \Phi_{\text{react}} \rvert, \lvert \Phi_{\text{bound}} \rvert\right)}$"
     #)
-    ax[1].set_ylabel("max_relative_change")
-    ax[2].set_ylabel("max_Delta_u")
-    ax[3].set_ylabel("F_vector_norm")
-    ax[2].set_yscale('log')
-    ax[3].set_yscale('log')
-    ax[0].legend()
+    
     fig.tight_layout()
     fig.savefig(os.path.join(folder_to_solve, "convergence.png"), bbox_inches = "tight", dpi=300)
     plt.close()

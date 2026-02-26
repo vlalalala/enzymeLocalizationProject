@@ -270,6 +270,16 @@ For the discretization, we used
 f'(x_i) = \frac{1}{2h}(f_{i+1}-f_{i-1}) + O(h^2)
 ```
 
+**Calculating the residual vector $F$**
+```math
+F_i = \mathrm{diffusion term} + \mathrm{reaction term}
+```
+
+**Calculating the Jacobian matrix**
+```math
+J_{ij} = \frac{\partial F_i}{\partial x_j}
+```
+
 **Calculating the net flux**
 
 As a convergence condition, we establish that the (total) net flux should be close to 0.

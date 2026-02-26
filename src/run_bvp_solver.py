@@ -32,19 +32,7 @@ from enforce_parameter_value_conditions import (
 from auxiliary_functions_using_scipy import save_newton_iteration_data
 from study_bvp_solution import get_outward_fluxes
 
-def calculate_reaction_term(current_species_concentrations, region, n, species):
-    """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
-    """
-    reaction_term = 0
-    for reaction in species.as_reactant_in + species.as_product_in:
-        if isinstance(reaction, SpontaneousReaction):
-            term = reaction.k * current_species_concentrations[region][n][reaction.start_species]
-        else:
-            term = reaction.k_cat * ENZYME_CONCENTRATIONS[region][reaction.enzyme] * current_species_concentrations[region][n][reaction.start_species] / (reaction.k_M + current_species_concentrations[region][n][reaction.start_species])
-        if reaction in species.as_reactant_in: # if acts as reactant, diminishes
-            term *= -1
-        reaction_term += term
-    return reaction_term
+
 
 def calculate_reaction_partial_derivative(current_species_concentrations, reaction_to_check, partial_derivative_species, region, n):
     """ Gives the partial derivative of a reaction to a concentration of a species
@@ -54,7 +42,16 @@ def calculate_reaction_partial_derivative(current_species_concentrations, reacti
     if isinstance(reaction_to_check, SpontaneousReaction):
         derivative = reaction_to_check.k
     elif isinstance(reaction_to_check, EnzymaticReaction):
-        derivative = reaction_to_check.k_cat * ENZYME_CONCENTRATIONS[region][reaction_to_check.enzyme] * reaction_to_check.k_M / ( reaction_to_check.k_M + current_species_concentrations[region][n][partial_derivative_species])**2
+        S = current_species_concentrations[region][n][reaction_to_check.start_species]
+        if partial_derivative_species == reaction_to_check.start_species:
+            derivative = (
+                reaction_to_check.k_cat
+                * ENZYME_CONCENTRATIONS[region][reaction_to_check.enzyme]
+                * reaction_to_check.k_M
+                / (reaction_to_check.k_M + S)**2
+            )
+        else:
+            derivative = 0.0
     if partial_derivative_species == reaction_to_check.start_species:
         derivative *= -1
     return derivative
@@ -86,6 +83,20 @@ def get_pore_density_occupation_information(current_species_concentrations, info
     total_occupied_pore_density = sum(occupied_pore_density.values())
     return concentration_rate_ratio_factor, sum_concentration_rate_ratio_factor, occupied_pore_density, total_occupied_pore_density
 
+def calculate_reaction_term(current_species_concentrations, region, n, species):
+    """ Gives the reaction term for F_i (for a specific species at a specific point in the mesh).
+    """
+    reaction_term = 0
+    for reaction in species.as_reactant_in + species.as_product_in:
+        if isinstance(reaction, SpontaneousReaction):
+            term = reaction.k * current_species_concentrations[region][n][reaction.start_species]
+        else:
+            term = reaction.k_cat * ENZYME_CONCENTRATIONS[region][reaction.enzyme] * current_species_concentrations[region][n][reaction.start_species] / (reaction.k_M + current_species_concentrations[region][n][reaction.start_species])
+        if reaction in species.as_reactant_in: # if acts as reactant, diminishes
+            term *= -1
+        reaction_term += term
+    return reaction_term
+
 def define_newton_residual_and_optionally_jacobian(current_species_concentrations, fill_jacobian = True):
     """Defines the residual vector F and the jacobian matrix J (not sparse) 
     (the latter only if fill_jacobian is set to True (default)).
@@ -112,6 +123,7 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
             # FILL IN J_ij
             if not fill_jacobian:
                 continue
+            # j is that by which we are applying the derivative to F_i
             for j in range(NUM_POINTS):
                 (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
                 # Contributions from diffusion
@@ -122,10 +134,31 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
                 elif j_region==region and j_n==left_n and j_species == species: # same species, right or left #####################
                     J[i,j] += diff * (1/DELTA_R**2 - 1/(DELTA_R*r))
                 # Contributions from reactions
-                if j_region == region and j_n == center_n: # if on the same place but not necessarily the same species
+                # if we are looking at the right position in the mesh (position in the mesh of j is the same as of i)
+                if j_region == region and j_n == center_n:
+                    # we look at all reactions in which the species from i is involved
                     for reaction in species.as_reactant_in + species.as_product_in:
-                        if j_species in [reaction.start_species, reaction.end_species]:
-                            J[i,j] += calculate_reaction_partial_derivative(current_species_concentrations, reaction, j_species, region, center_n)
+                        # but only the derivative with respect to the substrate matters
+                        if j_species != reaction.start_species:
+                            continue
+                        # get concentration of substrate
+                        S = current_species_concentrations[region][center_n][reaction.start_species]
+                        # if the reaction is spontaneous
+                        if isinstance(reaction, SpontaneousReaction):
+                            base = reaction.k # sign is placed afterwards
+                        else: #EnzymaticReaction
+                            base = (
+                                reaction.k_cat
+                                * ENZYME_CONCENTRATIONS[region][reaction.enzyme]
+                                * reaction.k_M
+                                / (reaction.k_M + S)**2
+                            )
+                        # Apply sign
+                        if species == reaction.start_species:
+                            J[i,j] += -base
+                        elif species == reaction.end_species:
+                            J[i,j] += +base
+ 
         elif point_type == "l":
             if region==0: # deal with r=0 point, no membrane
                 (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
@@ -144,10 +177,193 @@ def define_newton_residual_and_optionally_jacobian(current_species_concentration
                     elif j_region == region and j_n == 1 and j_species == species: # partial derivative to the one on the right
                         J[i,j] += 3 * diff / DELTA_R**2 * 2
                     # Contributions from reactions
-                    if j_region == region and j_n == n: # if on the same place but not necessarily the same species
+                    if j_region == region and j_n == n:# if on the same place but not necessarily the same species
+                        # we look at all reactions in which the species from i is involved
                         for reaction in species.as_reactant_in + species.as_product_in:
-                            if j_species in [reaction.start_species, reaction.end_species]:
-                                J[i,j] += calculate_reaction_partial_derivative(current_species_concentrations, reaction, j_species, region, n)
+                            # but only the derivative with respect to the substrate matters
+                            if j_species != reaction.start_species:
+                                continue
+                            # get concentration of substrate
+                            S = current_species_concentrations[region][n][reaction.start_species]
+                            # if the reaction is spontaneous
+                            if isinstance(reaction, SpontaneousReaction):
+                                base = reaction.k # sign is placed afterwards
+                            else: #EnzymaticReaction
+                                base = (
+                                    reaction.k_cat
+                                    * ENZYME_CONCENTRATIONS[region][reaction.enzyme]
+                                    * reaction.k_M
+                                    / (reaction.k_M + S)**2
+                                )
+                            # Apply sign
+                            if species == reaction.start_species:
+                                J[i,j] += -base
+                            elif species == reaction.end_species:
+                                J[i,j] += +base
+
+
+
+            else: # deal with left-most point within region (except r=0)
+                (prev_region, prev_region_last_n), (_, _), (_, _) = NEIGHBORS[(region, n)]
+                c_prev_region_last = current_species_concentrations[prev_region][prev_region_last_n][species]
+                c_region_first = current_species_concentrations[region][0][species]
+                c_region_second = current_species_concentrations[region][1][species]
+                F[i] = diff  * (c_region_second - c_region_first) / DELTA_R - species.permeability_constant * (c_region_first - c_prev_region_last)
+                if not fill_jacobian:
+                    continue
+                for j in range(NUM_POINTS):
+                    (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    # Contributions from diffusion
+                    if j_region == region and j_n == n and j_species == species:
+                        J[i,j] += -diff/DELTA_R - species.permeability_constant
+                    elif j_region == region and j_species == species and j_n == 1:
+                        J[i,j] += diff/DELTA_R
+                    elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
+                        J[i,j] += -species.permeability_constant
+                    # No contributions from reactions (flux considered)
+
+        else: # point_type == "r"
+            if region == NUM_REGIONS-1: # deal with r=R point
+                (_, rR_neighbor_n), (_, rR_n) = NEIGHBORS[(region, n)]
+                c_rR_neighbor = current_species_concentrations[region][rR_neighbor_n][species]
+                c_rR = current_species_concentrations[region][rR_n][species]
+                F[i] = diff * (c_rR - c_rR_neighbor) / DELTA_R - species.permeability_constant * (species.external_concentration - c_rR)
+                if not fill_jacobian:
+                    continue
+                # CONSTRUCT J_ij
+                for j in range(NUM_POINTS):
+                    (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    if j_region == region and j_n == n and j_species == species: # basically i=j
+                        J[i,j] += diff/DELTA_R + species.permeability_constant
+                    elif j_region == region and j_species == species and j_n == rR_neighbor_n:
+                        J[i,j] += -diff/DELTA_R
+
+            else: # deal with right-most point within region (except r=R)
+                (_, _), (_, _), (next_region, _) = NEIGHBORS[(region, n)]
+                c_second_to_last = current_species_concentrations[region][n-1][species]
+                c_last = current_species_concentrations[region][n][species]
+                c_next_region_first = current_species_concentrations[next_region][0][species]
+                F[i] = diff * (c_last - c_second_to_last) / DELTA_R - species.permeability_constant * (c_next_region_first - c_last)
+                if not fill_jacobian:
+                    continue
+                for j in range(NUM_POINTS):
+                    (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    if j_region == region and j_n == n and j_species == species: # basically i=j
+                        J[i,j] += diff/DELTA_R + species.permeability_constant
+                    elif j_region == region and j_species == species and j_n == n-1:
+                        J[i,j] += -diff/DELTA_R
+                    elif j_region == next_region and j_species == species and j_n == 0:
+                        J[i,j] += species.permeability_constant
+
+    if fill_jacobian:
+        return F, J
+    else:
+        return F, _
+
+def define_newton_residual_and_optionally_jacobian_efficient(current_species_concentrations, fill_jacobian = True):
+    """Defines the residual vector F and the jacobian matrix J (not sparse) 
+    (the latter only if fill_jacobian is set to True (default)).
+    Returns either F, _ or F, J.    
+    """
+    F = np.zeros(NUM_POINTS)
+    if fill_jacobian:
+        J = lil_matrix((NUM_POINTS, NUM_POINTS))# np.zeros((NUM_POINTS, NUM_POINTS)) 
+    for i in range(NUM_POINTS):
+        (region, n, species) = REVERSE_POINT_IDS[i]
+        r = RADII[region][n]
+        diff = species.diffusion_constant
+        point_type = POINT_INFOS[region][n]
+        # CONSTRUCT F_i
+        # FOR EACH POINT WITHIN THE BULK
+        if point_type == "i":
+            (_, left_n), (_, center_n), (_, right_n) = NEIGHBORS[(region, n)]
+            c_left = current_species_concentrations[region][left_n][species]
+            c_center = current_species_concentrations[region][center_n][species]
+            c_right = current_species_concentrations[region][right_n][species]
+            diffusion_term = diff * (1/ DELTA_R**2 * (c_right - 2* c_center + c_left) + 1 /(DELTA_R*r) * (c_right - c_left))
+            reaction_term = calculate_reaction_term(current_species_concentrations, region, center_n, species)
+            F[i] = diffusion_term + reaction_term
+            # FILL IN J_ij
+            if not fill_jacobian:
+                continue
+            # j is that by which we are applying the derivative to F_i
+            # diffusion center
+            j = POINT_IDS[(region, n, species)]
+            J[i, j] += diff * (-2 / DELTA_R**2)
+
+            # diffusion right
+            j = POINT_IDS[(region, right_n, species)]
+            J[i, j] += diff * (1/DELTA_R**2 + 1/(DELTA_R*r))
+
+            # diffusion left
+            j = POINT_IDS[(region, left_n, species)]
+            J[i, j] += diff * (1/DELTA_R**2 - 1/(DELTA_R*r))
+
+            # reactions
+            for reaction in species.as_reactant_in + species.as_product_in:
+                j = POINT_IDS[(region, n, reaction.start_species)]
+                # get concentration of substrate
+                S = current_species_concentrations[region][center_n][reaction.start_species]
+                # if the reaction is spontaneous
+                if isinstance(reaction, SpontaneousReaction):
+                    base = reaction.k # sign is placed afterwards
+                else: #EnzymaticReaction
+                    base = (
+                        reaction.k_cat
+                        * ENZYME_CONCENTRATIONS[region][reaction.enzyme]
+                        * reaction.k_M
+                        / (reaction.k_M + S)**2
+                    )
+                # Apply sign
+                if species == reaction.start_species:
+                    J[i,j] += -base
+                elif species == reaction.end_species:
+                    J[i,j] += +base
+        
+        elif point_type == "l":
+            if region==0: # deal with r=0 point, no membrane
+                (_, r0_n), (_, r0_neighbor_n) = NEIGHBORS[(region, n)]
+                c_r0 = current_species_concentrations[region][r0_n][species]
+                c_r0_neighbor = current_species_concentrations[region][r0_neighbor_n][species]
+                diffusion_term = 3 * diff / DELTA_R**2 * 2 * (c_r0_neighbor - c_r0)
+                reaction_term = calculate_reaction_term(current_species_concentrations, region, r0_n, species)
+                F[i] = diffusion_term + reaction_term
+                if not fill_jacobian:
+                    continue
+                for j in range(NUM_POINTS):
+                    (j_region, j_n, j_species) = REVERSE_POINT_IDS[j]
+                    # Contributions from diffusion
+                    if j_region == region and j_n == 0 and j_species == species: # j == i, basically
+                        J[i,j] += -3 * diff / DELTA_R**2 * 2
+                    elif j_region == region and j_n == 1 and j_species == species: # partial derivative to the one on the right
+                        J[i,j] += 3 * diff / DELTA_R**2 * 2
+                    # Contributions from reactions
+                    if j_region == region and j_n == n:# if on the same place but not necessarily the same species
+                        # we look at all reactions in which the species from i is involved
+                        for reaction in species.as_reactant_in + species.as_product_in:
+                            # but only the derivative with respect to the substrate matters
+                            if j_species != reaction.start_species:
+                                continue
+                            # get concentration of substrate
+                            S = current_species_concentrations[region][n][reaction.start_species]
+                            # if the reaction is spontaneous
+                            if isinstance(reaction, SpontaneousReaction):
+                                base = reaction.k # sign is placed afterwards
+                            else: #EnzymaticReaction
+                                base = (
+                                    reaction.k_cat
+                                    * ENZYME_CONCENTRATIONS[region][reaction.enzyme]
+                                    * reaction.k_M
+                                    / (reaction.k_M + S)**2
+                                )
+                            # Apply sign
+                            if species == reaction.start_species:
+                                J[i,j] += -base
+                            elif species == reaction.end_species:
+                                J[i,j] += +base
+
+
+
             else: # deal with left-most point within region (except r=0)
                 (prev_region, prev_region_last_n), (_, _), (_, _) = NEIGHBORS[(region, n)]
                 c_prev_region_last = current_species_concentrations[prev_region][prev_region_last_n][species]
@@ -217,7 +433,7 @@ def compute_newton_step(species_concentrations):
     du = spsolve(J_sparse, -F_vector)
     return F_vector, J_sparse, du
 
-def adaptive_newton_step_new(
+def adaptive_newton_step(
     species_concentrations,
     tau_current,
     adaptive_step_parameters,
@@ -226,6 +442,7 @@ def adaptive_newton_step_new(
     # Unpack parameters
     tau_min = adaptive_step_parameters.get("tau_min")
     tau_max = adaptive_step_parameters.get("tau_max")
+    tau_max = 1.0e-1 ####################################################################remove
     gamma_inc = adaptive_step_parameters.get("gamma_inc")
     gamma_dec = adaptive_step_parameters.get("gamma_dec")
     
@@ -236,133 +453,27 @@ def adaptive_newton_step_new(
     norm_NF = np.linalg.norm(NF)
     t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) # step size
     du = t_n * NF
+    species_concentrations_try = copy.deepcopy(species_concentrations)
     for i, du_value in enumerate(du):
         (region, n, species) = REVERSE_POINT_IDS[i]
-        species_concentrations[region][n][species] +=  du_value
-        if species_concentrations[region][n][species] < 0:
-            raise ValueError("negative concentration found!")          
-    F_norm_new = np.linalg.norm(F_vector)
-    # if the norm failed to decrease, make the tolerance tau smaller
+        species_concentrations_try[region][n][species] +=  du_value
+        if species_concentrations_try[region][n][species] < 0:
+            tau_new = tau_current * gamma_dec
+            if tau_new < tau_min:
+                raise ValueError("negative values!")
+            return species_concentrations, tau_new, last_F_norm
+    F_vector_new, _ = define_newton_residual_and_optionally_jacobian(species_concentrations_try, fill_jacobian=False)
+    F_norm_new = np.linalg.norm(F_vector_new)
+
     if F_norm_new < last_F_norm:
         tau_new = min(tau_max, tau_current * gamma_inc)
+        return species_concentrations_try, tau_new, F_norm_new
+
     else:
         tau_new = tau_current * gamma_dec
-        #if tau_new < tau_min:
-        #   raise ValueError("Newton could not decrease the norm of the residual any more.")
-    return species_concentrations, tau_new, F_norm_new
-
-
-def adaptive_newton_step_old(
-    species_concentrations,
-    alpha_current,
-    successive_unsuccessful_steps,
-    adaptive_step_parameters,
-    ):
-    """
-    Perform one Newton step with adaptive step length (alpha may be >1).
-    Returns (next_species_concentrations, alpha_current) where info is dict with diagnostics.
-    """
-    # Step 0: Unpack parameters
-    initial_alpha = adaptive_step_parameters.get("initial_alpha")
-    alpha_min = adaptive_step_parameters.get("alpha_min")
-    alpha_max = adaptive_step_parameters.get("alpha_max")
-    gamma_inc = adaptive_step_parameters.get("gamma_inc")
-    gamma_dec = adaptive_step_parameters.get("gamma_dec")
-    max_accepted_successive_unsuccessful_steps = adaptive_step_parameters.get("max_num_accepted_successive_unsuccessful_steps")
-    # Steps 1-3: Compute du (see compute_newton_step)
-    F_vector, _, du = compute_newton_step(species_concentrations)
-    norm_F_vector = np.linalg.norm(F_vector)
-    if norm_F_vector == 0:
-        return species_concentrations, alpha_current, 0, 0
-    # Step 4: Attempt alpha > 1 first (grow from previous alpha_current)
-    alpha_try = min(alpha_current * gamma_inc, alpha_max)
-    success = False
-    while True:
-        species_concentrations_try = copy.deepcopy(species_concentrations)
-        for i, du_value in enumerate(du):
-            (i_region, i_n, i_species) = REVERSE_POINT_IDS[i]
-            species_concentrations_try[i_region][i_n][i_species] += alpha_try * du_value
-        # Step 5: Check that all new concentrations are still positive (=0 included)
-        # If some negative concentrations, decrease alpha. If alpha is already really small,
-        # will later exit without success
-        if not all_non_negative(species_concentrations_try):
-            alpha_try *= gamma_dec
-            if alpha_try < alpha_min:
-                break
-            continue
-        # Step 6: Compute trial residual
-        F_vector_try, _ = define_newton_residual_and_optionally_jacobian(
-            species_concentrations_try, fill_jacobian=False)
-        norm_F_vector_try = np.linalg.norm(F_vector_try)
-        # Step 7: Accept if residual decreased
-        if norm_F_vector_try < norm_F_vector:
-            species_concentrations = species_concentrations_try
-            alpha_current = min(alpha_try * gamma_inc, alpha_max)
-            success = True
-            successive_unsuccessful_steps = 0
-            norm_F_to_return = norm_F_vector_try
-            break
-        # otherwise shrink alpha and retry
-        alpha_try *= gamma_dec
-        if alpha_try < alpha_min:
-            break
-    # If the backtracking never worked, add 1 to number of unsuccessful steps
-    if success is False:
-        successive_unsuccessful_steps += 1
-        print("An unsuccessful step occurred", flush = True)
-        # If there are many unsuccessful steps, that means that it is not possible
-        # to decrease the residual more given the mesh step size
-        if successive_unsuccessful_steps > max_accepted_successive_unsuccessful_steps: #######################################################
-            raise ValueError("Newton could not decrease the norm of the residual any more.")
-        # in case that the backtracking did not work, set alpha_current to initial value
-        alpha_current = initial_alpha
-        #for i, du_value in enumerate(du):
-        #    (region, n, species) = REVERSE_POINT_IDS[i]
-        #    species_concentrations[region][n][species] += alpha_current * du_value
-        norm_F_to_return = norm_F_vector
-        
-    return species_concentrations, alpha_current, successive_unsuccessful_steps, norm_F_to_return
-
-
-def check_convergence_via_jacobian_and_residual(
-        current_species_concentrations, convergence_parameters, get_full_info):
-    """
-    Returns true if convergence fulfilled (see below); false if not
-    """
-    if get_full_info:
-        info = {"max_relative_change": 0, "max_Delta_u":0.0, "F_vector_norm":0.0}
-    else:
-        info = {}
-    convergence = True
-    # Step 0: Unpack parameters
-    tol_rel = convergence_parameters.get("tol_relative", 1)
-    tol_abs = convergence_parameters.get("tol_absolute", 1)
-    tol_res = convergence_parameters.get("tol_residual", 1)
-    # Step 1: Get du from concentrations
-    F_vector, _, du = compute_newton_step(current_species_concentrations)
-    # Step 2: Check that the norm of the residual is small
-    F_vector_norm = np.linalg.norm(F_vector)
-    if get_full_info:
-        info["F_vector_norm"] = F_vector_norm
-        info["max_Delta_u"] = max(du)
-    if F_vector_norm > tol_res:
-        convergence = False
-        if not get_full_info: # early return in case no convergence and no need for full info
-            return convergence, {}
-    # Step 3: Check that each node has had a very small relative change
-    # (In case the node has a very small value, have the change be smaller than some absolute value)
-    for i, du_value in enumerate(du):
-        (region, n, species) = REVERSE_POINT_IDS[i]
-        node_u = current_species_concentrations[region][n][species]
-        max_tolerated_relative_change = tol_rel * node_u
-        if get_full_info:
-            info["max_relative_change"] = max(info["max_relative_change"], max_tolerated_relative_change)
-        if du_value > max(tol_abs, max_tolerated_relative_change):
-            convergence = False
-            if not get_full_info: # early return in case no convergence and no need for full info
-                return convergence, {}
-    return convergence, info
-
+        if tau_new < tau_min:
+           raise ValueError("Newton could not decrease the norm of the residual any more.")
+        return species_concentrations, tau_new, F_norm_new
 
 def check_convergence_via_flux_equilibrium(
         current_species_concentrations, convergence_parameters, get_full_info):
@@ -421,7 +532,6 @@ def solve_newton(
         variables_to_save_dictionary,
         save_data_every,
         check_convergence_every,
-        adaptive,
         log_convergence_info,
         convergence_info_logger_path,
         log_iteration_info_every,
@@ -431,59 +541,28 @@ def solve_newton(
     save_data_every and check_convergence_every N iterations. If not to be done, set each to 0.
     """
     current_species_concentrations = initial_species_concentrations
-    current_alpha = adaptive_step_parameters["initial_alpha"]
-    current_successive_unsuccessful_steps = 0
     early_convergence = False # tracks whether the system fin
     convergence_info_logger = CSVLogger(convergence_info_logger_path)
-    adaptive_step_parameters = {"tau_min":1e-20, "tau_max": 1e-1, "gamma_inc": 1.2, "gamma_dec":0.5}
-    tau_current = adaptive_step_parameters["tau_min"]
-    last_F_norm = 1
+    tau_current = convergence_parameters["initial_tau"]
+    last_F_norm = 1e10
     for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
                      file=sys.stderr,
                      total=int(max_num_newton_iterations),
                      initial=initial_iteration_number):
-        # Improve species concentration estimate
-        if adaptive == False:
-            _, _, du = compute_newton_step(current_species_concentrations)
-            for i, du_value in enumerate(du):
-                (region, n, species) = REVERSE_POINT_IDS[i]
-                current_species_concentrations[region][n][species] +=  du_value
-            if log_iteration_info_every != 0 and iter%log_iteration_info_every==0 :
-                print(f"No step adaptation:\n"
-                      f"iteration: {iter}\n"
-                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
+        try:
+            current_species_concentrations, tau_current, last_F_norm = adaptive_newton_step(
+                current_species_concentrations,
+                tau_current,
+                adaptive_step_parameters,
+                last_F_norm
                 )
-        else:
-            try:
-                current_species_concentrations, tau_current, last_F_norm = adaptive_newton_step_new(
-                    current_species_concentrations,
-                    tau_current,
-                    adaptive_step_parameters,
-                    last_F_norm
-                    )
-            except: # once the adaptive method cannot further decrease the norm of the residual, break
+        except ValueError as e: # once the adaptive method cannot further decrease the norm of the residual, break
+            if "Newton" in str(e):
                 early_convergence = "Newton failed to decrease the norm any further"
-                break
-            if log_iteration_info_every != 0 and iter%log_iteration_info_every==0 :
-                print(f"Step adaptation:\n"
-                      f"iteration: {iter}\n"
-                      f"tau: {tau_current}\n",
-                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
-                )
-            """
-            try:
-                current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, current_F_norm = adaptive_newton_step(
-                    current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)
-            except: # once the adaptive method cannot further decrease the norm of the residual, break
-                early_convergence = "Newton failed to decrease the norm any further"
-                break
-            if log_iteration_info_every != 0 and iter%log_iteration_info_every==0 :
-                print(f"Step adaptation:\n"
-                      f"iteration: {iter}\n"
-                      f"alpha: {current_alpha}, current successive unsuccessful steps: {current_successive_unsuccessful_steps}\n",
-                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
-                )
-            """
+            elif "negative" in str(e):
+                early_convergence = "failure due to negative concentration"
+            break
+
         # Save result if needed
         if save_data_every !=0 and (iter+1)%save_data_every==0:
             F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
@@ -510,15 +589,14 @@ def solve_newton(
                 convergence_parameters,
                 get_full_info=log_convergence_info
             )
-            convergence_jacobian_residual, info_jacobian_residual = check_convergence_via_jacobian_and_residual(
-                current_species_concentrations,
-                convergence_parameters,
-                get_full_info=log_convergence_info
-            )
+            info_flux_equilibration.update({
+                "runtime": f"{time.time() - simulation_start_time:.3f} seconds",
+                "tau": float(tau_current),
+                "F_vector_norm": float(last_F_norm)
+            })
             if log_convergence_info:
-                info = info_flux_equilibration | info_jacobian_residual
-                convergence_info_logger.log(iter, info)
-            if convergence_flux_equilibration and convergence_jacobian_residual:
+                convergence_info_logger.log(iter, info_flux_equilibration)
+            if convergence_flux_equilibration:
                 early_convergence = True
                 break
     return current_species_concentrations, early_convergence
@@ -654,20 +732,16 @@ if __name__ == "__main__":
     
     # Step 5: Define convergence criterion
     convergence_parameters = {
-        "tol_relative":SOLVER_PARAMS["convergence_parameters"]["tol_relative_value"],
-        # tol_absolute is the tolerance of the maximum value of Delta u;
-        # max_guess_concentration gives the order of magnitude in which solutions are expected to be
-        "tol_absolute":max_guess_concentration*SOLVER_PARAMS["convergence_parameters"]["tol_absolute_factor"],
-        "tol_residual":np.linalg.norm(F_vector_guess)*SOLVER_PARAMS["convergence_parameters"]["tol_residual_factor"],
         "tol_relative_flux_deviation": SOLVER_PARAMS["convergence_parameters"]["tol_relative_flux_deviation"],
+        "initial_tau": 1#F_vector_guess*1.0e-5, # settting the initial value of tau close to F_vector_guess
     }
 
     # Important: save output for checking. tqdm is excluded
     print(f"Opening log file for {FOLDER_TO_SOLVE}.")
     with open(os.path.join(FOLDER_TO_SOLVE, ".newton_solver.log"), "a") as f, redirect_stdout(f):
         print(f"Starting solver from iteration number {initial_iteration_number} \n")
-        print("convergence parameters",
-            {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()}, "\n")
+        #print("convergence parameters",
+        #    {k: float(f"{v:.2e}") for k, v in convergence_parameters.items()}, "\n")
         # Step 6: Run solver (timed)
         start_time = time.time()
         species_concentrations_final, early_convergence = solve_newton(
@@ -680,7 +754,6 @@ if __name__ == "__main__":
             variables_to_save_dictionary = SOLVER_INPUT["variables_to_save"],
             save_data_every=SOLVER_INPUT["output_options"]["save_data_every"],
             check_convergence_every=SOLVER_PARAMS["newton_parameters"]["check_convergence_every"],
-            adaptive = not SOLVER_INPUT["newton_parameters"]["override_adaptive_method"], #########################################################
             log_iteration_info_every = SOLVER_INPUT["output_options"]["log_iteration_info_every"],
             log_convergence_info = SOLVER_INPUT["output_options"]["log_convergence_progress"],
             convergence_info_logger_path=os.path.join(FOLDER_TO_SOLVE, ".convergence_logger.csv"),
