@@ -10,18 +10,6 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 from src.auxiliary_functions_framework_organization_using_standard_library import(
     find_latest_solution)
 
-from snakemake.jobs import Job
-
-def on_success_hook(job: Job):
-    """Print a modified output"""
-    if job.rule == "solve_boundary_value_problem":
-        outputs = " ".join(str(o) for o in job.output)
-        print(f"Finished jobid: {job.jobid} (Rule: {job.rule}) -> {outputs}")
-    else:
-        # For all other rules, print exactly what Snakemake normally prints
-        print(f"Finished jobid: {job.jobid} (Rule: {job.rule})")
-
-onsuccess(on_success_hook)
 
 ############################################################
 # Step 1: Create a new folder
@@ -40,7 +28,7 @@ onsuccess(on_success_hook)
 """
 snakemake \
   --profile config/slurm \
-  --jobs 800 \
+  --jobs 1 \
   --rerun-incomplete \
   --keep-going \
   --use-conda \
@@ -56,8 +44,8 @@ df = "examples/simple_decay_without_inner_boundaries"
 df = "examples/simple_decay_with_one_inner_boundary"
 df = "examples/simple_decay_with_two_inner_boundaries"
 #df = "data/simple_cycle_system"
-#df = "examples/slurm_test"
-df = "data_private/slurm_test2"
+df = "data_private/slurm_test1"
+#df = "data_private/slurm_test2"
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
@@ -205,7 +193,7 @@ rule solve_boundary_value_problem:
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 1000)),
+        max_iterations = lambda wildcards: int(config.get("max_iterations", 10000)),
         solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
     conda:
         "config/environment.yaml"

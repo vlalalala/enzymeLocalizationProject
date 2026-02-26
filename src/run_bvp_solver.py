@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 import argparse
 from tqdm import tqdm
 import numpy as np
+import scipy
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import lil_matrix
 import matplotlib.pyplot as plt
@@ -216,7 +217,42 @@ def compute_newton_step(species_concentrations):
     du = spsolve(J_sparse, -F_vector)
     return F_vector, J_sparse, du
 
-def adaptive_newton_step(
+def adaptive_newton_step_new(
+    species_concentrations,
+    tau_current,
+    adaptive_step_parameters,
+    last_F_norm
+    ):
+    # Unpack parameters
+    tau_min = adaptive_step_parameters.get("tau_min")
+    tau_max = adaptive_step_parameters.get("tau_max")
+    gamma_inc = adaptive_step_parameters.get("gamma_inc")
+    gamma_dec = adaptive_step_parameters.get("gamma_dec")
+    
+    # From "An adaptive Newton-method based on a dynamical systems approach" paper
+    F_vector, J_matrix = define_newton_residual_and_optionally_jacobian(species_concentrations)
+    J_sparse = J_matrix.tocsc()
+    NF = -spsolve(J_sparse, F_vector)
+    norm_NF = np.linalg.norm(NF)
+    t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) # step size
+    du = t_n * NF
+    for i, du_value in enumerate(du):
+        (region, n, species) = REVERSE_POINT_IDS[i]
+        species_concentrations[region][n][species] +=  du_value
+        if species_concentrations[region][n][species] < 0:
+            raise ValueError("negative concentration found!")          
+    F_norm_new = np.linalg.norm(F_vector)
+    # if the norm failed to decrease, make the tolerance tau smaller
+    if F_norm_new < last_F_norm:
+        tau_new = min(tau_max, tau_current * gamma_inc)
+    else:
+        tau_new = tau_current * gamma_dec
+        #if tau_new < tau_min:
+        #   raise ValueError("Newton could not decrease the norm of the residual any more.")
+    return species_concentrations, tau_new, F_norm_new
+
+
+def adaptive_newton_step_old(
     species_concentrations,
     alpha_current,
     successive_unsuccessful_steps,
@@ -399,6 +435,9 @@ def solve_newton(
     current_successive_unsuccessful_steps = 0
     early_convergence = False # tracks whether the system fin
     convergence_info_logger = CSVLogger(convergence_info_logger_path)
+    adaptive_step_parameters = {"tau_min":1e-20, "tau_max": 1e-1, "gamma_inc": 1.2, "gamma_dec":0.5}
+    tau_current = adaptive_step_parameters["tau_min"]
+    last_F_norm = 1
     for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
                      file=sys.stderr,
                      total=int(max_num_newton_iterations),
@@ -416,6 +455,23 @@ def solve_newton(
                 )
         else:
             try:
+                current_species_concentrations, tau_current, last_F_norm = adaptive_newton_step_new(
+                    current_species_concentrations,
+                    tau_current,
+                    adaptive_step_parameters,
+                    last_F_norm
+                    )
+            except: # once the adaptive method cannot further decrease the norm of the residual, break
+                early_convergence = "Newton failed to decrease the norm any further"
+                break
+            if log_iteration_info_every != 0 and iter%log_iteration_info_every==0 :
+                print(f"Step adaptation:\n"
+                      f"iteration: {iter}\n"
+                      f"tau: {tau_current}\n",
+                      f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
+                )
+            """
+            try:
                 current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, current_F_norm = adaptive_newton_step(
                     current_species_concentrations, current_alpha, current_successive_unsuccessful_steps, adaptive_step_parameters)
             except: # once the adaptive method cannot further decrease the norm of the residual, break
@@ -427,6 +483,7 @@ def solve_newton(
                       f"alpha: {current_alpha}, current successive unsuccessful steps: {current_successive_unsuccessful_steps}\n",
                       f"after {time.time() - simulation_start_time:.3f} seconds of runtime.\n", flush=True
                 )
+            """
         # Save result if needed
         if save_data_every !=0 and (iter+1)%save_data_every==0:
             F_vector, J_matrix, du = compute_newton_step(current_species_concentrations)
@@ -623,7 +680,7 @@ if __name__ == "__main__":
             variables_to_save_dictionary = SOLVER_INPUT["variables_to_save"],
             save_data_every=SOLVER_INPUT["output_options"]["save_data_every"],
             check_convergence_every=SOLVER_PARAMS["newton_parameters"]["check_convergence_every"],
-            adaptive = not SOLVER_INPUT["newton_parameters"]["override_adaptive_method"],
+            adaptive = not SOLVER_INPUT["newton_parameters"]["override_adaptive_method"], #########################################################
             log_iteration_info_every = SOLVER_INPUT["output_options"]["log_iteration_info_every"],
             log_convergence_info = SOLVER_INPUT["output_options"]["log_convergence_progress"],
             convergence_info_logger_path=os.path.join(FOLDER_TO_SOLVE, ".convergence_logger.csv"),

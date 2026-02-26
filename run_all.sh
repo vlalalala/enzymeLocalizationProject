@@ -18,3 +18,4 @@ snakemake \
     --rerun-incomplete \
     --keep-going \
     --printshellcmds
+#    --forcerun solve_boundary_value_problem

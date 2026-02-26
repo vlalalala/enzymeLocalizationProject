@@ -7,8 +7,8 @@ from auxiliary_functions_using_standard_library import load_json
 def create_convergence_file():
     # Create file with information on convergence
     subfolders = sorted([
-    p for p in Path(FOLDER_TO_STUDY).iterdir()
-    if p.is_dir() and p.name.startswith("combined_")
+        p for p in Path(FOLDER_TO_STUDY).iterdir()
+        if p.is_dir() and p.name.startswith("combined_")
     ])
 
     convergence_data = {}
