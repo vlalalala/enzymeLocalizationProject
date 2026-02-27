@@ -1,6 +1,149 @@
 import yaml
 from pathlib import Path
+import pandas as pd
 
+def filter_combined_folders_yaml_criteria(combined_root: str | Path, criteria_per_option_yaml: dict):
+    """
+    combined_root: path containing options_* and combined_* folders
+    criteria: dict like {"options_parameters_geometry": {"geometry_config": {"outer_membrane_radius": 0.5}},
+                          "options_parameters_solver_input": {"some_param": 10}}
+    Returns: list of Path objects to combined folders satisfying all criteria (combined_*)
+
+    Example:
+    filter_combined_folders(
+        "../data_private/slurm_test2",
+        {
+            "options_parameters_geometry": {
+                "geometry_config": {
+                    "outer_membrane_radius": 1.0e-5
+                }
+            },
+            "options_parameters_solver_input": {
+                "geometry_parameters" : {
+                    "num_mesh_points":400
+                }
+            }
+        }
+    )
+    """
+    combined_root = Path(combined_root)
+    result = []
+
+    for folder in sorted(combined_root.glob("combined_*")):
+        match = True
+        for options_folder_name, param_dict in criteria_per_option_yaml.items():
+
+            # Extract the '*' from 'options_*'
+            if not options_folder_name.startswith("options_"):
+                raise ValueError(f"{options_folder_name} must start with 'options_'")
+
+            basename = options_folder_name[len("options_"):]
+            opt_file = folder / f"{basename}.yaml"
+            
+            if not opt_file.exists():
+                match = False
+                break
+            with open(opt_file) as f:
+                data = yaml.safe_load(f)
+            # recursive check
+            def check_params(d, p):
+                for k, v in p.items():
+                    if isinstance(v, dict):
+                        if not check_params(d.get(k, {}), v):
+                            return False
+                    else:
+                        if d.get(k) != v:
+                            return False
+                return True
+            if not check_params(data, param_dict):
+                match = False
+                break
+        if match:
+            result.append(folder)
+    return result
+
+def csv_file_matches_criteria(csv_path: str | Path, conditions: dict) -> bool:
+    """
+    Example:
+    csv_file_matches_criteria(
+        "../data_private/slurm_test2/options_species/combo_000001.csv",
+        {"name": {"Z": {"external_concentration": 0}}}
+    )
+
+    Returns True if the file satisfies all conditional constraints.
+    (if there are no conditional constraints, it returns True)
+    """
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        raise FileNotFoundError(f"The file {csv_path} does not exist.")
+    df = pd.read_csv(csv_path, dtype=str)  # keep everything as string
+    for trigger_column, trigger_map in conditions.items():
+        if trigger_column not in df.columns:
+            return False
+        for trigger_value, required_dict in trigger_map.items():
+            # Select rows where trigger_column == trigger_value
+            mask = df[trigger_column] == str(trigger_value)
+            if not mask.any():
+                # No such rows → nothing to check
+                continue
+            for required_column, required_value in required_dict.items():
+                if required_column not in df.columns:
+                    return False
+                # Check that ALL selected rows satisfy the requirement
+                if not df.loc[mask, required_column].eq(str(required_value)).all():
+                    return False
+    return True
+
+def filter_combined_folders_csv_criteria(
+    combined_root: str | Path,
+    criteria_per_option_csv: dict,
+):
+    """
+    Example:
+    filter_combined_folders_csv_criteria(
+        "../data_private/slurm_test2",
+        {
+            "options_enzymes": {"name": {"A": {"regions": "[0]"}}}
+        }
+    )
+    """
+    combined_root = Path(combined_root)
+    result = []
+    for folder in sorted(combined_root.glob("combined_*")):
+        match = True
+        for options_folder_name, conditions in criteria_per_option_csv.items():
+            if not options_folder_name.startswith("options_"):
+                raise ValueError(
+                    f"{options_folder_name} must start with 'options_'"
+                )
+            # Extract the * part
+            basename = options_folder_name[len("options_"):]
+            csv_file = folder / f"{basename}.csv"
+            if not csv_file.exists():
+                match = False
+                break
+            if not csv_file_matches_criteria(csv_file, conditions):
+                match = False
+                break
+        if match:
+            result.append(folder)
+    return result
+
+def filter_combined_folders(
+    combined_root: str | Path,
+    criteria_yaml,
+    criteria_csv,
+):
+    csv_matches = filter_combined_folders_csv_criteria(
+        combined_root, criteria_csv
+    )
+    yaml_matches = filter_combined_folders_yaml_criteria(
+        combined_root, criteria_yaml
+    )
+    return list(set(csv_matches) & set(yaml_matches))
+
+# %%
+####################### obsolete ####################################
 def get_options_dict(folder: str | Path, file_ext=".yaml"):
     #index_options_folder
     """
@@ -11,6 +154,8 @@ def get_options_dict(folder: str | Path, file_ext=".yaml"):
     geometry_dict["combo_000002.yaml"]["geometry_config"]["outer_membrane_radius"] → 0.5
     """
     folder = Path(folder)
+    if not folder.exists():
+        raise FileNotFoundError(f"The folder {folder} does not exist.")
     options_info = {}
     for f in folder.glob(f"*{file_ext}"):
         with open(f) as fd:
@@ -43,119 +188,18 @@ def filter_files_by_param(options_dict, param_path, target_value):
     return result
 
 
-def filter_combined_folders(combined_root: str | Path, criteria: dict):
-    """
-    combined_root: path containing options_* and combined_* folders
-    criteria: dict like {"options_parameters_geometry": {"geometry_config": {"outer_membrane_radius": 0.5}},
-                          "options_parameters_solver_input": {"some_param": 10}}
-    Returns: list of Path objects to combined folders satisfying all criteria
-    """
-    combined_root = Path(combined_root)
-    result = []
-
-    for folder in sorted(combined_root.glob("combined_*")):
-        match = True
-        for opt_basename, param_dict in criteria.items():
-            opt_file = folder / f"{opt_basename}.yaml"
-            if not opt_file.exists():
-                match = False
-                break
-            with open(opt_file) as f:
-                data = yaml.safe_load(f)
-            # recursive check
-            def check_params(d, p):
-                for k, v in p.items():
-                    if isinstance(v, dict):
-                        if not check_params(d.get(k, {}), v):
-                            return False
-                    else:
-                        if d.get(k) != v:
-                            return False
-                return True
-            if not check_params(data, param_dict):
-                match = False
-                break
-        if match:
-            result.append(folder)
-    return result
-
-
-
-def csv_file_matches_criteria(csv_path: str, conditions: dict) -> bool:
-    """
-    csv_path: path to CSV file
-    conditions: dict mapping column to dict of condition value → required value
-        Example: {
-            "name": {"A": "R_alpha", "B": "R_beta"},
-        }
-        Meaning: if row[name] == "A" → row["regions"] == "R_alpha"
-                 if row[name] == "B" → row["regions"] == "R_beta"
+def filter_option_csv_folder(options_folder: str, conditions: dict, combo_prefix="combo_"):
+    """ Returns a list of all csv files within the options folder
+    that conform to the conditions.
     Example:
-    conditions = {
-        "name": {
-            "A": "R_alpha",
-            "B": "R_beta",
-        }
-    }
-
-    matches = csv_file_matches_criteria("options_foo/combo_00001.csv", conditions)
-    print(matches)  # True/False
+    filter_option_csv_folder(
+        "../data_private/slurm_test2/options_enzymes",
+        {"name": {"A": {"regions": "[0]"}}}
+    )
     """
-    df = pd.read_csv(csv_path, dtype=str)  # all as strings
-    for col, mapping in conditions.items():
-        for val, required_region in mapping.items():
-            mask = df[col] == val
-            if not df.loc[mask, "regions"].eq(required_region).all():
-                return False
-    return True
-
-def filter_option_csv_folder(folder: str, conditions: dict, combo_prefix="combo_"):
-    folder = Path(folder)
+    folder = Path(options_folder)
     matches = []
     for f in folder.glob(f"{combo_prefix}*.csv"):
         if csv_file_matches_criteria(f, conditions):
             matches.append(f.name)
     return matches
-
-
-
-def filter_combined_csv_folders(combined_root: str, criteria_per_option_csv: dict):
-    """
-    criteria_per_option_csv: dict mapping option folder basename → filter dict
-    Example:
-        {
-            "foo": {"name": {"A": "R_alpha", "B": "R_beta"}},
-            "bar": {"some_col": {"X": "Y"}}
-        }
-
-        criteria_per_option_csv = {
-        "foo": {"name": {"A": "R_alpha", "B": "R_beta"}},
-        "bar": {"id": {"X": "1"}},  # could mix CSV and YAML similarly
-    }
-
-    matching_folders = filter_combined_csv_folders("all_combos", criteria_per_option_csv)
-    print(matching_folders)
-    """
-    combined_root = Path(combined_root)
-    result = []
-
-    for folder in sorted(combined_root.glob("combined_*")):
-        match = True
-        for option_basename, conditions in criteria_per_option_csv.items():
-            csv_file = folder / f"{option_basename}.csv"
-            if not csv_file.exists() or not csv_file_matches_criteria(csv_file, conditions):
-                match = False
-                break
-        if match:
-            result.append(folder)
-    return result
-
-"""
-criteria = {
-    "alpha": {"geometry_config": {"outer_membrane_radius": 0.5}},
-    "beta": {"some_param": 10},
-}
-
-matching_folders = filter_combined_folders("all_combos", criteria)
-print("Folders that match criteria:", matching_folders)
-"""

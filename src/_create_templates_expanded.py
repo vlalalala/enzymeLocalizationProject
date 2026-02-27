@@ -81,6 +81,17 @@ def parse_value(raw):
                     continue
                 for x in final_elements_from_item:
                     complete_values_list.append(x)
+            elif item.startswith("logspace:"):
+                _, start, stop, num = item.split(":")
+                if not is_int_value(num):
+                    raise ValueError(f"The number of array elements given through {item} is not valid.")
+                final_elements_from_item = list(
+                    float(x) for x in np.logspace(float(start), float(stop), int(num)))
+                if string_encodes_list:
+                    complete_values_list.append(final_elements_from_item)
+                    continue
+                for x in final_elements_from_item:
+                    complete_values_list.append(x)
             else:
                 complete_values_list.append(item)
         else:

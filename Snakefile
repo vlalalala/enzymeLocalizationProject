@@ -28,7 +28,7 @@ from src.auxiliary_functions_framework_organization_using_standard_library impor
 """
 snakemake \
   --profile config/slurm \
-  --jobs 1 \
+  --jobs 216 \
   --rerun-incomplete \
   --keep-going \
   --use-conda \
@@ -44,7 +44,7 @@ df = "examples/simple_decay_without_inner_boundaries"
 df = "examples/simple_decay_with_one_inner_boundary"
 df = "examples/simple_decay_with_two_inner_boundaries"
 #df = "data/simple_cycle_system"
-df = "data_private/slurm_test1"
+df = "data_private/slurm_test2"
 #df = "data_private/test1"
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
@@ -93,7 +93,7 @@ rule check_system_geometry_info_validity:
     threads: 1
     resources:
         mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71900
-        runtime=10 # 1 minute
+        runtime=12 # 1 minute
     conda:
         "config/environment.yaml"
     shell:
@@ -200,7 +200,7 @@ rule solve_boundary_value_problem:
     threads: 1
     resources:
         mem_mb=1000,
-        runtime= 15
+        runtime= 20
     shell:
         """
         python src/run_bvp_solver.py \

@@ -3,7 +3,6 @@ from pathlib import Path
 from auxiliary_functions import dump_json
 from auxiliary_functions_using_standard_library import load_json
 
-
 def create_convergence_file():
     # Create file with information on convergence
     subfolders = sorted([
