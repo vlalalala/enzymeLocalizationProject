@@ -90,5 +90,7 @@ def check_validity_file(case_directory, file_name):
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
-    for file_name in ["parameters_solver_input", "parameters_solver_params"]:
-        solver_info_nested_dict = check_validity_file(folder_to_check_validity, f"{file_name}.yaml")
+    file_to_check_validity = sys.argv[2]
+    if file_to_check_validity not in ["parameters_solver_input", "parameters_solver_params"]:
+        raise ValueError(f"Cannot check validity of the file.")
+    solver_info_nested_dict = check_validity_file(folder_to_check_validity, f"{file_to_check_validity}.yaml")

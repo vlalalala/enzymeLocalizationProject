@@ -139,34 +139,39 @@ def make_newton_iterations_gif(
         else:
             for file in files:
                 png_file = png_file = os.path.splitext(file)[0] + ".png"
-                os.remove(png_file)
+                if os.path.isfile(png_file):
+                    os.remove(png_file)
 
     # Create concentration files
     png_files_created = []
     print("creating files for gif", file_to_create)
     for file in tqdm(files, file=sys.stderr):
         png_file = os.path.splitext(file)[0] + ".png" # remove .json
-        if os.path.isfile(png_file):
-            continue
-        number = int(re.findall(r"\d+", os.path.basename(png_file))[0])+1
-        number_with_max_digits = f"{number:0{digit_count}d}"
-        species_concentrations_to_plot_dict_with_strings = load_json(file)
-        species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
-            species_concentrations_to_plot_dict_with_strings, species_lookup_dict)
-        fig, ax = plot_steady_state_concentrations(
-            reaction_network=reaction_network,
-            num_regions=num_regions,
-            num_mesh_points_in_regions=num_mesh_points_in_regions,
-            radii=radii,
-            membrane_radii=membrane_radii,
-            output_file_name=None,
-            species_concentrations_to_plot=species_concentrations_to_plot_dict,
-            system_geometry_dict=system_geometry_dict,
-            title = f"iteration #{number_with_max_digits}",
-            ymax = max_y)
-        fig.savefig(png_file, dpi = 300)
-        plt.close(fig)
-        png_files_created.append(png_file)
+        if not os.path.isfile(png_file):
+            # create it
+            number = int(re.findall(r"\d+", os.path.basename(png_file))[0]) + 1
+            number_with_max_digits = f"{number:0{digit_count}d}"
+
+            species_concentrations_to_plot_dict_with_strings = load_json(file)
+            species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
+                species_concentrations_to_plot_dict_with_strings, species_lookup_dict)
+
+            fig, ax = plot_steady_state_concentrations(
+                reaction_network=reaction_network,
+                num_regions=num_regions,
+                num_mesh_points_in_regions=num_mesh_points_in_regions,
+                radii=radii,
+                membrane_radii=membrane_radii,
+                output_file_name=None,
+                species_concentrations_to_plot=species_concentrations_to_plot_dict,
+                system_geometry_dict=system_geometry_dict,
+                title=f"iteration #{number_with_max_digits}",
+                ymax=max_y)
+
+            fig.savefig(png_file, dpi=300)
+            plt.close(fig)
+
+        png_files.append(png_file)
     # Put all the pngs together
     print("creating gif", file_to_create)
     with imageio.get_writer(file_to_create, mode="I", loop=0, duration=0.1) as writer:
@@ -210,7 +215,7 @@ def plot_convergence_progress(
     #    r"{\max\!\left(\lvert \Phi_{\text{react}} \rvert, \lvert \Phi_{\text{bound}} \rvert\right)}$"
     #)
     
-    fig.tight_layout()
+    #fig.tight_layout()
     fig.savefig(os.path.join(folder_to_solve, "convergence.png"), bbox_inches = "tight", dpi=300)
     plt.close()
 

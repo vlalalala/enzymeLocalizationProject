@@ -515,7 +515,8 @@ def check_convergence_via_flux_equilibrium(
         relative_deviation = abs(reaction_fluxes[species] + boundary_fluxes[species]) / max(abs(boundary_fluxes[species]), abs(reaction_fluxes[species]))
         if get_full_info:
             info[species] = relative_deviation
-        if relative_deviation > tol_relative_flux_deviation:
+        if (tol_relative_flux_deviation <= relative_deviation <= 1 - tol_relative_flux_deviation
+                or relative_deviation >= 1 + tol_relative_flux_deviation):
             convergence = False
             if not get_full_info: # if we do not need the full info, early return
                 return convergence, {}
@@ -770,7 +771,7 @@ if __name__ == "__main__":
             f"with early convergence: {early_convergence}")
 
     dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", species_concentrations_final)
-    
+
     plot_steady_state_concentrations(
         reaction_network=REACTION_NETWORK,
         num_regions=NUM_REGIONS,
@@ -781,21 +782,3 @@ if __name__ == "__main__":
         species_concentrations_to_plot = species_concentrations_final,
         system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"]
     )
-
-    if SOLVER_INPUT["output_options"]["create_gif_with_saved_data"]:
-        make_newton_iterations_gif(
-            reaction_network=REACTION_NETWORK,
-            num_regions=NUM_REGIONS,
-            num_mesh_points_in_regions=NUM_MESH_POINTS_IN_REGIONS,
-            radii=RADII,
-            membrane_radii=MEMBRANE_RADII,
-            iteration_data_folder=ITERATION_DATA_PATH,
-            gif_output_folder=FOLDER_TO_SOLVE,
-            species_lookup_dict=SPECIES_LOOKUP,
-            system_geometry_dict=SYSTEM_GEOMETRY_DICT["geometry_config"]
-        )
-    if SOLVER_INPUT["output_options"]["log_convergence_progress"]:
-        plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
-    
-    fluxes = get_outward_fluxes(species_concentrations_final, REACTION_NETWORK, NUM_REGIONS, NUM_MESH_POINTS_IN_REGIONS)
-    dump_json(FOLDER_TO_SOLVE, "fluxes", fluxes)

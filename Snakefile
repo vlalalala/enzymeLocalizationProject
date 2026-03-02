@@ -10,6 +10,11 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 from src.auxiliary_functions_framework_organization_using_standard_library import(
     find_latest_solution)
 
+#########
+# TODO: new snakemake rule. inputs factor for mesh and resolves everything
+# with that factor mesh. (int). takes .species_steady_state_concentrations.json
+# and interpolates
+#########
 
 ############################################################
 # Step 1: Create a new folder
@@ -50,6 +55,7 @@ df = "data_private/slurm_test2"
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
+all_outputs = [os.path.join(f, ".completed_visualization") for f in sim_folders]
 
 rule all:
     input:
@@ -60,15 +66,14 @@ reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
 # Maximum resident set size (kbytes) computed with 2500 mesh points, 4 species, 3 enzymes and 6 reactions.
 
-rule check_solver_info_validity:
+rule check_solver_input_validity:
     # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
     input:
         lambda wildcards: [
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
         ]
     output:
-        touch("{df}/{bn}_{cn}/.validated_solver")
+        touch("{df}/{bn}_{cn}/.validated_solver_input")
     threads: 1
     resources:
         mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71480
@@ -76,7 +81,7 @@ rule check_solver_info_validity:
     conda:
         "config/environment.yaml"
     shell:
-        "python src/check_solver_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/check_solver_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn} parameters_solver_input"
 
 
 rule check_system_geometry_info_validity:
@@ -86,7 +91,7 @@ rule check_system_geometry_info_validity:
     # snakemake -s Snakefile.smk data/test_0/.system_geometry_expanded.json --cores 1 --use-conda
     input:
         lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_geometry.yaml",
-                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver",
+                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver_input",
                            ]
     output:
         "{df}/{bn}_{cn}/.expanded_system_geometry.json"
@@ -179,6 +184,24 @@ rule cleanup_old_iterations:
         with open(output[0], "w") as f:
             f.write("done\n")
 
+rule check_solver_params_validity:
+    # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
+    input:
+        lambda wildcards: [
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml",
+        ]
+    output:
+        touch("{df}/{bn}_{cn}/.validated_solver_params")
+    threads: 1
+    resources:
+        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71480
+        runtime=6 # 3 minutes
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/check_solver_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn} parameters_solver_params"
+
+
 rule solve_boundary_value_problem:
     """The max-iterations condition can be changed as required without deleting anything.
     Automatically finds the latest iteration saved.
@@ -188,6 +211,7 @@ rule solve_boundary_value_problem:
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
         geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
         solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
+        solver_params_validated = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver_params" 
         system_mesh = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_mesh.json",
         cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_iterations",
     output:
@@ -214,8 +238,29 @@ rule plot_boundary_value_problem:
     """Rule is not meant to be chained to other rules.
     """
     # snakemake -s Snakefile data/test_phase_space/combined_000001/.completed_visualization --cores 1 --use-conda
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.species_steady_state_concentrations.json"
     output:
         touch("{df}/{bn}_{cn}/.completed_visualization")
+    conda:
+        "config/environment.yaml"
+    threads: 1
+    resources:
+        mem_mb=1000,
+        runtime= 20
+    shell:
+        """
+        python src/plot_bvp_solution.py \
+            {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+        """
+
+rule increase_mesh_size:
+    """This rule can be run to increase the number of mesh points in case convergence has not taken place
+    """
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.species_steady_state_concentrations.json"
+    output:
+        touch("{df}/{bn}_{cn}/.completed_refinement_check")
     conda:
         "config/environment.yaml"
     shell:
