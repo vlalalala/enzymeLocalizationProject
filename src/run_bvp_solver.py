@@ -510,16 +510,25 @@ def check_convergence_via_flux_equilibrium(
             - current_species_concentrations[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1][species])
     # Since we are simulating the steady state, we want the total net flux to be 0 for each species
     # Because of numerics, we need some tolerance
+    species_convergence = {species: None for species in REACTION_NETWORK.species}
     for species in REACTION_NETWORK.species:
         #print(species.name, reaction_fluxes[species], boundary_fluxes[species], flush=True)
         relative_deviation = abs(reaction_fluxes[species] + boundary_fluxes[species]) / max(abs(boundary_fluxes[species]), abs(reaction_fluxes[species]))
         if get_full_info:
             info[species] = relative_deviation
-        if (tol_relative_flux_deviation <= relative_deviation <= 1 - tol_relative_flux_deviation
-                or relative_deviation >= 1 + tol_relative_flux_deviation):
+        if relative_deviation <= tol_relative_flux_deviation:
+            species_convergence[species] = 0
+        elif (1 - tol_relative_flux_deviation <= relative_deviation <= 1 + tol_relative_flux_deviation):
+            species_convergence[species] = 1
+        else:
             convergence = False
             if not get_full_info: # if we do not need the full info, early return
                 return convergence, {}
+    # In case all species have a relative deviation of around 1, this should not count
+    # towards convergence, since this may occur at the beginning
+    if all(species_convergence[species]==1 for species in REACTION_NETWORK.species):
+        convergence = False
+            
     return convergence, info
 
 
