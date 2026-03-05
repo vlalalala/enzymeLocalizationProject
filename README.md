@@ -1,3 +1,9 @@
+---
+fontsize: 10pt
+papersize: a4
+geometry: margin=0.75in
+---
+
 # Numerical solver of chemical reactions within concentric spherical semi-permeable membranes
 
 This code is for calculating the steady state concentrations of substances placed in a spherically symmetrical system of semi-permeable membranes, where the concentration of  each of substances outside the exterior membrane is kept constant. Spontaneous and enzymatic reactions can be defined (enzymes can be placed in the regions between semi-permeable membranes) and an arbitrary number of semi-permeable membranes can be used. The boundary problem is solved numerically through the Newton method. The solver comes to an end once it is not possible to further reduce the norm of the residual with the given mesh or once the net flux (reaction flux + boundary flux) of each species is "close enough" to 0 (see below for more details).
@@ -42,9 +48,9 @@ It is easy to use in combination with Anaconda/Miniconda. For usage with Minicon
 3. follow the instructions in the Snakefile to run the scripts
 
 **Running on a SLURM cluster** (not tested yet):
-1. make an environment
+1. make an environment/install the following packages
     ```bash
-    mamba install -c conda-forge -c bioconda snakemake snakemake-executor-plugin-slurm
+    conda install -c conda-forge -c bioconda snakemake snakemake-executor-plugin-slurm
     ```
 2. Run once from the command line:
     ```bash
@@ -56,7 +62,7 @@ It is easy to use in combination with Anaconda/Miniconda. For usage with Minicon
     --rerun-incomplete
     ```
     or using profile data, run using `snakemake --profile profiles/slurm`
-Alternatively to step 2, if ssh connection can break, submit through `squeue run_all.sh`
+Alternatively to step 2, if ssh connection can break, submit through `sbatch run_all.sh`
 
 
 
@@ -179,105 +185,125 @@ To do so:
 IMPORTANT: it is very important that the ratios between end and start species are written in `" " ` in order that it is read as a string and not a sexagesimal number.
 
 ## Theory
-In spherical symmetry (assuming no angular dependence), the steady-state reaction-diffusion equation for one species becomes
+We start from the reaction-diffusion system in a steady state
+```math
+0 = D_s \nabla^2 c_s + R_s(\bm{c})
+```
+In spherical symmetry (assuming no angular dependence), the steady-state reaction-diffusion equation (for each species) becomes
 
 ```math
-\frac{1}{r^2} \frac{d}{dr} \left( r^2 \frac{du}{dr} \right) + \frac{1}{D_u} R_u(u,v...) = 0 \ ,
+\frac{1}{r^2} \frac{\mathrm{d}}{\mathrm{d}r} \left( r^2 \frac{\mathrm{d}c_s}{\mathrm{d}r} \right) + \frac{1}{D_s} R_s(\bm{c}) = 0 \ ,
 ```
 which simplifies to
 ```math
-\frac{d^2u}{dr^2} + \frac{2}{r} \frac{du}{dr} + \frac{1}{D_u} R_u(u,v...) = 0 \ .
+\frac{\mathrm{d}^2 c_s}{\mathrm{d}r^2} + \frac{2}{r} \frac{\mathrm{d}c_s}{\mathrm{d}r} + \frac{1}{D_u} R_s(\bm{c}) = 0 
+```
+(note the singularity at $r=0$).
+
+Since there are concentration jumps at the membranes, we discretize the interval $[0,R]$ with the following procedure:
+<div style="background-color: white; display: inline-block; padding: 10px;">
+  <img src="notes/discretization.png">
+</div>
+
+We have $M = R/h+1$ "positions" for mesh points.
+Given $S$ species and $N$ compartments (i.e. $N-1$ inner membranes) we have a system of $(M+N+1) \cdot S$ equations.
+
+There are $S \cdot [2 + (N-1)\cdot 2] = 2SN$ boundary conditions (since for each of the S species we have one BC at $r=0$, one BC at $r=R$ and one BC at each side of each inner membrane).
+
+For the discretization of space, we use
+```math
+f^\prime(x_i) = \frac{1}{2h}(f_{i+1}-f_{i-1}) + O(h^2) \\[1em]
+f^{\prime\prime}(x_i) \approx \frac{1}{h^2}(f_{i+1}-2f_i + f_{i-1})
+```
+with $h$ the distance between adjacent mesh points (within the same region).
+
+For each interior point, we have
+```math
+0 = D_s \cdot \left( \frac{c_s^\mathrm{right} - 2 \cdot c_s^\mathrm{center} + c_s^\mathrm{left}}{h^2} + \frac{c_s^\mathrm{right} - c_s^\mathrm{left}}{h \cdot r}\right) + R_s\left(\bm{c}^\mathrm{center}\right)
 ```
 
-(Note the singularity at $r=0$).
-
-Using
+For the points at $r=0$, we get
 ```math
-\begin{cases}
-y_0 = u \\
-y_1 = \frac{du}{dr} \\\end{cases}
+\nabla^2 c(0) = 3 \frac{\partial^2 c}{\partial r^2}(0)
 ```
-we define each of the $2^\mathrm{nd}$ order differential equations (one for each species) as 2 $1^\mathrm{st}$ order differential equations of the form
+using l'Hospital rule.
+Using $c_{-1} = c_1$ we get
 ```math
-\begin{cases}
-\frac{dy_0}{dr} = y_1 \\
-\frac{dy_1}{dr} = -\frac{2}{r} y_1 - \frac{1}{D} R_y(y_0, z_0...)
-\end{cases}
-```
-
-As for the boundary conditions:
-
-At $r=0$ we use reflection
-```math
-\frac{du}{dr}(0) = 0
+\nabla^2 c_s(0) = 3 \cdot D_s / h^2 \cdot 2 \cdot (c_s^\mathrm{right} - c_s^\mathrm{center})
 ```
 such that
 ```math
-\left(\frac{dy_0}{dr}(0) = \right)\ \  y_1(0) = 0
-```
-and at $r=R$ we have
-```math
-\frac{du}{dr}(R) = [u_\mathrm{ext} − u(R)] \cdot \frac{p_u}{D_u}
-```
-such that
-```math
-y_1(R) = \left(u_{ext} - y_0(R)\right) \cdot \frac{p_u}{D_u}
-```
-with $p_u$ and $D_u$ the permeability to each membrane and diffusion constant for substance $u$, respectively.
-
-**Matrix formulation**:
-
-Given $m$ species and $n$ compartments (i.e. $n-1$ inner membranes at $r_i$ with $i \in \{1,2,...,n-1\} $) we have $m \cdot [2 + (n-1)\cdot 2] = 2mn$ boundary conditions (since for each species we have one BC at $r=0$, one BC at $r=R$, one BC at each side of each inner membrane).
-
-In order to use the Newton method to solve the whole system, we define $2\cdot m\cdot n$ variables, with $k\in \{0, 1, ..., n-1\}$
-
-```math
-v_k^{(m)} \coloneqq u_k^{(m)}
-```
-```math
-w_k^{(m)} \coloneqq \frac{\mathrm{d}u_k^{(m)}}{\mathrm{d}r}
-```
-with their derivatives given by
-```math
-\frac{\mathrm{d}v_k^{(m)}}{\mathrm{d}r} = w_k^{(m)}
-```
-```math
-\frac{\mathrm{d}w_k^{(m)}}{\mathrm{d}r} = -\frac{2}{r} w_k^{(m)}-\frac{1}{D}R(\vec{v}_k)
+0 = 3 \cdot D_s / h^2 \cdot 2 \cdot (c_s^\mathrm{right} - c_s^\mathrm{center}) + R_s\left(\bm{c}^\mathrm{center}\right)
 ```
 
-The boundary conditions are then given by
+For the points at semipermeable membranes, we use
 ```math
-w^{(m)}(0) = 0
+0 = D_s \cdot \frac{c_s^\mathrm{right} - c_s^\mathrm{center,+}}{h} - p_s \cdot (c_s^\mathrm{center, +} - c_s^\mathrm{center, -})
 ```
-for the interior boundary condition, (Neumann, no-flux BC),
+for the points at the right of the semipermeable membrane, and
 ```math
-w^{(m)}(R) = \left(u_\mathrm{ext} - v^{(m)}(R)\right) \cdot \frac{p^{(m)}}{D^{(m)}}
-```
-for the condition at the outer-most membrane, and
-```math
-w_i^{(m)}(r_i^+) =  \frac{p^{(m)}}{D} \cdot \left( v_{i}^{(m)}(r_i^+) - v_{i-1}^{(m)}(r_i^-)\right)
-```
-```math
-w_{i-1}^{(m)}(r_i^-) =  \frac{p^{(m)}}{D} \cdot \left( v_{i}^{(m)}(r_i^+) - v_{i-1}^{(m)}(r_i^-)\right)
-```
-for the inner membranes (i.e. Robin BC).
-
-There is a concentration jump at the membranes, but the flux is continuous.
-
-For the discretization, we used
-
-```math
-f'(x_i) = \frac{1}{2h}(f_{i+1}-f_{i-1}) + O(h^2)
+0 = D_s \cdot \frac{c_s^\mathrm{center, -} - c_s^\mathrm{left}}{h} - p_s \cdot (c_s^\mathrm{center, +} - c_s^\mathrm{center, -})
 ```
 
-**Calculating the residual vector $F$**
-```math
-F_i = \mathrm{diffusion term} + \mathrm{reaction term}
-```
+Question: should I also put reaction flux here?
 
-**Calculating the Jacobian matrix**
+This gives a nonlinear algebraic system
+$F(\vec(x)) = 0$ where $\vec(x)$ contains all species concentrations at all grid points.
+
+The Jacobian $J$ is given by
 ```math
 J_{ij} = \frac{\partial F_i}{\partial x_j}
+```
+
+**Using the Newton method**
+
+Normally
+```math
+J(\bm{x}^{(k)}) \delta \bm{x}^{(k)} = -F(\bm{x}^{(k)}) \\
+
+\bm{x}^{(k+1)} = \bm{x}^{(k)} + \delta \bm{x}^{(k)}
+```
+or (equivalently)
+```math
+\delta \bm{x} = - J^{-1} F
+```
+(since J is invertible, multiplying both sides of the first equation by $J^(-1)$ through the left)
+
+However: Newton method only works (in this way) close to the solution.
+
+Therefore, we use an adaptive step size:
+Following the paper *An adaptive Newton-method based on a dynamical systems approach* by Amrein and Wihler, we use
+
+```math
+x_{n+1} = x_n - t_n J(x_n)^{-1}F(x_n)\\[1em]
+t_n = \mathrm{min}\left(\sqrt{\frac{2\tau}{||\mathrm{N}_\mathrm{F}(x_n)||_X}} , 1\right)
+```
+where $\mathrm{N}_\mathrm{F}(x_n) = -J^{-1}F(x)$ and $\tau$ is some tolerance. We define $\tau$ dynamically
+
+
+```math
+\begin{align*}
+&\text{Start: } u, \tau, \|F\|_{\text{last}} \\
+&\text{Compute residual and Jacobian: } F(u), J(u) \\
+&\Delta u_N = - J(u)^{-1} F(u), \quad \|\Delta u_N\| = \text{norm}(\Delta u_N) \\
+&t_n = \min\Big(\sqrt{\frac{2 \tau}{\|\Delta u_N\|}}, 1\Big), \quad \Delta u = t_n \Delta u_N \\
+&u_{\text{trial}} = u + \Delta u \\
+&\text{Check positivity:} \\
+&\quad \text{If any } u_{\text{trial}} < 0: \\
+&\qquad \tau_{\text{new}} = \tau \cdot \gamma_{\text{dec}} \\
+&\qquad \text{If } \tau_{\text{new}} < \tau_{\min} \text{ → ERROR (negative values)} \\
+&\qquad \text{Return } (u, \tau_{\text{new}}, \|F\|_{\text{last}}) \\
+&\text{Compute new residual: } F(u_{\text{trial}}), \quad \|F\|_{\text{new}} = \text{norm}(F(u_{\text{trial}})) \\
+&\text{Decision:} \\
+&\quad \text{If } \|F\|_{\text{new}} < \|F\|_{\text{last}} \quad \text{(successful step)} \\
+&\qquad \tau_{\text{new}} = \min(\tau_{\max}, \tau \cdot \gamma_{\text{inc}}) \\
+&\qquad \text{Return } (u_{\text{trial}}, \tau_{\text{new}}, \|F\|_{\text{new}}) \\
+&\quad \text{Else (unsuccessful step)} \\
+&\qquad \tau_{\text{new}} = \tau \cdot \gamma_{\text{dec}} \\
+&\qquad \text{If } \tau_{\text{new}} < \tau_{\min} \text{ → ERROR (cannot reduce residual further)} \\
+&\qquad \text{Return } (u, \tau_{\text{new}}, \|F\|_{\text{new}})
+\end{align*}
+
 ```
 
 **Calculating the net flux**
@@ -304,6 +330,7 @@ We define a relative net flux $\Phi^{(m)}$ for each species $m$ through
 Balance between the flux created through interaction with the outside and the flux created through reactions within the sphere must be ensured for the steady state. We consider that the steady state has been found numerically once this balance is smaller than some small $\epsilon > 0$.
 
 It is important to note that the net flux may not cross the threshold given by $\epsilon$ if the step size between neighboring mesh points is too large.
+
 
 
 

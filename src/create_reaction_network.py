@@ -30,11 +30,19 @@ class Participant:
         return f"{self.name}"
 
 class Enzyme(Participant):
-    def __init__(self, name: str, quantity: float, regions: list) -> None:
+    def __init__(self, name: str, quantity: float, allocation: dict) -> None:
         super().__init__(name)
         self.quantity = quantity
-        self.regions = regions
+        self.allocation = allocation
+        self.quantity_allocation = self.allocate_quantity(quantity, allocation)
 
+    def allocate_quantity(self, quantity, allocation):
+        quantity_allocation = {
+            region: None for region in allocation.keys()}
+        for region, relative_quantity in allocation.items():
+            quantity_allocation[region] = relative_quantity * quantity
+        return quantity_allocation
+    
     def __str__(self):
         return super().__str__()
     
@@ -256,11 +264,13 @@ def create_reaction_network(case_folder, csv_file_names):
     # Step 1: Import dataframes
     dataframes = {}
     for csv_file_name in csv_file_names:
+        if csv_file_name == "enzymes":
+            csv_file_name = "enzymes_without_concentration"
         pickle_path = os.path.join(case_folder, f".pickled_dataframe_{csv_file_name}")
         dataframes[csv_file_name] = pickle_load_binary(pickle_path)
     
     # Step 2: read rows for each dataframe and create an object for each; save each object in System
-    enzymes = [Enzyme(**row) for _, row in dataframes["enzymes"].iterrows()]
+    enzymes = [Enzyme(**row) for _, row in dataframes["enzymes_without_concentration"].iterrows()]
     system.enzymes = Collection(enzymes)
     species = [Species(**row) for _, row in dataframes["species"].iterrows()]
     system.species = Collection(species)
@@ -306,7 +316,8 @@ def create_reaction_network(case_folder, csv_file_names):
     #    system.draw_network(case_folder)
     #except:
     #    print("Unable to draw network.")
-    pickle_dump_binary(os.path.join(case_folder, ".pickled_reaction_network"), system)
+    pickle_dump_binary(
+        os.path.join(case_folder, ".pickled_reaction_network_without_enzyme_concentration"), system)
 
 
 if __name__ == "__main__":

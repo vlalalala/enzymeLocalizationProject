@@ -1,5 +1,0 @@
-convergence_parameters:
-    tol_relative_flux_deviation: [0.001]
-
-newton_parameters:
-    check_convergence_every: [10]

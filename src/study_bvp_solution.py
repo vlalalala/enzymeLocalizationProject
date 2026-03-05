@@ -1,6 +1,6 @@
 import argparse
 from auxiliary_functions_framework_organization import (
-    get_species_concentrations_from_json_file
+    get_dict_with_correct_key_types_from_json_file
 )
 from auxiliary_functions import dump_json
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     species_concentrations_with_strings = load_json(
         os.path.join(FOLDER_TO_SOLVE, ".species_steady_state_concentrations.json")
     )
-    species_concentrations_dict = get_species_concentrations_from_json_file(
+    species_concentrations_dict = get_dict_with_correct_key_types_from_json_file(
         species_concentrations_with_strings, SPECIES_LOOKUP)
 
     fluxes = get_outward_fluxes(species_concentrations_dict, REACTION_NETWORK, NUM_REGIONS, NUM_MESH_POINTS_IN_REGIONS)

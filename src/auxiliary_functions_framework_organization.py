@@ -1,25 +1,25 @@
 import ast
 
-def get_species_concentrations_from_json_file(
-        imported_concentrations_dict_from_json, species_lookup_dict) -> dict:
-    """Make keys that got converted to strings instead of integers into integers again
+def get_dict_with_correct_key_types_from_json_file(
+        imported_dict_from_json, species_lookup_dict) -> dict:
+    """ Takes a nested dict imported from a json file with the structure
+    [string key][string key][species.name string key]
+    and returns the same nested dict but with the last key
+    as [int key][int key][species object] using the dictionary species_lookup_dict, which maps
+    the species name to the species object
+    (also makes the integer keys that got converted to strings when originally saving the
+    dict into a json file into integers again).
+
+    Used for saved concentrations and point_ids.
     """
     dict_in_correct_concentrations_format = {
-            int(region_idx): {
-                int(mesh_point_idx): {
-                    species_lookup_dict[species_name]: data
-                    for species_name, data in mesh_point_info.items()}
-                for mesh_point_idx, mesh_point_info in region_info.items()}
-            for region_idx, region_info in imported_concentrations_dict_from_json.items()
-        }
-    return dict_in_correct_concentrations_format
-
-def get_correct_point_ids_dict(imported_point_ids_dict, species_lookup_dict
-    ):
-    """Works exactly the same as get_species_concentrations_from_json_file, just that every
-    [region][n][species] maps to the point_id and not to the concentration
-    """
-    dict_in_correct_concentrations_format = get_species_concentrations_from_json_file(imported_point_ids_dict, species_lookup_dict)
+        int(region_idx): {
+            int(mesh_point_idx): {
+                species_lookup_dict[species_name]: data
+                for species_name, data in mesh_point_info.items()}
+            for mesh_point_idx, mesh_point_info in region_info.items()}
+        for region_idx, region_info in imported_dict_from_json.items()
+    }
     return dict_in_correct_concentrations_format
 
 def get_correct_reverse_point_ids_dict(imported_reverse_point_ids_dict,

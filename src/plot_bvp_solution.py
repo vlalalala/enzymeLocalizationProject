@@ -12,7 +12,7 @@ from auxiliary_functions_using_standard_library import (
     format_sci, pickle_load_binary,
     load_json, find_max_in_nested_dict)
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-from auxiliary_functions_framework_organization import get_species_concentrations_from_json_file
+from auxiliary_functions_framework_organization import get_dict_with_correct_key_types_from_json_file
 import imageio.v3 as iio
 import imageio
 
@@ -153,7 +153,7 @@ def make_newton_iterations_gif(
             number_with_max_digits = f"{number:0{digit_count}d}"
 
             species_concentrations_to_plot_dict_with_strings = load_json(file)
-            species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
+            species_concentrations_to_plot_dict = get_dict_with_correct_key_types_from_json_file(
                 species_concentrations_to_plot_dict_with_strings, species_lookup_dict)
 
             fig, ax = plot_steady_state_concentrations(
@@ -171,7 +171,7 @@ def make_newton_iterations_gif(
             fig.savefig(png_file, dpi=300)
             plt.close(fig)
 
-        png_files.append(png_file)
+        png_files_created.append(png_file)
     # Put all the pngs together
     print("creating gif", file_to_create)
     with imageio.get_writer(file_to_create, mode="I", loop=0, duration=0.1) as writer:
@@ -232,6 +232,7 @@ def add_theory_curve_to_ax(
         and len(reaction_network.enzymatic_reactions) == 0
         and num_regions == 1
     ):  
+        print("Plotting analytical solution")
         s_reaction = reaction_network.spontaneous_reactions[0]
         s = s_reaction.start_species
         s_lambda = np.sqrt(s_reaction.k / s.diffusion_constant)
@@ -245,10 +246,11 @@ def add_theory_curve_to_ax(
         c = lambda r: 1/r * A *(np.exp(-s_lambda*r)-np.exp(s_lambda*r))
         r_to_plot = np.linspace(external_radius*0.01, external_radius, num = 100)
         ax.plot([r/external_radius for r in r_to_plot], [c(r) for r in r_to_plot], linestyle= "--",
-                label = f"analytical solution for {s.name}", zorder = -1, 
+                label = f"analytical solution for {s.name}", 
                 linewidth = 1,
                 color = "k",
-                alpha = 0.5
+                alpha = 0.5,
+                zorder = 100
         )
         ax.legend()
     
@@ -256,7 +258,8 @@ def add_theory_curve_to_ax(
     elif (len(reaction_network.spontaneous_reactions) == 1
         and len(reaction_network.enzymatic_reactions) == 0
         and num_regions == 2
-    ):   
+    ):  
+        print("Plotting analytical solution")
         reaction = reaction_network.spontaneous_reactions[0]
         X = reaction.start_species
         X_lambda = np.sqrt(reaction.k / X.diffusion_constant)
@@ -303,7 +306,7 @@ def add_theory_curve_to_ax(
                 label = None
             ax.plot([r/external_radius for r in r_to_plot],
                 [c[region_idx](r) for r in r_to_plot], linestyle= "--",
-                label = label, zorder = -1, 
+                label = label, zorder = 100, 
                 linewidth = 1,
                 color = "k",
                 alpha = 0.5
@@ -315,6 +318,8 @@ def add_theory_curve_to_ax(
         and len(reaction_network.enzymatic_reactions) == 0
         and num_regions == 3
     ):  
+        print("Plotting analytical solution")
+
         """This below was written by ChatGPT."""
         reaction = reaction_network.spontaneous_reactions[0]
         X = reaction.start_species
@@ -438,7 +443,7 @@ def add_theory_curve_to_ax(
                     [float(c[region_idx](rr)) for rr in r_to_plot],
                     linestyle="--",
                     label=label,
-                    zorder=-1,
+                    zorder=100,
                     linewidth=1,
                     color = "k",
                     alpha = 0.5
@@ -514,7 +519,7 @@ if __name__ == "__main__":
         matches = [f for f in files if regex.search(os.path.basename(f))]
         match_file= matches[0]
         species_concentrations_to_plot_with_strings = load_json(match_file)
-        species_concentrations_to_plot_dict = get_species_concentrations_from_json_file(
+        species_concentrations_to_plot_dict = get_dict_with_correct_key_types_from_json_file(
             species_concentrations_to_plot_with_strings, SPECIES_LOOKUP)
         file_to_create = os.path.splitext(match_file)[0] + "_individual.png" # remove .json
         plot_steady_state_concentrations(

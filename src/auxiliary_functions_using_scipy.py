@@ -19,22 +19,22 @@ def save_matrix_as_sparse_txt(matrix: np.ndarray, filepath: str):
                header="row\tcol\tvalue", delimiter="\t", comments='')
 
 def save_newton_iteration_data(
-    folder_to_save_in, iter_string, J_to_save, F_to_save,
+    folder_to_save_in, filename, J_to_save, F_to_save,
     species_concentrations_to_save, du_to_save, variables_to_save_dictionary):
     """Function to save data as needed, based on the dictionary variables_to_save_dictionary.
     """
     if variables_to_save_dictionary["save_F_vector"]:
-        np.savetxt(os.path.join(folder_to_save_in, f".iteration_nr_{iter_string}_F.txt"), F_to_save, fmt="%.15e", delimiter="\n")
+        np.savetxt(os.path.join(folder_to_save_in, f"{filename}_F.txt"), F_to_save, fmt="%.15e", delimiter="\n")
     if variables_to_save_dictionary["save_F_vector_norm"]:
-        dump_json(folder_to_save_in, f".iteration_nr_{iter_string}_F_vector_norm",
+        dump_json(folder_to_save_in, f"{filename}_F_vector_norm",
             np.linalg.norm(F_to_save))
     if variables_to_save_dictionary["save_J_matrix"]:
-        save_matrix_as_sparse_txt(J_to_save, os.path.join(folder_to_save_in, f".iteration_nr_{iter_string}_J_matrix"))
+        save_matrix_as_sparse_txt(J_to_save, os.path.join(folder_to_save_in, f"{filename}_J_matrix"))
     if variables_to_save_dictionary["save_du_vector"]:
-        np.savetxt(os.path.join(folder_to_save_in, f".iteration_nr_{iter_string}_du_vector.txt"), du_to_save, fmt="%.15e", delimiter="\n")
+        np.savetxt(os.path.join(folder_to_save_in, f"{filename}_du_vector.txt"), du_to_save, fmt="%.15e", delimiter="\n")
     if variables_to_save_dictionary["save_du_vector_max"]:
-        dump_json(folder_to_save_in, f".iteration_nr_{iter_string}_du_vector_max",
+        dump_json(folder_to_save_in, f"{filename}_du_vector_max",
             max(du_to_save))
     if variables_to_save_dictionary["save_concentrations"]:    
-        dump_json(folder_to_save_in, f".iteration_nr_{iter_string}_concentrations",
+        dump_json(folder_to_save_in, f"{filename}_concentrations",
             species_concentrations_to_save)

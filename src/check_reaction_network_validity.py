@@ -1,11 +1,29 @@
 #%%
 import sys
 import os
+import ast
 import pandas as pd
 from auxiliary_functions_using_standard_library import load_json, pickle_dump_binary
-from auxiliary_functions import (
+from auxiliary_functions import (read_yaml_file,
     define_ratio_from_string, no_empty_cells, no_repeated_rows_in_csv_file,
-    checks_lack_of_repetitions, check_correct_type, define_region_list)
+    checks_lack_of_repetitions, check_correct_type)
+
+def correct_allocation_dict(d, num_regions):
+    if not isinstance(d, dict):
+        raise ValueError(f"{d} is no dictionary")
+    if set(d.keys()) != set(range(num_regions)):
+        raise ValueError(f"there are not {num_regions} regions in {d}")
+    if abs(sum(d.values()) - 1.0) > 1e-8:
+        raise ValueError(f"the values in {d} do not sum to 1.")
+    return True
+
+def parse_and_check_allocation(csv_element_string, num_regions):
+    try:
+        d = ast.literal_eval(csv_element_string)
+    except Exception:
+        return None, False
+    assert correct_allocation_dict(d, num_regions)
+    return d
 
 def create_pandas_dataframe_from_csv_file(csv_file: str, num_regions: int) -> pd.DataFrame:
     """Reads the csv files and creates corresponding panda dataframes.
@@ -27,11 +45,11 @@ def create_pandas_dataframe_from_csv_file(csv_file: str, num_regions: int) -> pd
         ~dataframe.columns.str.contains("concentration", case=False)] # anything that contains the substring ratio and not the substring concentration (ratio within concentration)
     for ratio_col in ratio_cols:
         dataframe[ratio_col] = dataframe[ratio_col].apply(define_ratio_from_string)
-    # Checks regions
-    regions_cols = dataframe.columns[dataframe.columns.str.contains("regions")]
-    for regions_col in regions_cols:
-        dataframe[regions_col] = dataframe[regions_col].apply(
-            lambda x: define_region_list(x, num_regions))
+    # Checks allocation to regions defined
+    allocation_cols = dataframe.columns[dataframe.columns.str.contains("allocation")]
+    for allocation_col in allocation_cols:
+        dataframe[allocation_col] = dataframe[allocation_col].apply(
+            lambda x: parse_and_check_allocation(x, num_regions))
     return dataframe
 
 def extract_species_and_enzymes_from_reactions_data(
@@ -117,6 +135,8 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     
     # Pickle dataframes separately
     for filename, dataframe in dataframes.items():
+        if filename == "enzymes":
+            filename = "enzymes_without_concentration"
         pickle_dump_binary(
             os.path.join(case_directory, f".pickled_dataframe_{filename}"), dataframe)
     print(f"{case_directory} is good to go!")
@@ -124,8 +144,8 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
     reaction_network_info_file_names = load_json("src/_template_reaction_network.json").keys()
-    system_geometry_dict = load_json(
-        os.path.join(folder_to_check_validity, ".expanded_system_geometry.json"))
-    num_regions = system_geometry_dict["geometry_config"]["num_regions"]
+    system_geometry_dict = read_yaml_file(
+        os.path.join(folder_to_check_validity, "parameters_geometry.yaml"))
+    num_regions = int(len(system_geometry_dict["geometry_config"]["internal_membrane_relative_radii"]) + 1)
 
     check_validity_reaction_network_info(folder_to_check_validity, reaction_network_info_file_names, num_regions)

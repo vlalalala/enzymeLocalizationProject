@@ -7,8 +7,6 @@ import re
 import glob
 from itertools import product
 from src.auxiliary_functions_using_standard_library import as_list, load_json
-from src.auxiliary_functions_framework_organization_using_standard_library import(
-    find_latest_solution)
 
 #########
 # TODO: new snakemake rule. inputs factor for mesh and resolves everything
@@ -66,12 +64,14 @@ reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
 # Maximum resident set size (kbytes) computed with 2500 mesh points, 4 species, 3 enzymes and 6 reactions.
 
+############################################
+# RULES FOR CHECKING VALIDITY OF USER INPUT
+############################################
+
 rule check_solver_input_validity:
-    # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
+    # snakemake -s Snakefile data/test_0/.validated_solver_input --cores 1 --use-conda
     input:
-        lambda wildcards: [
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
-        ]
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml"
     output:
         touch("{df}/{bn}_{cn}/.validated_solver_input")
     threads: 1
@@ -83,36 +83,30 @@ rule check_solver_input_validity:
     shell:
         "python src/check_solver_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn} parameters_solver_input"
 
-
-rule check_system_geometry_info_validity:
-    """ To define the system geometry, the number of mesh points for the solver already
-    has to be read, in order to shift the membrane positions to the closest mesh positions
-    """
-    # snakemake -s Snakefile.smk data/test_0/.system_geometry_expanded.json --cores 1 --use-conda
+rule check_solver_output_validity:
+    # snakemake -s Snakefile data/test_0/.validated_solver_output --cores 1 --use-conda
     input:
-        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_geometry.yaml",
-                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver_input",
-                           ]
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml"
     output:
-        "{df}/{bn}_{cn}/.expanded_system_geometry.json"
+        touch("{df}/{bn}_{cn}/.validated_solver_output")
     threads: 1
     resources:
-        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71900
-        runtime=12 # 1 minute
+        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71480
+        runtime=6 # 3 minutes
     conda:
         "config/environment.yaml"
     shell:
-        "python src/check_system_geometry_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/check_solver_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn} parameters_solver_output"
 
 rule check_reaction_network_info_validity:
-    # snakemake -s Snakefile.smk data/test_0/.validated_reaction_network --cores 1 --use-conda
+    # snakemake -s Snakefile data/test_0/.validated_reaction_network_input --cores 1 --use-conda
     input:
         lambda wildcards: [
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/{rn}.csv"
             for rn in reaction_network_info_dict.keys()
-            ] + [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json"]
+            ] + [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_geometry.yaml"]
     output:
-        touch("{df}/{bn}_{cn}/.validated_reaction_network")
+        touch("{df}/{bn}_{cn}/.validated_reaction_network_input")
     threads: 1
     resources:
         mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 73560
@@ -122,12 +116,36 @@ rule check_reaction_network_info_validity:
     shell:
         "python src/check_reaction_network_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-rule create_reaction_network:
-    # snakemake -s Snakefile.smk data/violacein_0/reaction_network_graph.png --cores 1 --use-conda
+#################################################
+# RULES FOR DEFINING SYSTEM
+#################################################
+
+rule create_system_geometry:
+    """ To define the system geometry, the baseline number of mesh points for the solver already
+    has to be read, in order to shift the membrane positions to the closest mesh positions
+    """
+    # snakemake -s Snakefile data/test_0/.system_geometry.json --cores 1 --use-conda
     input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_reaction_network"
+        lambda wildcards: [f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_geometry.yaml",
+                           f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_discretization.yaml",
+                           ]
     output:
-        ["{df}/{bn}_{cn}/.pickled_reaction_network"]
+        "{df}/{bn}_{cn}/.system_geometry.json"
+    threads: 1
+    resources:
+        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71900
+        runtime=12 # 1 minute
+    conda:
+        "config/environment.yaml"
+    shell:
+        "python src/create_system_geometry.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+
+rule create_reaction_network:
+    # snakemake -s Snakefile data/violacein_0/.pickled_reaction_network --cores 1 --use-conda
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_reaction_network_input"
+    output:
+        ["{df}/{bn}_{cn}/.pickled_reaction_network_without_enzyme_concentration"]
     threads: 1
     resources:
         mem_mb=500, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 136612
@@ -137,33 +155,43 @@ rule create_reaction_network:
     shell:
         "python src/create_reaction_network.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
 
-rule create_system_mesh:
-    # snakemake -s Snakefile.smk data/test_0/.expanded_system_mesh.json --cores 1 --use-conda
+rule define_enzyme_concentrations:
+    # snakemake -s Snakefile data/violacein_0/.pickled_reaction_network --cores 1 --use-conda
     input:
         lambda wildcards: [
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml"]
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_reaction_network_input",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network_without_enzyme_concentration",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.system_geometry.json",
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_value_conditions.yaml",
+        ]
     output:
-        "{df}/{bn}_{cn}/.expanded_system_mesh.json"
+        ["{df}/{bn}_{cn}/.pickled_reaction_network"]
     threads: 1
     resources:
-        mem_mb=400, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 112888
+        mem_mb=500, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 136612
         runtime=10 # 1 minute
     conda:
         "config/environment.yaml"
     shell:
-        "python src/create_system_mesh.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+        "python src/define_enzyme_concentrations.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+    
+####################################################
+# RULES TO FIND AND PLOT SOLUTION
+####################################################
 
 rule cleanup_old_iterations:
-    """In case the input files for a simulation have been changed, all of the
-    files with .iteration_nr_* have to be deleted, as well as the log file created
+    """In case any of the input files for a simulation have been changed, all of the
+    files with .*iteration_nr_* have to be deleted, as well as the log file created
     previously.
     """
     input:
+        discretization_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_discretization.yaml",
+        geometry_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_geometry.yaml",
+        solver_input_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
+        solver_output_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_output.yaml",
+        value_conditions_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_value_conditions.yaml",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.system_geometry.json",
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
-        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
     output:
         touch("{df}/{bn}_{cn}/.validated_iterations")
     threads: 1
@@ -175,50 +203,44 @@ rule cleanup_old_iterations:
         folder = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
         print(f"Cleaning up {folder}")
         # delete all old iteration files
-        for f in glob.glob(os.path.join(folder, "solver_iteration_data/.iteration_nr_*")):
+        for f in glob.glob(os.path.join(folder, "solver_iteration_data/*iteration_nr_*")):
             os.remove(f)
-        log_file = os.path.join(folder, ".newton_solver.log")
-        if os.path.exists(log_file):
-            os.remove(log_file)
+        log_patterns = patterns = ["*.log", "*_log_*", ".*.log", ".*_log_*", ".progress_log_*"]
+        log_files = []
+        for pattern in patterns:
+            log_files.extend(glob.glob(os.path.join(folder, pattern)))
+
+        if log_files:
+            for log_file in log_files:
+                if os.path.exists(log_file):
+                    os.remove(log_file)
+                    print(f"Removing {log_file} file.")
+        else:
+            print("No log files found.")
         # mark cleanup as done
         with open(output[0], "w") as f:
             f.write("done\n")
 
-rule check_solver_params_validity:
-    # snakemake -s Snakefile.smk data/test_0/.solver_input_pickle --cores 1 --use-conda
-    input:
-        lambda wildcards: [
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml",
-        ]
-    output:
-        touch("{df}/{bn}_{cn}/.validated_solver_params")
-    threads: 1
-    resources:
-        mem_mb=300, # using /usr/bin/time -v gave me Maximum resident set size (kbytes): 71480
-        runtime=6 # 3 minutes
-    conda:
-        "config/environment.yaml"
-    shell:
-        "python src/check_solver_validity.py {wildcards.df}/{wildcards.bn}_{wildcards.cn} parameters_solver_params"
-
-
-rule solve_boundary_value_problem:
+rule solve_boundary_value_problem_with_mesh_adaptation:
     """The max-iterations condition can be changed as required without deleting anything.
     Automatically finds the latest iteration saved.
     """
-    # snakemake -s Snakefile data/test_0/.species_steady_state_concentrations.json --config max_iterations=1e4 --cores 1 --use-conda
+    # snakemake -s Snakefile data/test_0/.species_steady_state_concentrations.json --cores 1 --use-conda
     input:
+        discretization_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_discretization.yaml",
+        geometry_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_geometry.yaml",
+        solver_input_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
+        solver_output_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_output.yaml",
+        value_conditions_yaml = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_value_conditions.yaml",
+        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.system_geometry.json",
         network = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.pickled_reaction_network",
-        geometry = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_geometry.json",
-        solver_input = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_input.yaml",
-        solver_params_validated = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_solver_params" 
-        system_mesh = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.expanded_system_mesh.json",
-        cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_iterations",
+        cleanup = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.validated_iterations"
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
-        max_iterations = lambda wildcards: int(config.get("max_iterations", 1000)),
-        solver_params = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/parameters_solver_params.yaml"
+        max_num_Newton_iterations = lambda wildcards: int(config.get("max_num_Newton_iterations", 10000)),
+        max_num_interpolation_times = lambda wildcards: int(config.get("max_num_interpolation_times", 8)),
+        max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-2)
     conda:
         "config/environment.yaml"
     threads: 1
@@ -227,12 +249,13 @@ rule solve_boundary_value_problem:
         runtime= 20
     shell:
         """
-        python src/run_bvp_solver.py \
+        python src/run_bvp_solver_mesh_adaptation.py \
             {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
-            --max_iterations {params.max_iterations} \
-            --solver_input_file {input.solver_input} \
-            --solver_params_file {params.solver_params} \
+            --max_num_Newton_iterations {params.max_num_Newton_iterations} \
+            --max_num_interpolation_times {params.max_num_interpolation_times} \
+            --max_relative_species_concentrations_difference {params.max_relative_species_concentrations_difference} \
         """
+
 
 rule plot_boundary_value_problem:
     """Rule is not meant to be chained to other rules.
@@ -253,22 +276,6 @@ rule plot_boundary_value_problem:
         python src/plot_bvp_solution.py \
             {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
         """
-
-rule increase_mesh_size:
-    """This rule can be run to increase the number of mesh points in case convergence has not taken place
-    """
-    input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.species_steady_state_concentrations.json"
-    output:
-        touch("{df}/{bn}_{cn}/.completed_refinement_check")
-    conda:
-        "config/environment.yaml"
-    shell:
-        """
-        python src/plot_bvp_solution.py \
-            {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
-        """
-
 
 
 ### To have a specific iteration of the solver plotted, run on terminal ###

@@ -3,12 +3,13 @@ import os
 from auxiliary_functions import read_yaml_file
 
 def check_validity_file(case_directory, file_name):
-    """For a particular file (file_name, with ending) in the directory case_directory,
-    checks whether the input data is valid.
+    """ For the file file_name (file_name includes the file extension)
+    in the directory case_directory, checks whether the input data
+    is valid.
     """
-    solver_info_nested_dict = read_yaml_file(os.path.join(case_directory, file_name))
+    info_nested_dict = read_yaml_file(os.path.join(case_directory, file_name))
 
-    for section, section_dict in solver_info_nested_dict.items():
+    for section, section_dict in info_nested_dict.items():
         for key, value in section_dict.items():
             key_lower = key.lower()
 
@@ -86,11 +87,11 @@ def check_validity_file(case_directory, file_name):
                         raise ValueError(
                             f"In '{section}', '{key}' ({min_val_f}) cannot be greater than '{max_key}' ({max_val_f})."
                         )
-    return solver_info_nested_dict
+    return info_nested_dict
 
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
     file_to_check_validity = sys.argv[2]
-    if file_to_check_validity not in ["parameters_solver_input", "parameters_solver_params"]:
+    if file_to_check_validity not in ["parameters_solver_input", "parameters_solver_params", "parameters_solver_output"]:
         raise ValueError(f"Cannot check validity of the file.")
-    solver_info_nested_dict = check_validity_file(folder_to_check_validity, f"{file_to_check_validity}.yaml")
+    info_nested_dict = check_validity_file(folder_to_check_validity, f"{file_to_check_validity}.yaml")

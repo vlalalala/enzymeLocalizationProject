@@ -5,6 +5,51 @@ from auxiliary_functions_using_standard_library import pickle_load_binary, load_
 from auxiliary_functions import dump_json, read_yaml_file
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 
+def interpolate_midpoints(values, interpolation_times):
+    """
+    Inserts midpoints between neighboring values,
+    doing this a number interpolation_times of times
+    and returns the new list.
+    values : list of numbers (ordered)
+    """
+    if interpolation_times < 0:
+        raise ValueError("times must be non-negative")
+    result = list(values)
+    for _ in range(interpolation_times):
+        new_list = []
+        for i in range(len(result) - 1):
+            new_list.append(result[i])
+            midpoint = (result[i] + result[i + 1]) / 2
+            new_list.append(midpoint)
+        new_list.append(result[-1])
+        result = new_list
+    return result
+
+def define_mesh_points(
+    system_geometry_dict,
+    mesh_points_duplication_times
+):
+    """
+    system_geometry_dict has the baseline geometry
+    """
+    baseline_mesh_points = system_geometry_dict["geometry_config"]["baseline_mesh_points"]
+    modified_mesh_points = interpolate_midpoints(baseline_mesh_points, mesh_points_duplication_times)
+    system_geometry_dict["geometry_config"]["modified_mesh_points"] = modified_mesh_points
+    boundary_radii = system_geometry_dict["geometry_config"]["boundary_radii"]
+    
+    mesh_points_in_regions = {
+        region_idx : [mesh_point for mesh_point in modified_mesh_points if boundary_radii[region_idx]<=mesh_point<=boundary_radii[region_idx+1]]
+        for region_idx in range(system_geometry_dict["geometry_config"]["num_regions"])
+    }
+    system_geometry_dict["geometry_config"]["mesh_points_in_regions"]  = mesh_points_in_regions
+    num_mesh_points_in_regions = {
+        region_idx: len(mesh_points_in_region)
+        for region_idx, mesh_points_in_region in mesh_points_in_regions.items()
+    }
+    system_geometry_dict["geometry_config"]["num_mesh_points_in_regions"]  = num_mesh_points_in_regions
+
+    return system_geometry_dict
+
 def build_point_ids_dict(reaction_network: System, num_mesh_points_in_regions: dict) -> dict:
     """Builds a nested dict mapping (region, mesh_point, species) to unique IDs.
     Access values of unique IDs through point_ids_dict[region_idx][mesh_point_idx][species]
@@ -105,42 +150,39 @@ def build_point_neighbor_dict(num_mesh_points_in_regions) -> dict:
                     neighbors_dict[(region_idx, n)].append( (region_idx+1, 0) )
     return neighbors_dict
 
-if __name__ == "__main__":
-    FOLDER_TO_SOLVE = sys.argv[1]    
-    # Step 0: Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
-    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
-    SOLVER_INPUT = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_solver_input.yaml"))
-
-    # Step 1: Define all geometry variables
-    MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["mesh_points_in_regions"]
-    NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_mesh_points_in_regions"]
+def build_system_mesh(system_geometry_dict, reaction_network, mesh_points_duplication_times):
+    # Define mesh points for given number of interpolation iterations
+    system_geometry_nested_dict = define_mesh_points(system_geometry_dict, mesh_points_duplication_times)
     
-    # Step 2: Define structures to access geometry information
-    POINT_IDS = build_point_ids_dict(REACTION_NETWORK, NUM_MESH_POINTS_IN_REGIONS)
-    REVERSE_POINT_IDS = build_reverse_point_ids_dict(POINT_IDS)
-    RADII = build_radii_dict(MESH_POINTS_IN_REGIONS)
-    DELTA_R = RADII[0][1]-RADII[0][0] # the different points within a region are equally spaced
-    NUM_POINTS = len(REVERSE_POINT_IDS) # each point saves the concentration for one species at one node
-    POINT_INFOS = build_point_infos_dict(NUM_MESH_POINTS_IN_REGIONS)
-    NEIGHBORS = build_point_neighbor_dict(NUM_MESH_POINTS_IN_REGIONS)
+    # Define aliases for easier access
+    num_mesh_points_in_regions = system_geometry_nested_dict["geometry_config"]["num_mesh_points_in_regions"]
+    mesh_points_in_regions = system_geometry_nested_dict["geometry_config"]["mesh_points_in_regions"]
+    
+    # Define structures to access geometry information
+    point_ids = build_point_ids_dict(reaction_network, num_mesh_points_in_regions)
+    reverse_point_ids = build_reverse_point_ids_dict(point_ids)
+    radii = build_radii_dict(mesh_points_in_regions)
+    delta_r = radii[0][1]-radii[0][0] # the different points within a region are equally spaced
+    num_points = len(reverse_point_ids) # each point saves the concentration for one species at one node
+    point_infos = build_point_infos_dict(num_mesh_points_in_regions)
+    neighbors = build_point_neighbor_dict(num_mesh_points_in_regions)
     
     # Check that each region has at least 3 points
-    for region, radii in RADII.items():
-        if len(radii)<3:
+    for region, region_radii in radii.items():
+        if len(region_radii)<3:
             raise ValueError(f"Region {region} has less than 3 points, such that the diffusion term does not work.")
 
     # Save dictionary in .json file for readability
-    dict_to_dump = {
-        "point_ids": POINT_IDS,
-        "reverse_point_ids": REVERSE_POINT_IDS,
-        "radii": RADII,
-        "delta_r": DELTA_R,
-        "num_points": NUM_POINTS,
-        "point_infos": POINT_INFOS,
-        "neighbors": NEIGHBORS
+    expanded_system_mesh = {
+        "point_ids": point_ids,
+        "reverse_point_ids": reverse_point_ids,
+        "radii": radii,
+        "delta_r": delta_r,
+        "num_points": num_points,
+        "point_infos": point_infos,
+        "neighbors": neighbors
     }
-    dump_json(FOLDER_TO_SOLVE, ".expanded_system_mesh", dict_to_dump)
+    return system_geometry_nested_dict, expanded_system_mesh
 
 
     

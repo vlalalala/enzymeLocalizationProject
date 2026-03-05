@@ -2,17 +2,13 @@ import sys
 import os
 from typing import Dict, Any, Union
 import numpy as np
-from auxiliary_functions_using_standard_library import load_json, closest_value
+from auxiliary_functions_using_standard_library import closest_value
 from auxiliary_functions import dump_json, read_yaml_file
 
-def check_validity_system_geometry_info(case_directory):
+def check_validity_system_geometry_info(nested_dict_to_check):
+    """Raises errors if there 
     """
-    """
-    
-    system_geometry_nested_dict : Dict[Union[str, int], Dict[str, Any]] = read_yaml_file(os.path.join(case_directory, "parameters_geometry.yaml"))
-    solver_input_nested_dict : Dict[Union[str, int], Dict[str, Any]] = read_yaml_file(os.path.join(case_directory, "parameters_solver_input.yaml"))
-    
-    for section, section_dict in system_geometry_nested_dict.items():
+    for section, section_dict in nested_dict_to_check.items():
         for key, value in section_dict.items():
             # Rule 1: Keys containing "num" must be int
             if any(integer_substring in key.lower() for integer_substring in ["num"]):
@@ -60,35 +56,50 @@ def check_validity_system_geometry_info(case_directory):
     #if (system_geometry_nested_dict["GEOMETRY_CONFIG"]["inner_mesh_radius_relative_to_smallest_membrane"]
     #    >= system_geometry_nested_dict["GEOMETRY_CONFIG"]["inner_mesh_radius_relative_to_smallest_membrane"]):
 
+def construct_baseline_mesh_points(
+    case_directory,
+    system_geometry_nested_dict,
+    discretization_params_dict
+):  
+    """
+    Expands and saves file with the system geometry expanded to accomodate
+    for the discretization (the membrane positions are set to the closest 
+    mesh position given the (baseline) discretization chosen.)
+    """
     external_radius = system_geometry_nested_dict["geometry_config"]["outer_membrane_radius"]
     membrane_input_radii = [relative * external_radius for relative in system_geometry_nested_dict["geometry_config"]["internal_membrane_relative_radii"] + [1]]
     system_geometry_nested_dict["geometry_config"]["membrane_input_radii"] = membrane_input_radii
-    mesh_points = np.linspace(0, external_radius, num = solver_input_nested_dict["geometry_parameters"]["num_mesh_points"])
-    system_geometry_nested_dict["geometry_config"]["mesh_points"] = mesh_points
+    mesh_points = np.linspace(0, external_radius, num = discretization_params_dict["discretization_parameters"]["baseline_num_mesh_points"])
+    system_geometry_nested_dict["geometry_config"]["baseline_mesh_points"] = mesh_points
     membrane_radii = [closest_value(mesh_points, membrane_input_radius) for membrane_input_radius in membrane_input_radii]
     system_geometry_nested_dict["geometry_config"]["membrane_radii"] = membrane_radii
     num_regions = len(membrane_radii)
     system_geometry_nested_dict["geometry_config"]["num_regions"]  = num_regions
     boundary_radii = [0] + membrane_radii
     system_geometry_nested_dict["geometry_config"]["boundary_radii"]  = boundary_radii
-    mesh_points_in_regions = {
-        region_idx : [mesh_point for mesh_point in mesh_points if boundary_radii[region_idx]<=mesh_point<=boundary_radii[region_idx+1]]
-        for region_idx in range(num_regions)
-    }
-    system_geometry_nested_dict["geometry_config"]["mesh_points_in_regions"]  = mesh_points_in_regions
-    num_mesh_points_in_regions = {
-        region_idx: len(mesh_points_in_region)
-        for region_idx, mesh_points_in_region in mesh_points_in_regions.items()
-    }
-    system_geometry_nested_dict["geometry_config"]["num_mesh_points_in_regions"]  = num_mesh_points_in_regions
+    volume_regions = {region: 4*np.pi/3 * (boundary_radii[region+1]**3 - boundary_radii[region]**3)
+                      for region in range(num_regions)}
+    system_geometry_nested_dict["geometry_config"]["volume_regions"]  = volume_regions
 
     dump_json(
         case_directory,
-        ".expanded_system_geometry",
+        ".system_geometry",
         system_geometry_nested_dict
     )
 
 if __name__ == "__main__":
-    folder_to_check_validity = sys.argv[1]
-    check_validity_system_geometry_info(folder_to_check_validity)
+    case_directory = sys.argv[1]
+    # Import files with user input
+    system_geometry_nested_dict = read_yaml_file(os.path.join(case_directory, "parameters_geometry.yaml"))
+    discretization_params_dict = read_yaml_file(os.path.join(case_directory, "parameters_discretization.yaml"))
+    # Check that user input is valid
+    check_validity_system_geometry_info(system_geometry_nested_dict)
+    check_validity_system_geometry_info(discretization_params_dict)
+    # Save baseline system geometry
+    construct_baseline_mesh_points(
+        case_directory,
+        system_geometry_nested_dict,
+        discretization_params_dict
+    )
+    
 
