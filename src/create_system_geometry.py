@@ -69,7 +69,7 @@ def construct_baseline_mesh_points(
     external_radius = system_geometry_nested_dict["geometry_config"]["outer_membrane_radius"]
     membrane_input_radii = [relative * external_radius for relative in system_geometry_nested_dict["geometry_config"]["internal_membrane_relative_radii"] + [1]]
     system_geometry_nested_dict["geometry_config"]["membrane_input_radii"] = membrane_input_radii
-    mesh_points = np.linspace(0, external_radius, num = discretization_params_dict["discretization_parameters"]["baseline_num_mesh_points"])
+    mesh_points = np.linspace(0, external_radius, num = discretization_params_dict["discretization_parameters"]["min_num_mesh_points"])
     system_geometry_nested_dict["geometry_config"]["baseline_mesh_points"] = mesh_points
     membrane_radii = [closest_value(mesh_points, membrane_input_radius) for membrane_input_radius in membrane_input_radii]
     system_geometry_nested_dict["geometry_config"]["membrane_radii"] = membrane_radii

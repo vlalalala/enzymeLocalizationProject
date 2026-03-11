@@ -32,7 +32,7 @@ def calculate_reaction_term(current_species_concentrations, region, n, species):
         if isinstance(reaction, SpontaneousReaction):
             term = reaction.k * current_species_concentrations[region][n][reaction.start_species]
         else:
-            term = reaction.k_cat * reaction.enzyme.enzyme.regional_concentrations[region] * current_species_concentrations[region][n][reaction.start_species] / (reaction.k_M + current_species_concentrations[region][n][reaction.start_species])
+            term = reaction.k_cat * reaction.enzyme.regional_concentrations[region] * current_species_concentrations[region][n][reaction.start_species] / (reaction.k_M + current_species_concentrations[region][n][reaction.start_species])
         if reaction in species.as_reactant_in: # if acts as reactant, diminishes
             term *= -1
         reaction_term += term
@@ -99,7 +99,7 @@ def define_newton_residual_and_optionally_jacobian(
                         else: #EnzymaticReaction
                             base = (
                                 reaction.k_cat
-                                * reaction.enzyme.enzyme.regional_concentrations[region]#ENZYME_CONCENTRATIONS[region][reaction.enzyme]
+                                * reaction.enzyme.regional_concentrations[region]#ENZYME_CONCENTRATIONS[region][reaction.enzyme]
                                 * reaction.k_M
                                 / (reaction.k_M + S)**2
                             )
@@ -141,7 +141,7 @@ def define_newton_residual_and_optionally_jacobian(
                             else: #EnzymaticReaction
                                 base = (
                                     reaction.k_cat
-                                    * reaction.enzyme.enzyme.regional_concentrations[region]#[region][reaction.enzyme]
+                                    * reaction.enzyme.regional_concentrations[region]#[region][reaction.enzyme]
                                     * reaction.k_M
                                     / (reaction.k_M + S)**2
                                 )
@@ -353,7 +353,7 @@ def get_info_flux_equilibrium(
         info_relative[species] = relative_deviation
 
     info_absolute = {f"{species}_absolute": value for species, value in info_absolute.items()}
-    info_relative = {f"{species}_relative": value for species, value in info_absolute.items()}     
+    info_relative = {f"{species}_relative": value for species, value in info_relative.items()}     
     info = info_absolute | info_relative # merge the two dictionaries
 
     return info
@@ -427,9 +427,9 @@ def solve_newton(
                 )
         except ValueError as e: # once the adaptive method cannot further decrease the norm of the residual, break
             if "Newton" in str(e):
-                early_convergence = "Newton failed to decrease the norm any further"
+                print(f"Newton failed to decrease the norm any further in iteration {iter}", flush=True)
             elif "negative" in str(e):
-                early_convergence = "failure due to negative concentration"
+                print(f"failure due to negative concentration in iteration {iter}", flush=True)
             break
 
         # Save result if needed

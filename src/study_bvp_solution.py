@@ -2,7 +2,9 @@ import argparse
 from auxiliary_functions_framework_organization import (
     get_dict_with_correct_key_types_from_json_file
 )
+import os
 from auxiliary_functions import dump_json
+from auxiliary_functions_using_standard_library import pickle_load_binary, load_json
 
 
 def get_outward_fluxes(species_concentrations_dict, reaction_network, num_regions, num_mesh_points_in_regions):
@@ -10,7 +12,10 @@ def get_outward_fluxes(species_concentrations_dict, reaction_network, num_region
     """
     fluxes = {}
     for species in reaction_network.species:
-        concentration_at_R = species_concentrations_dict[num_regions-1][num_mesh_points_in_regions[num_regions-1]-1][species]
+        try:
+            concentration_at_R = species_concentrations_dict[num_regions-1][num_mesh_points_in_regions[num_regions-1]-1][species]
+        except:
+            concentration_at_R = species_concentrations_dict[num_regions-1][num_mesh_points_in_regions[num_regions-1]-1][species.name]
         fluxes.update({species.name : species.permeability_constant * (concentration_at_R - species.external_concentration)})
     return fluxes
 
@@ -24,9 +29,9 @@ if __name__ == "__main__":
     FOLDER_TO_SOLVE = args.folder_to_solve
 
     # Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network_final"))
-    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
-    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh.json"))
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
+    SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, "system_geometry_for_convergence.json"))
+    SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh_for_convergence.json"))
 
     SPECIES_LOOKUP = {sp.name: sp for sp in REACTION_NETWORK.species}
 

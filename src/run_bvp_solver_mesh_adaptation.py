@@ -20,6 +20,7 @@ from auxiliary_functions import dump_json
 from run_bvp_solver import solve_newton
 from plot_bvp_solution import plot_steady_state_concentrations
 from auxiliary_functions_framework_organization import get_dict_with_correct_key_types_from_json_file
+from study_bvp_solution import get_outward_fluxes
 
 def find_latest_solution_of_given_interpolation_iteration(
         concentration_files, interpolation_iteration,
@@ -132,17 +133,39 @@ def map_radius_to_broader_and_finer_keys_for_region(broader_dict, finer_dict):
             result[broader_value] = (broader_key, finer_key)
     return result
 
+def get_max_nested(d):
+    """Returns the maximum value within a nested dict"""
+    values = []
+    for v in d.values():
+        if isinstance(v, dict):
+            values.append(get_max_nested(v))
+        elif v is not None:
+            values.append(v)
+    return max(values)
+
 def get_solutions_convergence(
         broad_radii, fine_radii,
         broad_species_concentrations,
         fine_species_concentrations,
         species_lookup,
-        max_relative_species_concentrations_difference
+        max_relative_species_concentrations_difference,
+        min_relative_concentration_difference_considered_relevant
     ):
     """ Returns True if the solutions computed with the
     different number of mesh points are close enough,
     according to max_relative_species_concentrations_change.
+
+    The reason for introducing an absolute tolerance is that,
+    if the values are very close to 0, increasing the refinement
+    will change the values a lot, which means that the relative
+    deviation will be pretty much 1.0
     """
+    absolute_tolerance = min_relative_concentration_difference_considered_relevant * max(
+        get_max_nested(fine_species_concentrations),
+        get_max_nested(broad_species_concentrations)
+    )
+    convergence = True
+    convergence_values = {}
     for region in range(len(broad_radii)):
         node_mapping = map_radius_to_broader_and_finer_keys_for_region(
             broad_radii[region], fine_radii[region]
@@ -151,12 +174,23 @@ def get_solutions_convergence(
             for species in species_lookup.keys():
                 concentration_broad_system = broad_species_concentrations[region][node_tuple[0]][species]
                 concentration_fine_system = fine_species_concentrations[region][node_tuple[1]][species]
-                rel_deviation = min(concentration_broad_system, concentration_fine_system) / max(
-                    concentration_broad_system, concentration_fine_system)
-                if rel_deviation < 1 - max_relative_species_concentrations_difference:
-                    print(region, node_tuple, species, rel_deviation)
-                    return False
-    return True
+                abs_diff = abs(concentration_broad_system - concentration_fine_system)
+                magnitude = max(abs(concentration_broad_system), abs(concentration_fine_system))
+                if magnitude < absolute_tolerance:
+                    # Values are negligibly small — treat as converged
+                    rel_deviation = None
+                else:
+                    rel_deviation = 1 - (min(concentration_broad_system, concentration_fine_system) / magnitude)
+                    if rel_deviation > max_relative_species_concentrations_difference:
+                        convergence = False
+
+                # Build nested dict without overwriting existing keys
+                if region not in convergence_values:
+                    convergence_values[region] = {}
+                if node_tuple[0] not in convergence_values[region]:
+                    convergence_values[region][node_tuple[0]] = {}
+                convergence_values[region][node_tuple[0]][species] = rel_deviation
+    return convergence, convergence_values
 
 
 
@@ -173,22 +207,60 @@ def make_iteration_filename(interpolation_iteration, newton_iteration, min_digit
         f"_Newton_iteration_nr_{newton_iteration:0{min_digits}d}"
     )
 
+def dicts_are_similar(dict1, dict2,
+    threshold):
+    for key in dict1:
+        v1, v2 = dict1[key], dict2[key]
+        if min(v1, v2) / max(v1, v2) < threshold:
+            return False
+    
+    return True
+
+def save_last_interpolation_iteration_files(
+    folder_to_solve, fine_system_mesh_dict, fine_species_concentrations,
+    iteration_data_path, interpolation_iteration
+):
+        dump_json(
+            folder_to_solve,
+            f".expanded_system_mesh_for_convergence",
+            fine_system_mesh_dict
+        )
+        dump_json(
+            folder_to_solve,
+            f".species_steady_state_concentrations",
+            fine_species_concentrations
+        )
+        shutil.copy(
+            os.path.join(iteration_data_path,
+                            f".system_geometry_interpolating_{interpolation_iteration}_times.json"),
+            os.path.join(folder_to_solve, "system_geometry_for_convergence.json")
+        )
+        shutil.copy(
+            os.path.join(iteration_data_path,
+                            f".system_geometry_interpolating_{interpolation_iteration}_times.json"),
+            os.path.join(folder_to_solve, "system_geometry_for_convergence.json")
+        )
 
 if __name__ == "__main__":
     # Parse arguments from command line
     parser = argparse.ArgumentParser()
-    parser.add_argument("folder_to_solve", type=str, help="Path to folder with system info")
+    parser.add_argument("--folder", type=str)
     # int(float()) used to be able to pass scientific notation (these are originally read as a string)
     parser.add_argument("--max_num_Newton_iterations", type=lambda x: int(float(x)), help="Maximum Newton iterations") 
     parser.add_argument("--max_num_interpolation_times", type=int)
     parser.add_argument("--max_relative_species_concentrations_difference", type=lambda x: float(x)) 
+    parser.add_argument("--max_relative_flux_difference", type=lambda x: float(x))
+    parser.add_argument("--min_relative_concentration_difference_considered_relevant", type=lambda x: float(x)) 
 
     args = parser.parse_args()
 
     # Load all the passed information, create folder for background info
-    FOLDER_TO_SOLVE = args.folder_to_solve
+    FOLDER_TO_SOLVE = args.folder
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
     os.makedirs(ITERATION_DATA_PATH, exist_ok=True)
+    max_relative_flux_difference = args.max_relative_flux_difference
+    min_relative_concentration_difference_considered_relevant = args.min_relative_concentration_difference_considered_relevant
+    print(f"Solving the problem defined in {FOLDER_TO_SOLVE}.")
 
     SOLVER_INPUT_INFO = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_solver_input.yaml"))
     SOLVER_OUTPUT_INFO = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_solver_output.yaml"))
@@ -330,7 +402,7 @@ if __name__ == "__main__":
             broad_system_mesh_dict = load_json(
                 os.path.join(ITERATION_DATA_PATH, f".expanded_system_mesh_interpolating_{interpolation_iteration-1}_times.json"))
             fine_system_mesh_dict = load_json(
-                os.path.join(ITERATION_DATA_PATH, f".expanded_system_mesh_interpolating_{interpolation_iteration-1}_times.json"))
+                os.path.join(ITERATION_DATA_PATH, f".expanded_system_mesh_interpolating_{interpolation_iteration}_times.json"))
             broad_radii = broad_system_mesh_dict["radii"]
             fine_radii = fine_system_mesh_dict["radii"]
             # Load concentrations map from node to concentration
@@ -346,31 +418,79 @@ if __name__ == "__main__":
                     f"interpolation_iteration_nr_{interpolation_iteration}_final_concentrations.json"
                 )
             )
-            convergence = get_solutions_convergence(
+            convergence, convergence_dict = get_solutions_convergence(
                 broad_radii, fine_radii,
                 broad_species_concentrations,
                 fine_species_concentrations,
                 SPECIES_LOOKUP,
-                MAX_RELATIVE_SPECIES_CONCENTRATIONS_DIFFERENCE
+                MAX_RELATIVE_SPECIES_CONCENTRATIONS_DIFFERENCE,
+                min_relative_concentration_difference_considered_relevant
+            )
+            dump_json(
+                ITERATION_DATA_PATH,
+                f".convergence_data_between_{interpolation_iteration-1}_and_{interpolation_iteration}_interpolations",
+                convergence_dict
             )
             if convergence:
                 print("Converged! Saving.")
-                dump_json(
+                open(os.path.join(FOLDER_TO_SOLVE, "concentration_convergence"), "w").close()
+                save_last_interpolation_iteration_files(
                     FOLDER_TO_SOLVE,
-                    f".expanded_system_mesh_for_convergence",
-                    fine_system_mesh_dict
-                )
-                dump_json(
-                    FOLDER_TO_SOLVE,
-                    f".species_steady_state_concentrations",
-                    fine_species_concentrations
-                )
-                shutil.copy(
-                    os.path.join(ITERATION_DATA_PATH,
-                                 f".system_geometry_interpolating_{interpolation_iteration}_times.json"),
-                    os.path.join(FOLDER_TO_SOLVE, "system_geometry_for_convergence.json")
+                    fine_system_mesh_dict,
+                    fine_species_concentrations,
+                    ITERATION_DATA_PATH,
+                    interpolation_iteration
                 )
                 print("Converged! Saved.")
                 sys.exit()
             else:
                 print("Did not converge. Refine the mesh.")
+    # In case there has been no convergence:
+    # (this can happen if reactions are extremely fast compared to diffusion,
+    # such that there are large gradients close to the membranes)
+    
+    # calculate the fluxes within the last 2 interpolation iterations
+    fluxes_list = []
+    max_concentration = 0
+    for interpolation_iteration in [MAX_NUM_INTERPOLATION_TIMES-2, MAX_NUM_INTERPOLATION_TIMES-1]:
+        species_concentrations_dict = load_json(
+            os.path.join(ITERATION_DATA_PATH, f"interpolation_iteration_nr_{interpolation_iteration}_final_concentrations.json")
+        )
+        system_geometry = load_json(
+            os.path.join(ITERATION_DATA_PATH, f".system_geometry_interpolating_{interpolation_iteration}_times.json")
+        )
+        num_regions = system_geometry["geometry_config"]["num_regions"]
+        num_mesh_points_in_regions = system_geometry["geometry_config"]["num_mesh_points_in_regions"]
+        fluxes = get_outward_fluxes(
+            species_concentrations_dict,
+            REACTION_NETWORK,
+            num_regions,
+            num_mesh_points_in_regions
+        )
+        fluxes_list.append(fluxes)
+        max_concentration = max(max_concentration, get_max_nested(species_concentrations_dict))
+    
+    if dicts_are_similar(
+        fluxes_list[0], fluxes_list[1],
+        threshold=max_relative_flux_difference,
+    ):
+        open(os.path.join(FOLDER_TO_SOLVE, "flux_convergence_without_concentration_convergence"), "w").close()
+    else:
+        open(os.path.join(FOLDER_TO_SOLVE, "no_flux_nor_concentration_convergence"), "w").close()
+
+    # save anyways
+    save_last_interpolation_iteration_files(
+        FOLDER_TO_SOLVE,
+        fine_system_mesh_dict,
+        fine_species_concentrations,
+        ITERATION_DATA_PATH,
+        interpolation_iteration
+    )
+
+
+    
+    
+
+
+    
+

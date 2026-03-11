@@ -13,9 +13,8 @@ conda activate snakemake_env
 # Run Snakemake with your profile
 snakemake \
     --profile config/slurm \
-    --jobs 216 \
+    --jobs 2 \
     --use-conda \
     --rerun-incomplete \
     --keep-going \
-    --printshellcmds \
-    --forcerun solve_boundary_value_problem
+    --printshellcmds

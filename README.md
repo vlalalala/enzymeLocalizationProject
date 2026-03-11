@@ -33,6 +33,19 @@ This work continues previous work by Hinzpeter et al: Optimal Compartmentalizati
 
 **IMPORTANT**: ratios different to 1:1 between reactants and products is not yet implemented!
 
+## Optimization
+We optimize the flux of some substance by allocating the different enzymes across the different regions.
+
+The number of free parameters is the following: (# enzyme types -1) + (# enzymes) x (# regions - 1) + (# regions - 1): 
+    1. The first factor represents the degrees of freedom we get from allocating a total fixed quantity of enzyme towards the different enzymes.
+    2. The second factor is the degrees of freedom from each enzyme allocation to the different regions has to sum up to 100%.
+    2. The third (# regions - 1) comes from having to find the optimal position of the (# regions - 1) number of inner membranes.
+
+Softmax function:
+```math
+x_i = \frac{e^{z_i}}{\sum_j e^{z_j}}
+```
+
 ## How to use the code
 The code uses `snakemake` for system management in order to be able to run reproducible and scalable data analyses. 
 It is easy to use in combination with Anaconda/Miniconda. For usage with Miniconda:
@@ -222,11 +235,45 @@ For each interior point, we have
 0 = D_s \cdot \left( \frac{c_s^\mathrm{right} - 2 \cdot c_s^\mathrm{center} + c_s^\mathrm{left}}{h^2} + \frac{c_s^\mathrm{right} - c_s^\mathrm{left}}{h \cdot r}\right) + R_s\left(\bm{c}^\mathrm{center}\right)
 ```
 
-For the points at $r=0$, we get
+For the points at $r=0$, we expand $c(r)$ in a Taylor series around $0$:
+```math
+c(r) = c(0) + c^\prime (0) r + \frac{1}{2} c^{\prime\prime}r^2 + \mathcal{O}(r^3)
+```
+s.t.
+```math
+c^\prime(r) = c^{\prime\prime}(0)r + \mathcal{O}(r^2)
+```
+and
+```math
+c^{\prime\prime}(r) = c^{\prime\prime}(0) + \mathcal{O}(r)
+```
+
+We have
+```math
+c^\prime (0) = 0
+```
+due to symmetry.
+
+Recall
+```math
+\frac{\mathrm{d}^2 c_s}{\mathrm{d}r^2} + \frac{2}{r} \frac{\mathrm{d}c_s}{\mathrm{d}r} + \frac{1}{D_u} R_s(\bm{c}) = 0 
+```
+The second term can be written in the following way:
+```math
+\frac{2}{r}c^\prime(r) = \frac{2}{r}(c^{\prime\prime}(0)r + \mathcal{O}(r^2)) = 2c^{\prime\prime}(0)+\mathcal{O}(r)
+```
+s.t.
+```math
+\left(\frac{\mathrm{d}^2 c_s}{\mathrm{d}r^2} + \frac{2}{r} \frac{\mathrm{d}c_s}{\mathrm{d}r}\right) \Bigr|_{r=0} \approx 3 c^{\prime\prime}(0)
+```
+
+
+
+
 ```math
 \nabla^2 c(0) = 3 \frac{\partial^2 c}{\partial r^2}(0)
 ```
-using l'Hospital rule.
+(It is also possible to derive this using l'Hospital rule.)
 Using $c_{-1} = c_1$ we get
 ```math
 \nabla^2 c_s(0) = 3 \cdot D_s / h^2 \cdot 2 \cdot (c_s^\mathrm{right} - c_s^\mathrm{center})
