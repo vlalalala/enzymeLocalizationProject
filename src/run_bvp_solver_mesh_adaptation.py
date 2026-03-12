@@ -21,6 +21,7 @@ from run_bvp_solver import solve_newton
 from plot_bvp_solution import plot_steady_state_concentrations
 from auxiliary_functions_framework_organization import get_dict_with_correct_key_types_from_json_file
 from study_bvp_solution import get_outward_fluxes
+from plot_bvp_solver_mesh_adaptation_progress import plot_convergence_progress, make_newton_iterations_gif
 
 def find_latest_solution_of_given_interpolation_iteration(
         concentration_files, interpolation_iteration,
@@ -441,7 +442,10 @@ if __name__ == "__main__":
                     ITERATION_DATA_PATH,
                     interpolation_iteration
                 )
-                print("Converged! Saved.")
+                print("Converged! Saved. Plotting.")
+                plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+                make_newton_iterations_gif(FOLDER_TO_SOLVE, REACTION_NETWORK, SPECIES_LOOKUP)
+                print("Plotted.")
                 sys.exit()
             else:
                 print("Did not converge. Refine the mesh.")
@@ -486,11 +490,7 @@ if __name__ == "__main__":
         ITERATION_DATA_PATH,
         interpolation_iteration
     )
-
-
     
-    
-
-
-    
-
+    plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+    make_newton_iterations_gif(FOLDER_TO_SOLVE, REACTION_NETWORK, SPECIES_LOOKUP)
+    print("Plotted.")

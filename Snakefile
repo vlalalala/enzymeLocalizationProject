@@ -45,6 +45,8 @@ df = "examples/simple_decay_with_two_inner_boundaries"
 df = "data_private/slurm_test2"
 df = "data_private/simple_optuna_test"
 df = "data_private/enzyme_opt"
+df = "data_private/case_01"
+
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 
@@ -76,7 +78,7 @@ def trial_path(wildcards, filename=""):
         base = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
     return f"{base}/{filename}" if filename else base
 
-N_TRIALS = 5    # parallel solver calls per round
+N_TRIALS = 3    # parallel solver calls per round
 N_ROUNDS = 3   # optimization rounds
 ROUND_WIDTH = len(str(N_ROUNDS - 1))
 TRIAL_WIDTH = len(str(N_TRIALS - 1))
@@ -334,6 +336,7 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
         """
 
 use rule solve_boundary_value_problem_with_mesh_adaptation as solve_boundary_value_problem_with_mesh_adaptation_within_optimization with:
+    # snakemake -s Snakefile data_private/case_01/combined_000015/optimization_round_0/trial_0/.species_steady_state_concentrations.json --cores 1 --use-conda
     output:
         "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.species_steady_state_concentrations.json"
 
@@ -363,9 +366,11 @@ rule plot_boundary_value_problem:
     """
     # snakemake -s Snakefile data/test_phase_space/combined_000001/.completed_visualization --cores 1 --use-conda
     input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/.species_steady_state_concentrations.json"
+        lambda wildcards: trial_path(wildcards, ".species_steady_state_concentrations.json")
     output:
         touch("{df}/{bn}_{cn}/.completed_visualization")
+    params:
+        folder = lambda wildcards: trial_path(wildcards)
     conda:
         "config/environment.yaml"
     threads: 1
@@ -374,9 +379,13 @@ rule plot_boundary_value_problem:
         runtime= 20
     shell:
         """
-        python src/plot_bvp_solution.py \
-            {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+        python src/plot_bvp_solver_mesh_adaptation_progress.py {params.folder}/
         """
+
+use rule plot_boundary_value_problem as plot_boundary_value_problem_within_optimization with:
+    # snakemake -s Snakefile data_private/case_01/combined_000015/optimization_round_0/trial_0/.completed_visualization --cores 1 --use-conda
+    output:
+        touch("{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.completed_visualization")
 
 #######################################################
 # ORGANIZE OPTIMIZATION

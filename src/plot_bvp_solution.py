@@ -13,7 +13,6 @@ from auxiliary_functions_using_standard_library import (
     load_json, find_max_in_nested_dict)
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 from auxiliary_functions_framework_organization import get_dict_with_correct_key_types_from_json_file
-import imageio.v3 as iio
 import imageio
 
 #plt.rcParams['text.usetex'] = True
@@ -446,7 +445,7 @@ if __name__ == "__main__":
     PLOT_ITERATION = args.plot_iteration
 
     # Load inputs and define global parameters
-    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network_final"))
+    REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
     SYSTEM_GEOMETRY_DICT = load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_geometry.json"))
     SYSTEM_MESH_DICT= load_json(os.path.join(FOLDER_TO_SOLVE, ".expanded_system_mesh.json"))
 
