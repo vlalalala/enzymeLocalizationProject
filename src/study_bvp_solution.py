@@ -5,7 +5,7 @@ from auxiliary_functions_framework_organization import (
 import os
 from auxiliary_functions import dump_json
 from auxiliary_functions_using_standard_library import pickle_load_binary, load_json
-
+import sys
 
 def get_outward_fluxes(species_concentrations_dict, reaction_network, num_regions, num_mesh_points_in_regions):
     """
@@ -24,9 +24,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("folder_to_solve", type=str, help="Path to folder with system info")
     args = parser.parse_args()
-
-    # Load all the passed information
     FOLDER_TO_SOLVE = args.folder_to_solve
+
+    # Do not run if the simulation has been pruned. Directly create dummy output file and exit.
+    if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "pruned.json")):
+        dump_json(FOLDER_TO_SOLVE, "fluxes", {"pruned": True})
+        sys.exit(0)
 
     # Load inputs and define global parameters
     REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
@@ -39,6 +42,7 @@ if __name__ == "__main__":
     NUM_MESH_POINTS_IN_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_mesh_points_in_regions"]
     NUM_REGIONS = SYSTEM_GEOMETRY_DICT["geometry_config"]["num_regions"]
     MEMBRANE_RADII = SYSTEM_GEOMETRY_DICT["geometry_config"]["membrane_radii"]
+    
     
     species_concentrations_with_strings = load_json(
         os.path.join(FOLDER_TO_SOLVE, ".species_steady_state_concentrations.json")

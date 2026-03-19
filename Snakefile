@@ -5,6 +5,7 @@
 import os
 import re
 import glob
+import hashlib
 from itertools import product
 from src.auxiliary_functions_using_standard_library import as_list, load_json
 
@@ -20,8 +21,8 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 # python src/_create_phase_space.py path_to_new_folder
 
 # Step 4: Run rule all
-# snakemake --use-conda --cores 1
-
+# snakemake --use-conda --cores 1 --scheduler greedy
+# scheduler greedy to schedule short jobs first
 # or
 """
 snakemake \
@@ -29,12 +30,21 @@ snakemake \
   --jobs 20 \
   --rerun-incomplete \
   --keep-going \
-  --use-conda
+  --quiet rules
 """
 # Get the number of jobs running through squeue --me -h | wc -l
 # --keep-going stops snakemake from submitting jobs once one has not worked
 
 # Note: The maximum resident set size (kbytes) was computed with 2500 mesh points, 4 species, 3 enzymes and 6 reactions.
+
+############################################################
+# Create environment
+#rule create_environment:
+#    # snakemake -s Snakefile config/.environment_with_snakemake_created --cores 1 --use-conda
+#    output:
+#        touch("config/.environment_with_snakemake_created")
+#    conda:
+#        "config/environment_with_snakemake.yaml"
 
 ############################################################
 
@@ -45,7 +55,7 @@ df = "examples/simple_decay_with_two_inner_boundaries"
 df = "data_private/slurm_test2"
 df = "data_private/simple_optuna_test"
 df = "data_private/enzyme_opt"
-df = "data_private/case_01"
+df = "data_private/case_02"
 
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
@@ -78,12 +88,12 @@ def trial_path(wildcards, filename=""):
         base = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
     return f"{base}/{filename}" if filename else base
 
-N_TRIALS = 3    # parallel solver calls per round
-N_ROUNDS = 3   # optimization rounds
+N_TRIALS = 20    # parallel solver calls per round
+N_ROUNDS = 10   # optimization rounds
 ROUND_WIDTH = len(str(N_ROUNDS - 1))
 TRIAL_WIDTH = len(str(N_TRIALS - 1))
-TRIALS = [str(i).zfill(TRIAL_WIDTH) for i in range(N_TRIALS)]
-ROUNDS = [str(i).zfill(ROUND_WIDTH) for i in range(N_ROUNDS)]
+#TRIALS = [str(i).zfill(TRIAL_WIDTH) for i in range(N_TRIALS)]
+#ROUNDS = [str(i).zfill(ROUND_WIDTH) for i in range(N_ROUNDS)]
 TRIALS = list(range(N_TRIALS))
 ROUNDS = list(range(N_ROUNDS))
 
@@ -99,6 +109,7 @@ wildcard_constraints:
 # RULES FOR CHECKING VALIDITY OF USER INPUT
 ############################################
 
+
 ### Get template for input files about reaction network ###
 reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
@@ -113,13 +124,17 @@ rule check_solver_input_validity:
     threads: 1
     resources:
         mem_mb=300,
-        runtime=6
+        runtime=20 # runtime resource for whole group
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    priority:
+        100  # run first
     conda:
         "config/environment.yaml"
     shell:
         "python src/check_solver_validity.py {params.folder} parameters_solver_input"
 
 use rule check_solver_input_validity as check_solver_input_validity_within_optimization with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     output:
         touch("{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.validated_solver_input")
 
@@ -134,13 +149,17 @@ rule check_solver_output_validity:
     threads: 1
     resources:
         mem_mb=300,
-        runtime=6
+        runtime=5
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    priority:
+        100  # run first
     conda:
         "config/environment.yaml"
     shell:
         "python src/check_solver_validity.py {params.folder} parameters_solver_output"
 
 use rule check_solver_output_validity as check_solver_output_validity_within_optimization with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     output:
         touch("{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.validated_solver_output")
 
@@ -158,13 +177,17 @@ rule check_reaction_network_info_validity:
     threads: 1
     resources:
         mem_mb=300,
-        runtime=7
+        runtime=5
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    priority:
+        100  # run first
     conda:
         "config/environment.yaml"
     shell:
         "python src/check_reaction_network_validity.py {params.folder}"
 
 use rule check_reaction_network_info_validity as check_reaction_network_info_validity_within_optimization with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     output:
         touch("{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.validated_reaction_network_input")
 
@@ -190,12 +213,16 @@ rule create_system_geometry:
     resources:
         mem_mb=300,
         runtime=12
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    priority:
+        100  # run first
     conda:
         "config/environment.yaml"
     shell:
         "python src/create_system_geometry.py {params.folder}"
 
 use rule create_system_geometry as create_system_geometry_within_optimization with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     output:
         "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.system_geometry.json"
 
@@ -211,12 +238,16 @@ rule create_reaction_network:
     resources:
         mem_mb=500,
         runtime=10
+    priority:
+        100  # run first
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     conda:
         "config/environment.yaml"
     shell:
         "python src/create_reaction_network.py {params.folder}"
 
 use rule create_reaction_network as create_reaction_network_within_optimization with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     output:
         "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.pickled_reaction_network_without_enzyme_concentration"
 
@@ -237,12 +268,17 @@ rule define_enzyme_concentrations:
     resources:
         mem_mb=500,
         runtime=10
+    priority:
+        100  # run first
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     conda:
         "config/environment.yaml"
     shell:
         "python src/define_enzyme_concentrations.py {params.folder}"
 
 use rule define_enzyme_concentrations as define_enzyme_concentrations_within_optimization with:
+    # hashlib to keep it shorter: group: lambda wildcards: f"solver_preparation_{trial_path(wildcards).replace("/", "_")}"
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     output:
         "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.pickled_reaction_network"
  
@@ -270,7 +306,9 @@ rule cleanup_old_iterations:
     threads: 1
     resources:
         mem_mb=1000,
-        runtime=10
+        runtime=5
+    priority:
+        100  # run first
     run:
         import os, glob
         folder = params.folder
@@ -314,7 +352,7 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
     params:
         folder                                         = lambda wildcards: trial_path(wildcards),
         max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 10000)),
-        max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 4)),
+        max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 3)),
         max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-2),
         max_relative_flux_difference = lambda wildcards: config.get("max_relative_flux_difference", 1.0e-2),
         min_relative_concentration_difference_considered_relevant = lambda wildcards: config.get("min_relative_concentration_difference_considered_relevant", 1.0e-2)
@@ -322,8 +360,10 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
         "config/environment.yaml"
     threads: 1
     resources:
-        mem_mb=1000,
-        runtime=90
+        mem_mb=5000,
+        runtime=130
+    priority:
+        0  # run LAST
     shell:
         """
         python src/run_bvp_solver_mesh_adaptation.py \
@@ -352,6 +392,8 @@ rule study_bvp_solution:
     resources:
         mem_mb=1000,
         runtime=5
+    priority:
+        100  # run first
     conda:
         "config/environment.yaml"
     shell:
@@ -377,6 +419,8 @@ rule plot_boundary_value_problem:
     resources:
         mem_mb=1000,
         runtime= 20
+    priority:
+        100  # run first
     shell:
         """
         python src/plot_bvp_solver_mesh_adaptation_progress.py {params.folder}/
@@ -430,6 +474,8 @@ rule suggest_optimization_params_round_0:
     resources:
         mem_mb=1000,
         runtime= 5
+    priority:
+        101  # run first
     shell:
         """
         python src/optimizer_suggest_trials.py \
@@ -447,7 +493,8 @@ rule suggest_optimization_params:
         done = lambda wildcards: (
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/"
             f"optimization_round_{int(wildcards.round)-1}.done"
-        )
+        ),
+        previous_round_best = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{int(wildcards.round)-1}_best.json"
     output:
         files = expand("{{df}}/{{bn}}_{{cn}}/optimization_round_{{round}}/trial_{trial}/{file_name}",
                        trial=TRIALS,
@@ -455,6 +502,8 @@ rule suggest_optimization_params:
         flag  = touch("{df}/{bn}_{cn}/optimization_round_{round}/.trial_files_created")
     conda:
         "config/environment.yaml"
+    priority:
+        101  # run first
     shell:
         """
         python src/optimizer_suggest_trials.py \
@@ -481,12 +530,30 @@ rule collect_and_update:
     resources:
         mem_mb=1000,
         runtime= 5
+    priority:
+        100  # run first
     shell:
         """
         python src/optimizer_collect_trial_results.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {wildcards.round} \
             --product_to_maximize {params.product_to_maximize}
+        """
+
+rule checkpoint_best:
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{wildcards.round}.done"
+    output:
+        "{df}/{bn}_{cn}/optimization_round_{round}_best.json"
+    conda:
+        "config/environment.yaml"
+    priority:
+        100  # run first
+    shell:
+        """
+        python src/optimizer_get_best_result.py \
+            --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+            --round {wildcards.round}
         """
 
 rule best_result:
@@ -497,14 +564,19 @@ rule best_result:
         "{df}/{bn}_{cn}/best_result.json"
     conda:
         "config/environment.yaml"
+    params:
+        last_round = N_ROUNDS-1
     threads: 1
     resources:
         mem_mb=1000,
         runtime= 3
+    priority:
+        100  # run first
     shell:
         """
         python src/optimizer_get_best_result.py \
-            --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn}
+            --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+            --round {params.last_round}
         """
 
 ### To have a specific iteration of the solver plotted, run on terminal ###
@@ -516,16 +588,3 @@ rule best_result:
 #https://collab.dvb.bayern/spaces/TUMnat/pages/431097554/SLURM+Queuing+system
 #https://collab.dvb.bayern/pages/viewpage.action?spaceKey=TUMnat&title=PH+Theory+Cluster
 
-rule checkpoint_best:
-    input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{wildcards.round}.done"
-    output:
-        "{df}/{bn}_{cn}/optimization_round_{round}_best.json"
-    conda:
-        "config/environment.yaml"
-    shell:
-        """
-        python src/optimizer_get_best_result.py \
-            --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
-            --round {wildcards.round}
-        """

@@ -1,6 +1,4 @@
 executor: slurm
-jobs: 1
-use-conda: true
 #slurm-extra-args: "--exclude=pauli1"
 #max-failures: 20
 

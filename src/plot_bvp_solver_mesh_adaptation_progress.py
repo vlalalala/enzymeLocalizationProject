@@ -123,7 +123,8 @@ def make_newton_iterations_gif(
             ))
             json_files.sort()
             # add last one
-            json_files.append(os.path.join(iteration_data_folder, f"interpolation_iteration_nr_{interp_nr}_final_concentrations.json"))
+            json_files.append(Path(os.path.join(iteration_data_folder, 
+                f"interpolation_iteration_nr_{interp_nr}_final_concentrations.json")))
             system_geometry = load_json(
                 os.path.join(
                     iteration_data_folder, f".system_geometry_interpolating_{interp_nr}_times.json"

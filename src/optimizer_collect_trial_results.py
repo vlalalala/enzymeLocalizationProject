@@ -5,6 +5,7 @@ import argparse
 import os
 from auxiliary_functions_using_standard_library import load_json
 from optuna.trial import TrialState
+import re
 
 if __name__ == "__main__":
     # Parse arguments from command line
@@ -33,18 +34,32 @@ if __name__ == "__main__":
     trial_dirs = [os.path.join(round_folder, f"trial_{trial_idx}") for trial_idx in range(n_trials)]
           
     # Feed results back to Optuna
-    for trial_idx, trial_dir in enumerate(trial_dirs):
+    for trial_dir in trial_dirs:
+        # Extract trial_idx from name
+        trial_idx = int(re.search(r"trial_(\d+)", os.path.basename(trial_dir)).group(1))
+        # Informs Optuna about the result of the trial
+        trial = study.trials[round_idx * n_trials + trial_idx]
+        # skip pruned trials
+        if trial.state == TrialState.PRUNED:
+            print(f"Trial {trial_idx} was pruned, skipping.")
+            continue
+        
+        # Non-pruned trials:
         fluxes = load_json(os.path.join(trial_dir, "fluxes.json"))
         try:
             scalar = fluxes[product_to_maximize]
         except:
             raise ValueError(f"Could not find species {product_to_maximize}.")
-        # Informs Optuna about the result of the trial
-        trial = study.trials[trial_idx]
+        
         if trial.state == TrialState.WAITING:
-            study.tell(trial_idx, scalar)
+            # TrialState WAITING if the trial was created with ask()
+            # but tell() was never called
+            study.tell(round_idx * n_trials + trial_idx, scalar)
         elif trial.state == TrialState.COMPLETE:
+            # tell() was already called for this trial
             print(f"Trial {trial_idx} already complete (value={trial.value}), skipping tell()")
         else:
-            # RUNNING or PRUNED - safe to tell
-            study.tell(trial_idx, scalar)
+            # RUNNING. the trial is still marked as running (this can
+            # happen if the previous script run crashed before calling tell()
+            # )
+            study.tell(round_idx * n_trials + trial_idx, scalar)

@@ -69,7 +69,7 @@ def define_regional_enzyme_concentrations(
             for region, region_volume in system_geometry_dict["geometry_config"]["volume_regions"].items()
         }
         if (maximum_concentration_allowed is not None
-            and any(enzyme.regional_concentrations.values() > maximum_concentration_allowed)):
+            and any(v > maximum_concentration_allowed for v in enzyme.regional_concentrations.values())):
             raise ValueError(f"A regional concentration of enzyme {enzyme.name}: {enzyme.regional_concentrations} is above {maximum_concentration_allowed}.")     
 
     return reaction_network
@@ -85,11 +85,15 @@ if __name__ == "__main__":
     # Create final .species_steady_state_concentrations in case the parameter values are not viable
     # with the constraints given
     try:
-        reaction_network = return_reaction_network_with_total_fixed_quantity_asserted(
-            parameter_value_conditions["enzyme_total_fixed_quantity"],
-            reaction_network,
-            parameter_value_conditions["enzyme_whose_quantity_to_modify_when_total_fixed_quantity"]
-        )
+        if "trial" not in folder:
+            reaction_network = return_reaction_network_with_total_fixed_quantity_asserted(
+                parameter_value_conditions["enzyme_total_fixed_quantity"],
+                reaction_network,
+                parameter_value_conditions["enzyme_whose_quantity_to_modify_when_total_fixed_quantity"]
+            )
+            print(f"modifying enzyme quantity of {parameter_value_conditions["enzyme_whose_quantity_to_modify_when_total_fixed_quantity"]}")
+        else:
+            print("defining enzyme concentrations without modifying quantities.")
         reaction_network = define_regional_enzyme_concentrations(
             reaction_network,
             system_geometry_dict,

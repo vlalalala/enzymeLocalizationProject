@@ -383,20 +383,38 @@ It is important to note that the net flux may not cross the threshold given by $
 
 
 ## Typical values
+see 
+https://bionumbers.hms.harvard.edu/search.aspx?trm=diffusion+coefficient
 
-Diffusion coefficient of l-Trp taken as $6.6\cdot 10^{-6} cm^{2} s^{-1} = 6.6\cdot 10^{-10} m^{2} s^{-1}$ (estimated from https://pmc.ncbi.nlm.nih.gov/articles/PMC16526/).
-Assuming same diffusion coefficient for the other values.
+**Diffusion coefficient**
+- Diffusion coefficient of l-Trp estimated as $D = 6.6\cdot 10^{-6} cm^{2} s^{-1} = 6.6\cdot 10^{-10} m^{2} s^{-1}$ (estimated from https://pmc.ncbi.nlm.nih.gov/articles/PMC16526/).
+- Diffusion coefficient in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated as $D=1000 \mu m^2s^{-1} = 1.0 \cdot 10^{-9} m^2 s^{-1}$
 
-Following https://pubs.acs.org/doi/pdf/10.1021/acsomega.3c08233?ref=article_openPDF (quantification of kinetics of VioA) we assume $k_\mathrm{M} = 125 \mu M = 1.25\cdot 10^{-4}M$ and $k_\mathrm{cat} = 0.75 s^{-1}$ for all enzymes.
 
-For the external concentration of l-Trp we're assuming $s_0 = 25 \mu M = 25\cdot 10^{-6}M$ and the permeability $p = 90 \mu M s^{-1} = 90\cdot 10^{-6}M s^{-1}$.
-(as in https://www.cell.com/biophysj/fulltext/S0006-3495(16)34263-1?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0006349516342631%3Fshowall%3Dtrue)
+**Maximal enzyme concentration**
+- Maximal enzyme concentration in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated as $25 mM = 25 \cdot 10^{-3}M = 25 mol/m^3$.
+- According to Zotter et al ("Quantifying enzyme activity in living cells"): "we were able to determine catalytic constants in cells with enzyme concentrations ranging from 0.01 to 10 μM and substrate concentration ranging from 1 to 100 μM. These are common concentrations for enzymes and substrates in the cell (34)". (34) is "BioNumbers—the database of key numbers in molecular and cell biology" by Milo et al.
 
-We use a radius of $1\mu m$.
+**Enzyme kinetic parameters**
+- Characteristics of VioA following https://pubs.acs.org/doi/pdf/10.1021/acsomega.3c08233?ref=article_openPDF: $k_\mathrm{M} = 125 \mu M = 125\cdot 10^{-3}mM = 125 \cdot 10^{-3} mol/m^3$ and $k_\mathrm{cat} = 0.75 s^{-1}$
 
-The concentration of enzymes is chosen as $25 mM = 25 \cdot 10^{-3}M$
+**External concentration**
+- External concentration following https://www.cell.com/biophysj/fulltext/S0006-3495(16)34263-1?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0006349516342631%3Fshowall%3Dtrue : 
+l-Trp we're assuming $s_0 = 25 \mu M = 25\cdot 10^{-6}M = 25\cdot 10^{-3}mol/m^3$.
+- Important note to self:
+    - it might make sense to take the external concentration to be within the range of $(0.1 - 10) \cdot k_M$
+- According to Zotter et al ("Quantifying enzyme activity in living cells"): "we were able to determine catalytic constants in cells with enzyme concentrations ranging from 0.01 to 10 μM and substrate concentration ranging from 1 to 100 μM. These are common concentrations for enzymes and substrates in the cell (34)". (34) is "BioNumbers—the database of key numbers in molecular and cell biology" by Milo et al.
 
-The specified values are to be given in SI units.
+**Permeability constant**
+- Maximal enzyme concentration in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated in the Supplementary Material. They use $p = 90 \mu M s^{-1} = 90\cdot 10^{-6}M s^{-1} = 90\cdot 10^{-3} mol s^{-1}$ for some and a fifth of that for others.
+
+**Vesicle size**
+- Radius of $1\mu m$.
+
+The specified values are all to be given in SI units (including concentrations)!
+
+**Enzyme quantity**
+keep in mind that $q_\mathrm{max} = c_\mathrm{max} * 4/3 * \pi * R**3$, which for $R = 1^{-6}m$ and $c_\mathrm{max}=25 \cdot 10^{-3}mol/m^3$ leads to $q_\mathrm{max} = 1.05\cdot 10^{-19}mol$
 
 
 ## Cases for which we know the analytical solution

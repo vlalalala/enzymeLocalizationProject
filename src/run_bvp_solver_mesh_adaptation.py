@@ -257,6 +257,12 @@ if __name__ == "__main__":
 
     # Load all the passed information, create folder for background info
     FOLDER_TO_SOLVE = args.folder
+
+    # Do not run if the simulation has been pruned. Directly create dummy output file and exit.
+    if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "pruned.json")):
+        dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", {"pruned": True})
+        sys.exit(0)
+
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")
     os.makedirs(ITERATION_DATA_PATH, exist_ok=True)
     max_relative_flux_difference = args.max_relative_flux_difference

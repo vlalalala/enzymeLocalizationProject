@@ -1,0 +1,19 @@
+name: snakemake_slurm_environment
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - numpy
+  - matplotlib
+  - pandas
+  - networkx
+  - pygraphviz
+  - scipy
+  - imageio
+  - tqdm
+  - pyyaml
+  - graphviz
+  - optuna
+  - snakemake
+  - snakemake-executor-plugin-slurm
