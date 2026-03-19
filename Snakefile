@@ -361,7 +361,7 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
     threads: 1
     resources:
         mem_mb=5000,
-        runtime=130
+        runtime=300
     priority:
         0  # run LAST
     shell:

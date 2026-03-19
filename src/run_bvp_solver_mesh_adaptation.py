@@ -44,9 +44,15 @@ def find_latest_solution_of_given_interpolation_iteration(
             matching_files.append((int(newton_str), path))
     if not matching_files:
         return None, None
-    # pick file with largest Newton iteration
-    latest_newton_iteration, latest_path = max(matching_files, key=lambda x: x[0])
-    return latest_newton_iteration, latest_path
+    # pick file with largest Newton iteration which is not empty
+    # (Snakemake may create the latest file but it might be empty, so we guard against that)
+    for newton_iteration, path in sorted(matching_files, key=lambda x: x[0], reverse=True):
+        if os.path.getsize(path) > 0:
+            return newton_iteration, path
+
+    return None, None
+    #latest_newton_iteration, latest_path = max(matching_files, key=lambda x: x[0])
+    #return latest_newton_iteration, latest_path
 
 def get_tau_and_residual_and_runtime_from_progress_log(progress_log_path, iteration_number):
     """
