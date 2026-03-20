@@ -4,7 +4,7 @@
 #SBATCH --error=.snakemake/slurm_logs/snakemake_controller_%j.err
 #SBATCH --time=18:00:00       # total walltime for the controller
 #SBATCH --cpus-per-task=1     # one CPU thread for the controller
-#SBATCH --mem=4000            # MB for the controller process
+#SBATCH --mem=5000            # MB for the controller process
 
 
 source /space/ge42far/miniconda3/etc/profile.d/conda.sh
@@ -19,3 +19,10 @@ snakemake \
     --keep-going \
     --printshellcmds \
     --use-conda
+
+# To figure out whether stuff went wrong:
+# sacct -j 36274046 --format=JobID,MaxRSS,AveRSS,State,ExitCode,ReqMem,AllocTRES,MaxVMSize,AveVMSize
+# sacct --nodelist=meitner06 --starttime=2026-03-19T17:50:00 --endtime=2026-03-19T17:55:00 --format=JobID,User,ReqMem,MaxRSS,State
+
+# To find log file
+# find /tuph/t30/bigspace/ge42far/enzymeLocalizationProject/.snakemake/slurm_logs -name "36279900.log"

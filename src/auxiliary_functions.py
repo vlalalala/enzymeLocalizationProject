@@ -54,6 +54,7 @@ def dump_json(dump_directory: str, file_basename: str, dict_to_dump: dict):
     path = os.path.join(dump_directory, f"{file_basename}.json")
     with open(path, "w") as f:
         json.dump(converted, f, indent=4)
+    # file is automatically closed here
 
 class Ratio:
     """Auxiliary class. Defines a ratio of a:b """

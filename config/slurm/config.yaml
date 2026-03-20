@@ -3,10 +3,10 @@ executor: slurm
 #max-failures: 20
 
 # Optional but common:
-default-resources:
+#default-resources:
   #slurm_partition: "compute"
   #slurm_account: "myacct"
-  runtime: 5         # minutes
-  mem_mb_per_cpu: 1000 # MB per CPU
+  #runtime: 5         # minutes
+  #mem_mb: 1000 # MB
 
 # threads = --cpus-per-task on SLURM
