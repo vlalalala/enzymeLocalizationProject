@@ -50,7 +50,7 @@ def plot_steady_state_concentrations(
     for x_value in x_values:
         ax.axvline(x_value/max(x_values), ymin = 0.95, ymax = 1, color="k")
     for species in reaction_network.species:
-        curve, = ax.plot(np.array(x_values)/max(x_values), y_values[species], label=species.name)
+        curve, = ax.plot(np.array(x_values)/max(x_values), y_values[species], label=species.name, alpha = 0.6)
         color = curve.get_color()
         ax.hlines(species.external_concentration, xmin=1, xmax = 1.1, color = color)
 
@@ -76,10 +76,10 @@ def plot_steady_state_concentrations(
 
     max_value = max(max(y_values[species]) for species in reaction_network.species)
     if ymax == None:
-        ymax = max_value * 1.05
+        ymax = max_value * 1.15
     if title != None:
         ax.set_title(title, loc="left")
-    ax.set_ylim(ymin=0, ymax = ymax)
+    ax.set_ylim(ymin=-ymax/25, ymax = ymax) #ymin close to 0, but not equal to 0
     ax.set_xlim(xmin=0, xmax = 1.1)
     fig.tight_layout()
     if output_file_name != None:

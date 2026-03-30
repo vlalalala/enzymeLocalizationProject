@@ -344,7 +344,7 @@ if __name__ == "__main__":
                 initial_species_concentrations = {
                     region_idx : {
                         mesh_point_idx : {
-                            species : max_external_concentration #* RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
+                            species : species.external_concentration + max_external_concentration*0.1 # max_external_concentration #* RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
                             for species in REACTION_NETWORK.species}
                         for mesh_point_idx in range(system_geometry_dict["geometry_config"]["num_mesh_points_in_regions"][region_idx])}
                     for region_idx in range(system_geometry_dict["geometry_config"]["num_regions"])

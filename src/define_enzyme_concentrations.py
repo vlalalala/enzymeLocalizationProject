@@ -7,38 +7,6 @@ from auxiliary_functions import read_yaml_file, dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
 
 
-def return_enzyme_concentrations(reaction_network, membrane_radii, maximum_enzyme_concentration):
-    """Returns a dictionary with keys [region_idx][species]
-    and the modified reaction_network with the concentrations.
-    """
-    enzyme_concentrations = {
-        region_idx: {
-            enzyme: None
-            for enzyme in reaction_network.enzymes
-        }
-        for region_idx in range(len(membrane_radii))
-    }
-    for enzyme in reaction_network.enzymes:
-        regions_volume = 0
-        for region in enzyme.regions:
-            if region == 0:
-                regions_volume += 4/3 * np.pi * membrane_radii[0]**3
-            else:
-                max_radius = membrane_radii[region]
-                min_radius = membrane_radii[region-1]
-                regions_volume += 4/3 * np.pi * (max_radius**3 - min_radius**3)
-        concentration = enzyme.quantity / regions_volume
-        reaction_network.enzymes[enzyme.name].concentration = concentration
-        if maximum_enzyme_concentration != None and concentration > maximum_enzyme_concentration:
-            raise ValueError(f"Enzyme {enzyme.name} has a larger concentration than allowed.")
-        for region_idx in enzyme_concentrations.keys():
-            if region_idx in enzyme.regions:
-                enzyme_concentrations[region_idx][enzyme] = concentration
-            else:
-                enzyme_concentrations[region_idx][enzyme] = 0
-    
-    return enzyme_concentrations, reaction_network
-
 def return_reaction_network_with_total_fixed_quantity_asserted(enzyme_total_fixed_quantity, reaction_network, enzyme_whose_quantity_to_modify):
     """ If enzyme_total_fixed_quantity is None, returns the reaction network inputted
     Else, enzyme_total_fixed_quantity is a float.
@@ -109,3 +77,10 @@ if __name__ == "__main__":
             os.path.join(folder, ".pickled_reaction_network"),
             reaction_network
         )
+    enzyme_concentrations = {
+        enzyme: enzyme.regional_concentrations
+        for enzyme in reaction_network.enzymes}
+    
+    # Save the enzyme concentrations in a human-readable format
+    # (Important: save outside of enzymes.csv (yes, it would be tempting) but Snakemake will not like it)
+    dump_json(folder, "enzyme_concentrations", enzyme_concentrations)

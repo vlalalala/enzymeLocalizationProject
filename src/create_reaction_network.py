@@ -80,7 +80,6 @@ class Reaction:
         self.start_species = start_species
         self.end_species = end_species
         self.ratio_endtostart_species = ratio_endtostart_species
-        self.name = ""
 
     def __repr__(self):
         return f"reaction from {self.start_species.name} to {self.end_species.name}"
@@ -95,6 +94,7 @@ class EnzymaticReaction(Reaction):
         self.k_M = k_M
         self.hill = hill
         self.k = k_cat/k_M
+        self.name = f"{start_species.name}->{end_species.name}_enzymatically"
 
     def __str__(self):
         return f"enzymatic {super().__repr__()} catalyzed by {self.enzyme}"
@@ -108,6 +108,7 @@ class SpontaneousReaction(Reaction):
                  k: float):
         super().__init__(start_species, end_species, ratio_endtostart_species)
         self.k = k
+        self.name = f"{start_species.name}->{end_species.name}_spontaneously"
     
     def __str__(self):
         return f"spontaneous {super().__repr__()}"

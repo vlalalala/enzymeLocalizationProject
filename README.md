@@ -379,8 +379,80 @@ Balance between the flux created through interaction with the outside and the fl
 It is important to note that the net flux may not cross the threshold given by $\epsilon$ if the step size between neighboring mesh points is too large.
 
 
+## How to make an informed initial guess for the concentrations
+
+### Plan A: Solve multiple simulations, each with higher reaction
+
+For no reaction, the steady state concentration is equal to the external concentration for each species.
+
+We use the Thiele Modulus $\phi = R \cdot \sqrt{k/D}$ to assess how fast reactions are with respect to diffusion ($\phi \ll 1$ means that diffusion is fast; $\phi \gg 1$ means that reactions are fast).
+
+We run a number $N_\mathrm{sim}$ of simulations.
+$k$ and $k_\mathrm{cat}$ modified.
+
+For each simulation:
+- For each species:
+    - Clip $k$ and $k_\mathrm{cat}$ by the same factor s.t. the largest reaction timescale is ca. 10x of diffusion timescale -> will produce a result close to the external concentration, but slightly shifted. 
+
+    The reaction (total) timescale relates to the timescales of the individual reactions is given by 
+    ```math
+    \frac{1}{\tau_\mathrm{reaction}} = \frac{1}{\tau_\mathrm{1}} + \frac{1}{\tau_\mathrm{2}}.
+    ```
 
 
+
+### Plan B: Estimate initial value
+#### Species gets consumed through spontaneous reaction or through enzyme in linear regime
+
+Assume a simple reaction of 1st order
+```math
+D_s\cdot\frac{1}{r^2} \frac{\mathrm{d}}{\mathrm{d}r} \left( r^2 \frac{\mathrm{d}c_s}{\mathrm{d}r} \right) - k \cdot c_s = 0 \ ,
+```
+Using
+```math
+u(r) = r \cdot c_s(r)
+```
+we get
+```math
+D_s \cdot \frac{\mathrm{d}^2 u}{\mathrm{d}r^2}- k \cdot u = 0
+```
+s.t. the general solution is
+```math
+u(r) = A \cdot \mathrm{sinh}(\phi \cdot r/R) + B \cdot \mathrm{cosh}(\phi \cdot r/R)
+```
+where $\phi = R \cdot \sqrt{k/D}$ is the Thiele modulus.
+
+At $r=0$ the concentration must be finite. This means that $u(0)$ must be equal to zero (s.t. $c(0) = u(0)/0$ does not blow up). Because $\mathrm{cosh}(0) = 1$, we need $B=0$.
+
+
+We use $c(R) = c_\mathrm{ext}$ (which doesn't have to be the case). This means that $u(R) = A \cdot \mathrm{sinh}(\phi) = c_\mathrm{ext} / R$. Thus, $A = c_\mathrm{ext} \cdot R / \mathrm{sinh}(\phi)$.
+
+The solution thus takes the form
+```math
+c(r) = c_\mathrm{ext} \cdot (R/r) \cdot \frac{\mathrm{sinh}(\phi \cdot r/R)}{\mathrm{sinh}(\phi)}
+```
+
+$k$ is the net rate with which the substance is consumed, either through a spontaneous reaction of 1st order or in the linear regime of an enzymatic reaction ($S\ll k_M$; using $k_\mathrm{eff} = k_\mathrm{cat}\cdot E / k_M$).
+
+What happens if enzyme is saturated ($S\gg k_M$)?
+
+#### Species gets consumed through spontaneous reaction, through enzyme in linear regime and through enzyme in saturated regime
+For this, we solve
+
+```math
+D_s\cdot\frac{1}{r^2} \frac{\mathrm{d}}{\mathrm{d}r} \left( r^2 \frac{\mathrm{d}c_s}{\mathrm{d}r} \right) - k \cdot c_s -k_\mathrm{cat}\cdot E = 0 \ ,
+```
+with $E$ the enzyme concentration. The solution then is
+```math
+c(r) = (c_\mathrm{ext} + k_\mathrm{cat} \cdot E / k) \cdot (R/r) \cdot \mathrm{sinh}(\phi \cdot r/R) / \mathrm{sinh}(\phi)  -  k_\mathrm{cat} \cdot E / k
+```
+where we are careful to not count $k_\mathrm{cat}$ more than once (i.e. do not consider it into $\phi$).
+
+**Important**: I    t might make sense to use the linear regime approximation regardless with the external concentration. If we are (in reality) nevertheless in the other regime, it will overestimate the depletion, though.
+
+
+#### Species is produced
+For the initial guess, the product of the mirror of the substrate.
 
 ## Typical values
 see 

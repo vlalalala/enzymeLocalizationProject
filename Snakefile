@@ -57,6 +57,8 @@ df = "data_private/simple_optuna_test"
 df = "data_private/enzyme_opt"
 df = "data_private/case_02"
 
+df = "data_private/case_02_resolve_adaptive"
+df = "data_private/reaction_scaling_test"
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 
@@ -66,7 +68,7 @@ all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 all_outputs = [os.path.join(f, ".completed_visualization") for f in sim_folders]
 # With optimization
-all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
+#all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
 
 rule all:
     input:

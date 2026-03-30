@@ -276,14 +276,28 @@ def adaptive_newton_step(
     t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) # step size
     du = t_n * NF
     species_concentrations_try = copy.deepcopy(species_concentrations)
+    ##########################################################
+    # FOR CHECKING WHETHER IT IS ALWAYS THE SAME SPECIES THAT CAUSES TROUBLE
+    ##########################################################
+    problematic_species = []
+    for i, du_value in enumerate(du):
+        (region, n, species) = reverse_point_ids[i]
+        if species_concentrations_try[region][n][species] +  du_value < 0:
+            if species not in problematic_species:
+                problematic_species.append(species)
+    if len(problematic_species) != 0:
+        print("problematic_species: ", problematic_species, flush=True)
+    ########################################
+    ##########################################
     for i, du_value in enumerate(du):
         (region, n, species) = reverse_point_ids[i]
         species_concentrations_try[region][n][species] +=  du_value
         if species_concentrations_try[region][n][species] < 0:
+            print(species, flush=True)
             tau_new = tau_current * gamma_dec
             if tau_new < tau_min:
-                raise ValueError("negative values!")
-            return species_concentrations, tau_new, last_F_norm
+                raise ValueError("negative values!") # is only called 
+            return species_concentrations, tau_new, last_F_norm, t_n
     
     F_vector_new, _ = define_newton_residual_and_optionally_jacobian(
         species_concentrations_try,
@@ -299,13 +313,15 @@ def adaptive_newton_step(
 
     if F_norm_new < last_F_norm:
         tau_new = min(tau_max, tau_current * gamma_inc)
-        return species_concentrations_try, tau_new, F_norm_new
+        print(f"decreased norm, good! with {t_n}",F_norm_new, last_F_norm, flush=True)
+        return species_concentrations_try, tau_new, F_norm_new, t_n
 
     else:
         tau_new = tau_current * gamma_dec
+        print(f"did not decrease norm, bad! with {t_n}", F_norm_new, last_F_norm, flush=True)
         if tau_new < tau_min:
            raise ValueError("Newton could not decrease the norm of the residual any more.")
-        return species_concentrations, tau_new, F_norm_new
+        return species_concentrations, tau_new, F_norm_new, t_n
 
 def get_info_flux_equilibrium(
         current_species_concentrations,
@@ -407,12 +423,13 @@ def solve_newton(
     progress_logger = CSVLogger(progress_log_path)
     tau_current = initial_tau
     last_F_norm = initial_residual_norm
+    t_n = 1 # initial step size guess
     for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
                      file=sys.stderr,
                      total=int(max_num_newton_iterations),
                      initial=initial_iteration_number):
         try:
-            current_species_concentrations, tau_current, last_F_norm = adaptive_newton_step(
+            current_species_concentrations, tau_current, last_F_norm, t_n = adaptive_newton_step(
                 current_species_concentrations,
                 tau_current,
                 adaptive_step_parameters,
@@ -449,11 +466,11 @@ def solve_newton(
             if plot_iteration_data_during_simulation:
                 fig, _ = plot_steady_state_concentrations(
                     reaction_network=reaction_network,
-                    num_regions=expanded_system_mesh_dict["num_regions"],
+                    num_regions=num_regions,
                     num_mesh_points_in_regions=num_mesh_points_in_regions,
                     radii=radii,
                     membrane_radii=membrane_radii,
-                    output_file_name=os.path.join(iteration_data_path, f".iteration_nr_{iter_string}_concentrations.png"),
+                    output_file_name=os.path.join(iteration_data_path, f".iteration_nr_{str(iter).zfill(6)}_concentrations.png"),
                     species_concentrations_to_plot=current_species_concentrations,
                     system_geometry_dict=system_geometry_dict["geometry_config"],
                     title = f"iteration #{iter}\n"
@@ -476,7 +493,8 @@ def solve_newton(
             info_flux_equilibration.update({
                 "runtime": f"{initial_runtime + time.time() - simulation_start_time:.3f} seconds",
                 "tau": float(tau_current),
-                "F_vector_norm": float(last_F_norm)
+                "F_vector_norm": float(last_F_norm),
+                "t_n": float(t_n)
             })
             progress_logger.log(iter, info_flux_equilibration)
 
