@@ -6,6 +6,7 @@ import os
 import re
 import glob
 import hashlib
+import shutil
 from itertools import product
 from src.auxiliary_functions_using_standard_library import as_list, load_json
 
@@ -263,7 +264,10 @@ rule define_enzyme_concentrations:
             trial_path(wildcards, "parameters_value_conditions.yaml"),
         ]
     output:
-        "{df}/{bn}_{cn}/.pickled_reaction_network"
+        [
+            "{df}/{bn}_{cn}/.pickled_reaction_network",
+            "{df}/{bn}_{cn}/enzyme_concentrations.json",
+        ]
     params:
         folder = lambda wildcards: trial_path(wildcards)
     threads: 1
@@ -282,16 +286,63 @@ use rule define_enzyme_concentrations as define_enzyme_concentrations_within_opt
     # hashlib to keep it shorter: group: lambda wildcards: f"solver_preparation_{trial_path(wildcards).replace("/", "_")}"
     group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
     output:
-        "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.pickled_reaction_network"
+        [
+            "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.pickled_reaction_network",
+            "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/enzyme_concentrations.json"
+        ]
  
 ####################################################
 # RULES TO FIND AND PLOT SOLUTION
 ####################################################
 
+rule create_initial_guess:
+    # snakemake -s Snakefile data_private/reaction_scaling_test/combined_000001/species_initial_guess.json --cores 1 --use-conda
+    input:
+        discretization_yaml   = lambda wildcards: trial_path(wildcards, "parameters_discretization.yaml"),
+        geometry_yaml         = lambda wildcards: trial_path(wildcards, "parameters_geometry.yaml"),
+        solver_input_yaml     = lambda wildcards: trial_path(wildcards, "parameters_solver_input.yaml"),
+        solver_output_yaml    = lambda wildcards: trial_path(wildcards, "parameters_solver_output.yaml"),
+        value_conditions_yaml = lambda wildcards: trial_path(wildcards, "parameters_value_conditions.yaml"),
+        geometry              = lambda wildcards: trial_path(wildcards, ".system_geometry.json"),
+        network               = lambda wildcards: trial_path(wildcards, ".pickled_reaction_network"),
+    output:
+        "{df}/{bn}_{cn}/species_initial_guess.json"
+    params:
+        folder                                         = lambda wildcards: trial_path(wildcards),
+        max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 500)),
+        max_num_creeping_reaction_simulations          = lambda wildcards: int(config.get("max_num_creeping_reaction_simulations", 10)),
+    conda:
+        "config/environment.yaml"
+    threads: 1
+    resources:
+        mem_mb=5000,
+        runtime=300
+    priority:
+        0  # run LAST
+    shell:
+        """
+        python src/run_bvp_solver_initial_guess_calculator.py \
+            --folder {params.folder} \
+            --max_num_Newton_iterations {params.max_num_Newton_iterations} \
+            --max_num_creeping_reaction_simulations {params.max_num_creeping_reaction_simulations} \
+        """
+
+use rule create_initial_guess as create_initial_guess_within_optimization with:
+    # snakemake -s Snakefile data_private/case_01/combined_000015/optimization_round_0/trial_0/species_initial_guess.json --cores 1 --use-conda
+    output:
+        "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/species_initial_guess.json"
+
+
+
+
 rule cleanup_old_iterations:
     """In case any of the input files for a simulation have been changed, all of the
     files with .*iteration_nr_* have to be deleted, as well as the log file created
     previously.
+    (This is needed because those files are not outputs of any previous snakemake rule,
+    so snakemake does not automatically delete then when some input file is modified.)
+    "concentration_convergence", "flux_convergence_without_concentration_convergence",
+    "no_flux_nor_concentration_convergence"
     """
     input:
         discretization_yaml   = lambda wildcards: trial_path(wildcards, "parameters_discretization.yaml"),
@@ -315,8 +366,21 @@ rule cleanup_old_iterations:
         import os, glob
         folder = params.folder
         print(f"Cleaning up {folder}")
-        for f in glob.glob(os.path.join(folder, "solver_iteration_data/*iteration_nr_*")):
-            os.remove(f)
+        # Remove files saved during previous simulations with the non-modified rates
+        solver_iteration_data_dir = os.path.join(folder, "solver_iteration_data")
+        if os.path.isdir(solver_iteration_data_dir):
+            print(f"Removing {solver_iteration_data_dir} directory.")
+            shutil.rmtree(solver_iteration_data_dir)
+        # Remove files saved during previous simulations with the modified rates
+        creeping_reaction_simulations_dir = os.path.join(folder, "creeping_reaction_simulations")
+        if os.path.isdir(creeping_reaction_simulations_dir):
+            print(f"Removing {creeping_reaction_simulations_dir} directory.")
+            shutil.rmtree(creeping_reaction_simulations_dir)
+        # Remove the final result from the simulations with modified rates
+        initial_guess_file = os.path.join(folder, "species_initial_guess.json")
+        if os.path.isfile(initial_guess_file):
+            os.remove(initial_guess_file)
+        # Remove all log files from previous (now obsolete) simulations
         log_patterns = ["*.log", "*_log_*", ".*.log", ".*_log_*", ".progress_log_*"]
         log_files = []
         for pattern in log_patterns:
@@ -328,6 +392,18 @@ rule cleanup_old_iterations:
                     print(f"Removing {log_file} file.")
         else:
             print("No log files found.")
+        # Remove all plots and files related to them
+        for file in os.listdir(folder):
+            if any(filename in file for filename in ["newton_iterations.gif", "max_y", "convergence.png"]):
+                os.remove(os.path.join(folder, file))
+        # Remove all files that inform about type of convergence
+        for file in os.listdir(folder):
+            if any(filename in file for filename in [
+                "concentration_convergence", "flux_convergence_without_concentration_convergence",
+                "no_flux_nor_concentration_convergence"
+            ]):
+                os.remove(os.path.join(folder, file))
+        # Write completed file with current metadata
         with open(output[0], "w") as f:
             f.write("done\n")
 
@@ -348,12 +424,13 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
         value_conditions_yaml = lambda wildcards: trial_path(wildcards, "parameters_value_conditions.yaml"),
         geometry              = lambda wildcards: trial_path(wildcards, ".system_geometry.json"),
         network               = lambda wildcards: trial_path(wildcards, ".pickled_reaction_network"),
-        cleanup               = lambda wildcards: trial_path(wildcards, ".validated_iterations")
+        cleanup               = lambda wildcards: trial_path(wildcards, ".validated_iterations"),
+        initial_guess_concentrations = lambda wildcards: trial_path(wildcards, "species_initial_guess.json")
     output:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
         folder                                         = lambda wildcards: trial_path(wildcards),
-        max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 10000)),
+        max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 500)),
         max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 3)),
         max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-2),
         max_relative_flux_difference = lambda wildcards: config.get("max_relative_flux_difference", 1.0e-2),
@@ -380,7 +457,11 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
 use rule solve_boundary_value_problem_with_mesh_adaptation as solve_boundary_value_problem_with_mesh_adaptation_within_optimization with:
     # snakemake -s Snakefile data_private/case_01/combined_000015/optimization_round_0/trial_0/.species_steady_state_concentrations.json --cores 1 --use-conda
     output:
-        "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.species_steady_state_concentrations.json"
+        [
+        "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.species_steady_state_concentrations.json",
+        "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/system_geometry_for_convergence.json",
+        "{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.expanded_system_mesh_for_convergence.json",
+        ]
 
 
 rule study_bvp_solution:

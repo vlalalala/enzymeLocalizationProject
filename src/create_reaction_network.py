@@ -94,7 +94,7 @@ class EnzymaticReaction(Reaction):
         self.k_M = k_M
         self.hill = hill
         self.k = k_cat/k_M
-        self.name = f"{start_species.name}->{end_species.name}_enzymatically"
+        self.name = "" # Is defined afterwards f"{start_species}->{end_species}_enzymatically" ######################################
 
     def __str__(self):
         return f"enzymatic {super().__repr__()} catalyzed by {self.enzyme}"
@@ -108,7 +108,7 @@ class SpontaneousReaction(Reaction):
                  k: float):
         super().__init__(start_species, end_species, ratio_endtostart_species)
         self.k = k
-        self.name = f"{start_species.name}->{end_species.name}_spontaneously"
+        self.name = "" # Is defined afterwards f"{start_species}->{end_species}_spontaneously" #######################################
     
     def __str__(self):
         return f"spontaneous {super().__repr__()}"
@@ -279,14 +279,14 @@ def create_reaction_network(case_folder, csv_file_names):
     enzymatic_reactions = []
     for _, row in dataframes["enzymatic_reactions"].iterrows():
         enzymatic_reaction = EnzymaticReaction(**row)
-        enzymatic_reaction.name = f"{enzymatic_reaction.start_species}->{enzymatic_reaction.end_species} {enzymatic_reaction.enzyme}"
+        enzymatic_reaction.name = f"{enzymatic_reaction.start_species}->{enzymatic_reaction.end_species} {enzymatic_reaction.enzyme}" ######################
         enzymatic_reactions.append(enzymatic_reaction)
     system.enzymatic_reactions = Collection(enzymatic_reactions)
     
     spontaneous_reactions = []
     for _, row in dataframes["spontaneous_reactions"].iterrows():
         spontaneous_reaction = SpontaneousReaction(**row)
-        spontaneous_reaction.name = f"{spontaneous_reaction.start_species}->{spontaneous_reaction.end_species}"
+        spontaneous_reaction.name = f"{spontaneous_reaction.start_species}->{spontaneous_reaction.end_species}" #####################################
         spontaneous_reactions.append(spontaneous_reaction)
     system.spontaneous_reactions = Collection(spontaneous_reactions)
 

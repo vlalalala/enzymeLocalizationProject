@@ -399,6 +399,16 @@ For each simulation:
     \frac{1}{\tau_\mathrm{reaction}} = \frac{1}{\tau_\mathrm{1}} + \frac{1}{\tau_\mathrm{2}}.
     ```
 
+The following condition must hold:
+```math
+x \cdot \gamma_\mathrm_{inc} \cdot \gamma_\mathrm_{dec} > x
+```
+so that decreasing the factor does not bring us to a factor x that is below one that was successful.
+We choose a stronger condition: If a simulation fails to converge, the new factor chosen must be
+in the middle between the one that failed and the previous one ()
+```math
+
+```
 
 
 ### Plan B: Estimate initial value

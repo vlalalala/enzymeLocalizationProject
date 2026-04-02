@@ -273,7 +273,7 @@ def adaptive_newton_step(
     J_sparse = J_matrix.tocsc()
     NF = -spsolve(J_sparse, F_vector)
     norm_NF = np.linalg.norm(NF)
-    t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) # step size
+    t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) # step size ##################################################################
     du = t_n * NF
     species_concentrations_try = copy.deepcopy(species_concentrations)
     ##########################################################
@@ -293,7 +293,7 @@ def adaptive_newton_step(
         (region, n, species) = reverse_point_ids[i]
         species_concentrations_try[region][n][species] +=  du_value
         if species_concentrations_try[region][n][species] < 0:
-            print(species, flush=True)
+            #print(species, flush=True)
             tau_new = tau_current * gamma_dec
             if tau_new < tau_min:
                 raise ValueError("negative values!") # is only called 

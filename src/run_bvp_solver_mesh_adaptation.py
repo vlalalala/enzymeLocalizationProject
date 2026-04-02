@@ -338,17 +338,21 @@ if __name__ == "__main__":
             )
             # In case no other simulation is found, create initial values
             if initial_iteration_number is None:
-                previous_solution = None
+                #previous_solution = None
                 initial_iteration_number = 0
-                max_external_concentration = max([species.external_concentration for species in REACTION_NETWORK.species])
-                initial_species_concentrations = {
-                    region_idx : {
-                        mesh_point_idx : {
-                            species : species.external_concentration + max_external_concentration*0.1 # max_external_concentration #* RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
-                            for species in REACTION_NETWORK.species}
-                        for mesh_point_idx in range(system_geometry_dict["geometry_config"]["num_mesh_points_in_regions"][region_idx])}
-                    for region_idx in range(system_geometry_dict["geometry_config"]["num_regions"])
-                }
+                #max_external_concentration = max([species.external_concentration for species in REACTION_NETWORK.species])
+                #initial_species_concentrations = {
+                #    region_idx : {
+                #        mesh_point_idx : {
+                #            species : species.external_concentration + max_external_concentration*0.1 # max_external_concentration #* RADII[region_idx][mesh_point_idx] / RADII[NUM_REGIONS-1][NUM_MESH_POINTS_IN_REGIONS[NUM_REGIONS-1]-1]
+                #            for species in REACTION_NETWORK.species}
+                #        for mesh_point_idx in range(system_geometry_dict["geometry_config"]["num_mesh_points_in_regions"][region_idx])}
+                #    for region_idx in range(system_geometry_dict["geometry_config"]["num_regions"])
+                #}
+                initial_species_concentrations = load_json(os.path.join(FOLDER_TO_SOLVE, "species_initial_guess.json"))
+                # make the concentrations file have the keys in the correct format
+                initial_species_concentrations = get_dict_with_correct_key_types_from_json_file(
+                    initial_species_concentrations, SPECIES_LOOKUP)
             if initial_tau is None:
                 initial_tau = SOLVER_INPUT_INFO["adaptive_step_parameters"]["tau_max"]
             if initial_residual_norm is None:
@@ -358,7 +362,6 @@ if __name__ == "__main__":
 
             filename_for_newton_function = lambda newton_iteration: make_iteration_filename(
                 interpolation_iteration, newton_iteration, num_iterations_digits)
-            
 
             with open(
                 os.path.join(FOLDER_TO_SOLVE, f".newton_solver_interpolating_{interpolation_iteration}_times.log"), "a") as f, redirect_stdout(f):
