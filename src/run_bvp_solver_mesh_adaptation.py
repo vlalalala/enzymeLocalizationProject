@@ -354,7 +354,7 @@ if __name__ == "__main__":
                 initial_species_concentrations = get_dict_with_correct_key_types_from_json_file(
                     initial_species_concentrations, SPECIES_LOOKUP)
             if initial_tau is None:
-                initial_tau = SOLVER_INPUT_INFO["adaptive_step_parameters"]["tau_max"]
+                initial_tau = np.inf# SOLVER_INPUT_INFO["adaptive_step_parameters"]["tau_max"]
             if initial_residual_norm is None:
                 initial_residual_norm = np.inf
             if initial_runtime is None:

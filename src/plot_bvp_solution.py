@@ -60,7 +60,6 @@ def plot_steady_state_concentrations(
                 reaction_network,
                 num_regions,
                 membrane_radii,
-                system_geometry_dict
             )
     
     ax.set_ylabel("concentration / M")
@@ -190,8 +189,9 @@ def add_theory_curve_to_ax(
         reaction_network,
         num_regions,
         membrane_radii,
-        system_geometry_dict
     ):
+    membrane_radii_with_0 = [0] + membrane_radii
+
     # Case of one spontaneous reaction with no inner boundaries
     if (len(reaction_network.spontaneous_reactions) == 1
         and len(reaction_network.enzymatic_reactions) == 0
@@ -257,12 +257,14 @@ def add_theory_curve_to_ax(
             + beta * r_inner * np.sinh(X_lambda * r_inner)
         )
 
-        mesh_points_in_regions = system_geometry_dict["mesh_points_in_regions"]
+        
         c_1 = lambda r : S * np.sinh(X_lambda * r) / r
         c_2 = lambda r : (A * np.exp(-X_lambda * r) + B * np.exp(X_lambda * r))/r
         c = [c_1, c_2]
         for region_idx in [0,1]:
-            region_radii = mesh_points_in_regions[region_idx]
+            max_radius = membrane_radii_with_0[region_idx+1]
+            min_radius = membrane_radii_with_0[region_idx]
+            region_radii = np.linspace(min_radius, max_radius)
             # region_radii[0] skipped to avoid division by 0
             r_to_plot = np.linspace(region_radii[0]+external_radius*0.01, region_radii[-1], num = 100)
             if region_idx == 0:
@@ -394,10 +396,11 @@ def add_theory_curve_to_ax(
         c = [c_1, c_2, c_3]
 
         # --- Plot using your mesh_points_in_regions structure (now 3 regions) ---
-        mesh_points_in_regions = system_geometry_dict["mesh_points_in_regions"]
 
         for region_idx in [0, 1, 2]:
-            region_radii = mesh_points_in_regions[region_idx]
+            max_radius = membrane_radii_with_0[region_idx+1]
+            min_radius = membrane_radii_with_0[region_idx]
+            region_radii = np.linspace(min_radius, max_radius)
             # skip first point in region 0 to avoid r=0 if present
             start_idx = 1 if (region_idx == 0 and np.isclose(region_radii[0], 0.0)) else 0
 

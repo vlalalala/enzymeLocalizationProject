@@ -30,6 +30,7 @@ def plot_convergence_progress(
         ax[0].plot(x, df["F_vector_norm"])
         ax[1].plot(x, df["tau"])
         ax[2].plot(x, df["t_n"])
+        
         for species in reaction_network.species:
             if file_idx == 0:
                 label = species.name
@@ -46,9 +47,13 @@ def plot_convergence_progress(
     ax[0].set_xlabel("iteration")
     ax[0].set_yscale('log')
 
+    y = df["tau"].values
+    if np.any(np.isfinite(y) & (y > 0)):
+        ax[1].set_yscale("log")
+    else:
+        print("Skipping log scale for tau")
     ax[1].set_ylabel("step size (tau)")
     ax[1].set_xlabel("iteration")
-    ax[1].set_yscale('log')
 
     ax[2].set_ylabel("step size (t_n)")
     ax[2].set_xlabel("iteration")
@@ -65,14 +70,17 @@ def plot_convergence_progress(
     ax[4].legend()
     ax[4].set_yscale('log')
     
-    fig.tight_layout()
+    try:
+        fig.tight_layout()
+    except:
+        print("Could not get tight layout to work.")
     fig.savefig(os.path.join(folder_to_solve, "convergence.png"), bbox_inches = "tight", dpi=300)
     plt.close()
 
 def make_newton_iterations_gif(
         folder_to_plot,
         reaction_network,
-        species_lookup_dict,
+        species_lookup_dict
     ):
     """
     Important: delete any .json files from previous simulations that may not be overwritten.
@@ -117,8 +125,8 @@ def make_newton_iterations_gif(
             ))
             json_files.sort()
             # add last one
-            json_files.append(Path(os.path.join(iteration_data_folder, 
-                f"interpolation_iteration_nr_{interp_nr}_final_concentrations.json")))
+            #json_files.append(Path(os.path.join(iteration_data_folder, 
+            #    f"interpolation_iteration_nr_{interp_nr}_final_concentrations.json")))
             system_geometry = load_json(
                 os.path.join(
                     iteration_data_folder, f".system_geometry_interpolating_{interp_nr}_times.json"
@@ -169,7 +177,7 @@ def make_newton_iterations_gif(
         for filename in tqdm(png_files_created, file=sys.stderr):
             writer.append_data(imageio.imread(filename))
 
-    print("gif created!")
+    print(f"gif created! {file_to_create}")
     # Create file with maximum concentration (to know whether previous png files
     #can be reused)
     with open(os.path.join(folder_to_plot, "max_y"), "w") as f:

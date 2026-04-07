@@ -464,6 +464,70 @@ where we are careful to not count $k_\mathrm{cat}$ more than once (i.e. do not c
 #### Species is produced
 For the initial guess, the product of the mirror of the substrate.
 
+## Literature on numerics used:
+- C.T.Kelley: Iterative Methods for Linear and Nonlinear Equations $\rightarrow$ "condition number" 
+- W.H.Press, S.A.Teukolsky, W.T. Vetterling, B.P.Flannery: Numerical Recipes in C, The Art of Scientific Computing $\rightarrow$ book recommended by Uli
+- L.N.Trefethen, D. Bau: Numerical Linear Algebra (lectures) $\rightarrow$ "condition number" (Lecture 12), has the analysis on perturbation.  
+
+
+## Convergence
+### Criterion 1
+A common convergence criterion (see Lemma 1.1.1 from C.T.Kelley) is the following:
+When solving the problem $Ax=b$, we can use
+```math
+\frac{\lVert r_k\rVert}{\lVert b \rVert} < \tau
+```
+where $r_k$ is the residual for the $k$-th iteration.
+
+This begs the question on how big $\tau$ should be.
+
+### Criterion 2
+One can decide to stop iterating once the change in concentrations (for each concentration, element-wise) is below some threshold (tolerance):
+```math
+\max_{i} \left|\frac{\delta u_i}{u_i}\right| < \mathrm{tol}
+```
+Machine precision $\epsilon$ (also called machine epsilon) leads us to the following two points to consider:
+
+1. For 64-bit floats, $\epsilon \approx 2.2\cdot 10^{-16}$. If $\delta u_i < u_i \cdot \epsilon$ for some $i$, $u_i$ will effectively not be updated. 
+2. Additionally, one has to consider how accurately one can solve systems of equations given such a machine precision. 
+(see Theorems 12.1 and 12.2 Trefethen): "If a problem $Ax=b$ contains an ill-conditioned matrix $A$, one must always expect to "lose $\mathrm{log}_{10} \kappa(A)$ digits" in computing the solution", with $\kappa(A)$ being the condition number $\lVert A \rVert \lVert A^{-1}\rVert$. The floor is then $\kappa(J) \cdot \epsilon$ and the tolerance must be slightly above (since the floor is not being crossed.)
+
+If $\kappa(A)$ is small, $A$ is said to be well-conditioned; if $\kappa(A)$ is large, $A$ is ill-conditioned. 
+
+```math
+\frac{\lVert \delta x \rVert}{\lVert x \rVert} \le \kappa(A) \cdot \frac{\lVert \delta b \rVert}{\lVert b \rVert}
+```
+
+See below for a more detailed proof:
+```math
+J(\textbf{u}) \cdot \delta \textbf{u} = F(\textbf{u})
+\rightarrow
+\delta \textbf{u} = J(\textbf{u})^{-1} F(\textbf{u})\\
+
+J(\textbf{u}) \cdot \delta \textbf{u}^\prime = F(\textbf{u}) + \delta F(\textbf{u})
+\rightarrow
+\delta \textbf{u}^\prime = J(\textbf{u})^{-1} (F + \delta F) \\
+
+\delta (\delta u) = \delta u^\prime - \delta u = J^{-1} \delta F \\
+
+\lVert \delta(\delta u) \rVert \le \lVert J^{-1}\rVert \cdot \lVert \delta F \rVert \\
+
+\lVert F \rVert \le \lVert J \rVert \cdot \lVert \delta u \rVert \\
+
+Dividing: \\
+\lVert \delta(\delta u)\rVert / \lVert \delta u \rVert \le \lVert J^{-1} \rVert \cdot \lVert J \rVert \cdot \lVert \delta F \rVert / \lVert F \rVert \\
+
+```
+
+The condition number is large if the Jacobian has very different scales accros its rows or columns.
+
+so small that it is insignificant given the order of magnitude of the concentration. (This means that `u_n + alpha * du == u_n` element_wise for the step $n$ (this should apply for each element). e.g. written through `np.max(np.abs(du / u)) < tol`)
+    - Careful if `u_i ≈ 0`
+
+Questions: 
+- Newton decrement
+
+
 ## Typical values
 see 
 https://bionumbers.hms.harvard.edu/search.aspx?trm=diffusion+coefficient

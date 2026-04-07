@@ -59,7 +59,11 @@ df = "data_private/enzyme_opt"
 df = "data_private/case_02"
 
 df = "data_private/case_02_resolve_adaptive"
-df = "data_private/reaction_scaling_test"
+df = "data_private/reaction_scaling_test_spontaneous"
+#df = "data_private/reaction_scaling_test"
+
+#df = "data_private/spontaneousXdecaysToY_2InnerBoundaries"
+#df = "data_private/spontaneousXdecaysToYdecaysToZ"
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 
@@ -309,8 +313,9 @@ rule create_initial_guess:
         "{df}/{bn}_{cn}/species_initial_guess.json"
     params:
         folder                                         = lambda wildcards: trial_path(wildcards),
-        max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 500)),
-        max_num_creeping_reaction_simulations          = lambda wildcards: int(config.get("max_num_creeping_reaction_simulations", 10)),
+        max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 2500)),
+        max_num_creeping_reaction_simulations          = lambda wildcards: int(config.get("max_num_creeping_reaction_simulations", 3)),
+        override                                       = True
     conda:
         "config/environment.yaml"
     threads: 1
@@ -325,6 +330,7 @@ rule create_initial_guess:
             --folder {params.folder} \
             --max_num_Newton_iterations {params.max_num_Newton_iterations} \
             --max_num_creeping_reaction_simulations {params.max_num_creeping_reaction_simulations} \
+            --override {params.override}
         """
 
 use rule create_initial_guess as create_initial_guess_within_optimization with:
@@ -430,7 +436,7 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
         "{df}/{bn}_{cn}/.species_steady_state_concentrations.json"
     params:
         folder                                         = lambda wildcards: trial_path(wildcards),
-        max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 500)),
+        max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 1000)),
         max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 3)),
         max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-2),
         max_relative_flux_difference = lambda wildcards: config.get("max_relative_flux_difference", 1.0e-2),
