@@ -63,7 +63,7 @@ df = "data_private/reaction_scaling_test_spontaneous"
 df = "data_private/reaction_scaling_test"
 
 df = "data_private/spontaneousXdecaysToY_2InnerBoundaries"
-#df = "data_private/spontaneousXdecaysToYdecaysToZ"
+df = "data_private/spontaneousXdecaysToYdecaysToZ"
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 

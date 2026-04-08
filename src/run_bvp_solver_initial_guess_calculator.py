@@ -204,7 +204,6 @@ if __name__ == "__main__":
                     # simulation initial values
                     initial_iteration_number=initial_iteration_number,
                     initial_species_concentrations=initial_species_concentrations,
-                    initial_tau=initial_tau,
                     initial_residual_norm=initial_residual_norm,
                     initial_runtime = initial_runtime,
                     # saving

@@ -28,7 +28,7 @@ def plot_convergence_progress(
         df = pd.read_csv(file)
         x = df["iteration"] + iterations_offset
         ax[0].plot(x, df["F_vector_norm"])
-        ax[1].plot(x, df["tau"])
+        #ax[1].plot(x, df["tau"])
         ax[2].plot(x, df["t_n"])
         
         for species in reaction_network.species:
@@ -47,11 +47,11 @@ def plot_convergence_progress(
     ax[0].set_xlabel("iteration")
     ax[0].set_yscale('log')
 
-    y = df["tau"].values
-    if np.any(np.isfinite(y) & (y > 0)):
-        ax[1].set_yscale("log")
-    else:
-        print("Skipping log scale for tau")
+    #y = df["tau"].values
+    #if np.any(np.isfinite(y) & (y > 0)):
+    #    ax[1].set_yscale("log")
+    #else:
+    #    print("Skipping log scale for tau")
     ax[1].set_ylabel("step size (tau)")
     ax[1].set_xlabel("iteration")
 

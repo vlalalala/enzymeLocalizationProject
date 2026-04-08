@@ -232,7 +232,7 @@ def compute_newton_step(
 def adaptive_newton_step(
     current_iteration,
     species_concentrations,
-    tau_current,
+    t_n,
     adaptive_step_parameters,
     last_F_norm,
     num_points,
@@ -244,8 +244,7 @@ def adaptive_newton_step(
     Delta_r
     ):
     # Unpack parameters
-    tau_min = adaptive_step_parameters.get("tau_min")
-    tau_max = np.inf#adaptive_step_parameters.get("tau_max")
+    t_n_min = adaptive_step_parameters.get("t_n_min")
     gamma_inc = adaptive_step_parameters.get("gamma_inc")
     gamma_dec = adaptive_step_parameters.get("gamma_dec")
     
@@ -265,17 +264,10 @@ def adaptive_newton_step(
     kappa = np.linalg.cond(J_matrix) # calculate the condition number
     J_sparse = J_sparse.tocsc()
     NF = -spsolve(J_sparse, F_vector)
-    norm_NF = np.linalg.norm(NF)
-    if np.isinf(tau_current):
-        # If it is the first round (and tau_current is infinite), set tau_current
-        # such that for the given norm_NF, t_n is 1
-        # -> t_n = sqrt(2*tau/norm_NF) = 1 -> tau = norm_NF/2
-        tau_current = norm_NF/2
-    t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) ###################### t_n should be max 1# step size ##################################################################
     du = t_n * NF
     species_concentrations_try = copy.deepcopy(species_concentrations)
     tolerance = kappa * np.finfo(F_vector.dtype).eps # absolute floor (this will never be crossed!)
-    tol_rel = tolerance * 100 ###################################################################################################
+    tol_rel = tolerance * 10 ###################################################################################################
     # The absolute floor cannot be crossed. We set 2 orders of magnitude higher
     #print(f"The tolerance is {tolerance}")
     ##########################################################
@@ -291,8 +283,8 @@ def adaptive_newton_step(
     #    print("problematic_species: ", problematic_species, flush=True)
     ########################################
     ##########################################
-    max_concentration = find_max_in_nested_dict(species_concentrations)
-    tol_abs = 1e-4 * max_concentration #######################################################################
+    #max_concentration = find_max_in_nested_dict(species_concentrations)
+    tol_abs = 0 #1e-4 * max_concentration #######################################################################
     relative_change_in_u = {i: None for i in range(len(du))}
     for i, du_value in enumerate(du):
         (region, n, species) = reverse_point_ids[i]
@@ -305,14 +297,14 @@ def adaptive_newton_step(
         species_concentrations_try[region][n][species] +=  du_value
         if species_concentrations_try[region][n][species] < 0:
             #print(species, flush=True)
-            tau_new = tau_current * gamma_dec
-            if tau_new < tau_min:
-                raise ValueError("Tau is under the minimum.") # is only called
+            t_n_new = t_n * gamma_dec
+            if t_n_new < t_n_min:
+                raise ValueError("t_n is under the minimum.") # is only called
             print("negative concentrations", flush=True)
-            return species_concentrations, tau_new, last_F_norm, t_n, kappa, np.nan
+            return species_concentrations, t_n_new, last_F_norm, t_n, kappa, np.nan
         #relative_change_in_u[i] = du_value / species_concentrations_try[region][n][species]
     #print("The max value is", max(relative_change_in_u.values()), flush=True)
-    if max(relative_change_in_u.values()) < 1 and current_iteration>100:
+    if max(relative_change_in_u.values()) < 1 and current_iteration>10:
         #tolerance: #####################################################
         # AND: always run at least 100 iterations. (so that it does not immediately say it has converged.)
         raise ValueError("The numerical limit was found.")
@@ -330,16 +322,16 @@ def adaptive_newton_step(
     F_norm_new = np.linalg.norm(F_vector_new)
 
     if F_norm_new < last_F_norm:
-        tau_new = min(tau_max, tau_current * gamma_inc)
+        t_n_new = min(1, t_n * gamma_inc)
         print(f"decreased norm, good! with step size t_n = {t_n}", flush=True)
-        return species_concentrations_try, tau_new, F_norm_new, t_n, kappa, max(relative_change_in_u.values())
+        return species_concentrations_try, t_n_new, F_norm_new, kappa, max(relative_change_in_u.values())
 
     else:
-        tau_new = tau_current * gamma_dec
+        t_n_new = t_n * gamma_dec
         print(f"did not decrease norm, bad! with step size t_n = {t_n}", flush=True)
-        if tau_new < tau_min:
-           raise ValueError("Tau is under the minimum.")
-        return species_concentrations, tau_new, F_norm_new, t_n, kappa, max(relative_change_in_u.values()) #########################################
+        if t_n_new < t_n_min:
+           raise ValueError("t_n is under the minimum.")
+        return species_concentrations, t_n_new, F_norm_new, kappa, max(relative_change_in_u.values()) #########################################
 
 def get_info_flux_equilibrium(
         current_species_concentrations,
@@ -405,7 +397,6 @@ def solve_newton(
         # simulation initial values
         initial_iteration_number,
         initial_species_concentrations,
-        initial_tau,
         initial_residual_norm,
         initial_runtime,
         # saving
@@ -438,18 +429,17 @@ def solve_newton(
     # Start 
     current_species_concentrations = initial_species_concentrations
     progress_logger = CSVLogger(progress_log_path)
-    tau_current = initial_tau
+    t_n = 1
     last_F_norm = initial_residual_norm
-    t_n = 1 # initial step size guess
     for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
                      file=sys.stderr,
                      total=int(max_num_newton_iterations),
                      initial=initial_iteration_number):
         try:
-            current_species_concentrations, tau_current, last_F_norm, t_n, kappa, max_rel_concentration_change = adaptive_newton_step(
+            current_species_concentrations, t_n, last_F_norm, kappa, max_rel_concentration_change = adaptive_newton_step(
                 iter,
                 current_species_concentrations,
-                tau_current,
+                t_n,
                 adaptive_step_parameters,
                 last_F_norm,
                 num_points=num_points,
@@ -463,8 +453,8 @@ def solve_newton(
         except ValueError as e: # once the adaptive method cannot further decrease the norm of the residual, break
             if "The numerical limit was found." in str(e):
                 print(f"The numerical limit was found in iteration {iter}", flush=True)
-            elif "Tau" in str(e):
-                print(f"Tau reached the minimum {iter}", flush=True)
+            elif "t_n is under the minimum" in str(e):
+                print(f"t_n reached the minimum in iteration {iter}", flush=True)
             break
 
         # Save result if needed
@@ -510,7 +500,6 @@ def solve_newton(
                 )
             info_flux_equilibration.update({
                 "runtime": f"{initial_runtime + time.time() - simulation_start_time:.3f} seconds",
-                "tau": float(tau_current),
                 "F_vector_norm": float(last_F_norm),
                 "t_n": float(t_n),
                 "condition number": float(kappa),
