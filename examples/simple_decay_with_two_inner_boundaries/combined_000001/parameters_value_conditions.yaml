@@ -1,4 +1,0 @@
-enzyme_total_fixed_quantity: null # mol or None
-enzyme_whose_quantity_to_modify_when_total_fixed_quantity: null
-enzyme_maximum_concentration : null # mol/m**3
-enzyme_impossible_combinations: [[["A", "C"], ["A", "B", "C"]]] # list of combinations of enzymes within at least one region s.t. the simulation isn't run

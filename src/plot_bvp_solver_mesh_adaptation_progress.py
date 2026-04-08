@@ -28,7 +28,7 @@ def plot_convergence_progress(
         df = pd.read_csv(file)
         x = df["iteration"] + iterations_offset
         ax[0].plot(x, df["F_vector_norm"])
-        #ax[1].plot(x, df["tau"])
+        ax[1].plot(x, df["max_rel_concentration_change"])
         ax[2].plot(x, df["t_n"])
         
         for species in reaction_network.species:
@@ -43,7 +43,7 @@ def plot_convergence_progress(
         for i in range(4):
             ax[i].axvline(iterations_offset, ls = ":", color = "k", alpha = 0.6)
 
-    ax[0].set_ylabel("residual vector norm")
+    ax[0].set_ylabel("norm of \n residual vector F")
     ax[0].set_xlabel("iteration")
     ax[0].set_yscale('log')
 
@@ -52,7 +52,7 @@ def plot_convergence_progress(
     #    ax[1].set_yscale("log")
     #else:
     #    print("Skipping log scale for tau")
-    ax[1].set_ylabel("step size (tau)")
+    ax[1].set_ylabel("largest relative \n distance to \n numerical limit")
     ax[1].set_xlabel("iteration")
 
     ax[2].set_ylabel("step size (t_n)")
@@ -60,12 +60,12 @@ def plot_convergence_progress(
     ax[2].set_yscale('log')
 
     
-    ax[3].set_ylabel("absolute difference between \n reaction and boundary flux")
+    ax[3].set_ylabel("absolute difference\n  between reaction \n and boundary flux")
     ax[3].set_xlabel("iteration")
     ax[3].legend()
     ax[3].set_yscale('log')
 
-    ax[4].set_ylabel("relative difference between \n reaction and boundary flux")
+    ax[4].set_ylabel("relative difference\n between reaction \n and boundary flux")
     ax[4].set_xlabel("iteration")
     ax[4].legend()
     ax[4].set_yscale('log')

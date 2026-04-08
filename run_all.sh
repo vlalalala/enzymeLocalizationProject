@@ -14,7 +14,7 @@ conda activate snakemake_env
 # Run Snakemake with the profile
 snakemake \
     --profile config/slurm \
-    --jobs 1500 \
+    --jobs 30 \
     --rerun-incomplete \
     --keep-going \
     --printshellcmds \

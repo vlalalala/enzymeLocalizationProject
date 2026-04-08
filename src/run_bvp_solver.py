@@ -267,7 +267,7 @@ def adaptive_newton_step(
     du = t_n * NF
     species_concentrations_try = copy.deepcopy(species_concentrations)
     tolerance = kappa * np.finfo(F_vector.dtype).eps # absolute floor (this will never be crossed!)
-    tol_rel = tolerance * 10 ###################################################################################################
+    ###################################################################################################
     # The absolute floor cannot be crossed. We set 2 orders of magnitude higher
     #print(f"The tolerance is {tolerance}")
     ##########################################################
@@ -293,21 +293,21 @@ def adaptive_newton_step(
         #    relative_change_in_u[i] = abs(du_value / u_old)
         #else:
         #    relative_change_in_u[i] = abs(du_value)
-        relative_change_in_u[i] = abs(du_value) / (tol_abs + tol_rel * abs(u_old))
+        relative_change_in_u[i] = abs(du_value) / (tol_abs + tolerance * abs(u_old))
         species_concentrations_try[region][n][species] +=  du_value
         if species_concentrations_try[region][n][species] < 0:
             #print(species, flush=True)
             t_n_new = t_n * gamma_dec
             if t_n_new < t_n_min:
                 raise ValueError("t_n is under the minimum.") # is only called
-            print("negative concentrations", flush=True)
+            #print("negative concentrations", flush=True)
             return species_concentrations, t_n_new, last_F_norm, t_n, kappa, np.nan
         #relative_change_in_u[i] = du_value / species_concentrations_try[region][n][species]
     #print("The max value is", max(relative_change_in_u.values()), flush=True)
-    if max(relative_change_in_u.values()) < 1 and current_iteration>10:
+    #if max(relative_change_in_u.values()) < 10 and current_iteration>10:
         #tolerance: #####################################################
         # AND: always run at least 100 iterations. (so that it does not immediately say it has converged.)
-        raise ValueError("The numerical limit was found.")
+    #    raise ValueError("The numerical limit was found.")
 
     F_vector_new, _ = define_newton_residual_and_optionally_jacobian(
         species_concentrations_try,
@@ -323,12 +323,12 @@ def adaptive_newton_step(
 
     if F_norm_new < last_F_norm:
         t_n_new = min(1, t_n * gamma_inc)
-        print(f"decreased norm, good! with step size t_n = {t_n}", flush=True)
+        #print(f"decreased norm, good! with step size t_n = {t_n}", flush=True)
         return species_concentrations_try, t_n_new, F_norm_new, kappa, max(relative_change_in_u.values())
 
     else:
         t_n_new = t_n * gamma_dec
-        print(f"did not decrease norm, bad! with step size t_n = {t_n}", flush=True)
+        #print(f"did not decrease norm! with step size t_n = {t_n}", flush=True)
         if t_n_new < t_n_min:
            raise ValueError("t_n is under the minimum.")
         return species_concentrations, t_n_new, F_norm_new, kappa, max(relative_change_in_u.values()) #########################################

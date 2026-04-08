@@ -64,11 +64,13 @@ def params_to_physical(
     exceeds the maximum concentration
     times the total volume of the vesicle -> raise an error
     """
-    minimum_required_volume = total_enzyme_quantity / enzyme_maximum_concentration 
     actual_volume = 4/3 * np.pi * external_radius**3
-    if minimum_required_volume > actual_volume:
-        raise ValueError(f"The maximum enzyme concentration is too low. The minimum required volume is {minimum_required_volume} and the actual volume is {actual_volume}")
-    
+    if total_enzyme_quantity is not None and enzyme_maximum_concentration is not None:
+        minimum_required_volume = total_enzyme_quantity / enzyme_maximum_concentration 
+        if minimum_required_volume > actual_volume:
+            raise ValueError(f"The maximum enzyme concentration is too low. The minimum required volume is {minimum_required_volume} and the actual volume is {actual_volume}")
+    else:
+        minimum_required_volume = 0
     """
     Calculate the volume "slack" to be distributed between the different regions
     """
@@ -95,10 +97,13 @@ def params_to_physical(
             total_enzyme_in_region[region] += enzyme_allocations[enzyme_index] * regional_alloc[enzyme_index][region]
 
     # Then compute the minimum volume per region
-    minimum_volume_per_region = [
-        total_enzyme_in_region[region] / enzyme_maximum_concentration
-        for region in range(n_regions)
-    ]
+    if enzyme_maximum_concentration is not None:
+        minimum_volume_per_region = [
+            total_enzyme_in_region[region] / enzyme_maximum_concentration
+            for region in range(n_regions)
+        ]
+    else:
+        minimum_volume_per_region = [0 for region in range(n_regions)]
     #print("minimum_volume_per_region", minimum_volume_per_region)
     """
     Compute inner membrane radii

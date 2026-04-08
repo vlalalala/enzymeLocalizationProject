@@ -29,8 +29,9 @@ def plot_optimization_progress(
         data[round_idx][trial_idx]["flux_to_maximize"]
         for round_idx in range(n_rounds)
         for trial_idx in range(n_trials)
-    ]
-    norm = mcolors.Normalize(vmin=min(all_fluxes), vmax=max(all_fluxes))
+    ] # all_fluxes is of length N_TRIALS * N_ROUNDS
+    non_pruned_fluxes = [flux for flux in all_fluxes if flux is not None]
+    norm = mcolors.Normalize(vmin=min(non_pruned_fluxes), vmax=max(non_pruned_fluxes))
     cmap = cm.viridis
 
     for round_idx in range(n_rounds):
@@ -58,7 +59,7 @@ def plot_optimization_progress(
             # Row 1 : plot enzyme allocation
             ###################
             enzyme_allocations_list = trial_data["enzyme_allocations"]
-            if len(enzyme_allocations_list)!=0:
+            if enzyme_allocations_list is not None: # in case any enzyme has been allocated
                 for enzyme_allocation_idx, enzyme_allocation in enumerate(enzyme_allocations_list):
                     marker = markers[enzyme_allocation_idx % len(markers)]
                     ax[1][0].scatter(
@@ -93,19 +94,19 @@ def plot_optimization_progress(
     for membrane_idx in range(len(data[0][0]["inner_membrane_radii"])):
         ax[0][0].scatter([], [], marker=markers[membrane_idx % len(markers)],
                 color="k", label=f"membrane {membrane_idx}")
-    ax[0][0].legend(loc="upper left", frameon=False)
+    ax[0][0].legend(frameon=True)
     
     # Legend for enzyme -> shape 
     for enzyme_idx in range(n_enzymes):
         ax[1][0].scatter([], [], marker=markers[enzyme_idx % len(markers)],
                 color="k", label=f"enzyme {enzyme_names[enzyme_idx]}")
-    ax[1][0].legend(loc="upper left", frameon=False)
+    ax[1][0].legend(frameon=True)
     
     # Legend for enzyme -> shape 
     for region_idx in range(n_regions):
         ax[2][0].scatter([], [], marker=markers[region_idx % len(markers)],
                 color="k", label=f"region {region_idx}")
-    ax[2][0].legend(loc="upper left", frameon=False)
+    ax[2][0].legend(frameon=True)
 
     ####################################################
     # Add axes labels
@@ -114,6 +115,8 @@ def plot_optimization_progress(
         ax[row][0].set_xlabel("round")
         ax[row][0].set_xticks(range(n_rounds))
     ax[0][0].set_ylabel("normalized membrane radius r/R")
+    ax[0][0].set_ylim(-0.05, 1.05)
+    ax[0][0].set_yticks([0,0.25,0.5,0.75,1])
     ax[1][0].set_ylabel("allocation to enzyme")
     for enzyme_idx in range(n_enzymes):
         ax[2+enzyme_idx][0].set_ylabel("allocation of enzyme to region")
@@ -135,10 +138,18 @@ if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     storage_path = os.path.join(FOLDER_TO_SOLVE, "optuna_study.db")
+    if not os.path.isfile(storage_path):
+        raise FileNotFoundError(f"The file {storage_path} does not exist.")
+    
+    storage = f"sqlite:///{FOLDER_TO_SOLVE}/optuna_study.db"
+    summaries = optuna.get_all_study_summaries(storage=storage)
+    if len(summaries) == 0:
+        raise ValueError(f"Within {storage} there are no studies...")
+
     study_name = "resource_allocation"
     study = optuna.load_study(
         study_name=study_name,
-        storage=f"sqlite:///{storage_path}"
+        storage=storage
     )
 
     # Find out number of enzymes
@@ -169,10 +180,10 @@ if __name__ == "__main__":
                 "inner_membrane_radii": None,
                 "regional_alloc": None,
                 "enzyme_allocations": None
-
             }
-        } for trial_idx in range(n_trials)
-        for round_idx in range(n_rounds)
+            for trial_idx in range(n_trials)  # inner loop stays inside
+        }
+        for round_idx in range(n_rounds)      # outer loop for the outer dict
     }
     for round_idx in range(n_rounds):
         for trial_idx in range(n_trials):
@@ -189,7 +200,6 @@ if __name__ == "__main__":
             data[round_idx][trial_idx]["inner_membrane_radii"] = inner_membrane_radii
             data[round_idx][trial_idx]["regional_alloc"] = regional_alloc
             data[round_idx][trial_idx]["enzyme_allocations"] = enzyme_allocations
-
     plot_optimization_progress(
         FOLDER_TO_SOLVE,
         data,

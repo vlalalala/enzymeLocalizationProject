@@ -1,5 +1,5 @@
 adaptive_step_parameters: 
-    t_n_min: [0.001]
+    t_n_min: [0.01]
     gamma_inc: [1.5]
     gamma_dec: [0.5]
 initial_concentration_guess_parameters:

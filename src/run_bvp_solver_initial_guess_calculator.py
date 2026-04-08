@@ -66,7 +66,10 @@ if __name__ == "__main__":
     SPECIES_LOOKUP = {sp.name: sp for sp in ORIGINAL_REACTION_NETWORK.species}
     CREEPING_REACTION_SIMULATIONS_FOLDER = os.path.join(FOLDER_TO_SOLVE, "creeping_reaction_simulations")
 
-    
+    if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "pruned.json")):
+        dump_json(FOLDER_TO_SOLVE, "species_initial_guess", {"pruned": True})
+        print(FOLDER_TO_SOLVE)
+        sys.exit(0)
 
     expanded_system_geometry_dict, expanded_system_mesh_dict = build_system_mesh(
                 SYSTEM_GEOMETRY_DICT, 

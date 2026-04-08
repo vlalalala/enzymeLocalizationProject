@@ -267,6 +267,8 @@ if __name__ == "__main__":
     # Do not run if the simulation has been pruned. Directly create dummy output file and exit.
     if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "pruned.json")):
         dump_json(FOLDER_TO_SOLVE, ".species_steady_state_concentrations", {"pruned": True})
+        dump_json(FOLDER_TO_SOLVE, "system_geometry_for_convergence", {"pruned": True})
+        dump_json(FOLDER_TO_SOLVE, ".expanded_system_mesh_for_convergence", {"pruned": True})
         sys.exit(0)
 
     ITERATION_DATA_PATH = os.path.join(FOLDER_TO_SOLVE, "solver_iteration_data")

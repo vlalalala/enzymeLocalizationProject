@@ -29,9 +29,9 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 snakemake \
   --profile config/slurm \
   --jobs 20 \
-  --rerun-incomplete \
   --keep-going \
-  --quiet rules
+  --use-conda \
+  --latency-wait 30
 """
 # Get the number of jobs running through squeue --me -h | wc -l
 # --keep-going stops snakemake from submitting jobs once one has not worked
@@ -54,7 +54,6 @@ df = "examples/simple_decay_without_inner_boundaries"
 df = "examples/simple_decay_with_one_inner_boundary"
 df = "examples/simple_decay_with_two_inner_boundaries"
 df = "data_private/slurm_test2"
-df = "data_private/simple_optuna_test"
 df = "data_private/enzyme_opt"
 df = "data_private/case_02"
 
@@ -65,6 +64,9 @@ df = "data_private/reaction_scaling_test"
 df = "data_private/spontaneousXdecaysToY_2InnerBoundaries"
 df = "data_private/spontaneousXdecaysToYdecaysToZ"
 
+df = "data_private/simple_optuna_test"
+df = "data_private/optimizationTest_spontaneousXdecaysToY_1InnerBoundary_copy"
+
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 
 # Different outputs dependent on mode
@@ -73,7 +75,7 @@ all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 all_outputs = [os.path.join(f, ".completed_visualization") for f in sim_folders]
 # With optimization
-#all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
+all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
 
 rule all:
     input:
@@ -96,7 +98,7 @@ def trial_path(wildcards, filename=""):
     return f"{base}/{filename}" if filename else base
 
 N_TRIALS = 20    # parallel solver calls per round
-N_ROUNDS = 10   # optimization rounds
+N_ROUNDS = 3   # optimization rounds
 ROUND_WIDTH = len(str(N_ROUNDS - 1))
 TRIAL_WIDTH = len(str(N_TRIALS - 1))
 #TRIALS = [str(i).zfill(TRIAL_WIDTH) for i in range(N_TRIALS)]
@@ -446,7 +448,7 @@ rule solve_boundary_value_problem_with_mesh_adaptation:
     threads: 1
     resources:
         mem_mb=5000,
-        runtime=300
+        runtime=15
     priority:
         0  # run LAST
     shell:
@@ -593,6 +595,10 @@ rule suggest_optimization_params:
         "config/environment.yaml"
     priority:
         101  # run first
+    threads: 1
+    resources:
+        mem_mb=1000,
+        runtime= 5
     shell:
         """
         python src/optimizer_suggest_trials.py \
@@ -638,6 +644,11 @@ rule checkpoint_best:
         "config/environment.yaml"
     priority:
         100  # run first
+    resources:
+        mem_mb=1000,
+        runtime= 5
+    priority:
+        100  # run first
     shell:
         """
         python src/optimizer_get_best_result.py \
@@ -650,7 +661,9 @@ rule best_result:
     input:
         lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{ROUNDS[-1]}.done"
     output:
-        "{df}/{bn}_{cn}/best_result.json"
+        ["{df}/{bn}_{cn}/best_result.json",
+        "{df}/{bn}_{cn}/optimization_progress.png"
+        ]
     conda:
         "config/environment.yaml"
     params:
@@ -666,6 +679,8 @@ rule best_result:
         python src/optimizer_get_best_result.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {params.last_round}
+
+        python src/optimizer_plot_progress.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}
         """
 
 ### To have a specific iteration of the solver plotted, run on terminal ###
