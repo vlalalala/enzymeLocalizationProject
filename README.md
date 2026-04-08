@@ -230,10 +230,15 @@ f^{\prime\prime}(x_i) \approx \frac{1}{h^2}(f_{i+1}-2f_i + f_{i-1})
 ```
 with $h$ the distance between adjacent mesh points (within the same region).
 
+**Interior points**
+
 For each interior point, we have
 ```math
 0 = D_s \cdot \left( \frac{c_s^\mathrm{right} - 2 \cdot c_s^\mathrm{center} + c_s^\mathrm{left}}{h^2} + \frac{c_s^\mathrm{right} - c_s^\mathrm{left}}{h \cdot r}\right) + R_s\left(\bm{c}^\mathrm{center}\right)
 ```
+where $r$ is the distance from the origin to the raidus of the interior point.
+
+**Treatment of points at $r=0$**
 
 For the points at $r=0$, we expand $c(r)$ in a Taylor series around $0$:
 ```math
@@ -283,14 +288,19 @@ such that
 0 = 3 \cdot D_s / h^2 \cdot 2 \cdot (c_s^\mathrm{right} - c_s^\mathrm{center}) + R_s\left(\bm{c}^\mathrm{center}\right)
 ```
 
-For the points at semipermeable membranes, we use
+**Points at the semipermeable membranes**
+
+For the points at the right of the semipermeable membrane (i.e. the left-most points of the region to the right of the membrane) we use
 ```math
 0 = D_s \cdot \frac{c_s^\mathrm{right} - c_s^\mathrm{center,+}}{h} - p_s \cdot (c_s^\mathrm{center, +} - c_s^\mathrm{center, -})
 ```
-for the points at the right of the semipermeable membrane, and
+where $c_s^\mathrm{center,+}$ is the concentration at the membrane on its right side and $c_s^\mathrm{center,-}$ is the concentration on the left side.
+
+For the points at the left of the semipermeable membrane (i.e. the right-most points of the region to the left of the membrane), we use
 ```math
 0 = D_s \cdot \frac{c_s^\mathrm{center, -} - c_s^\mathrm{left}}{h} - p_s \cdot (c_s^\mathrm{center, +} - c_s^\mathrm{center, -})
 ```
+analogously.
 
 Question: should I also put reaction flux here?
 
@@ -301,6 +311,7 @@ The Jacobian $J$ is given by
 ```math
 J_{ij} = \frac{\partial F_i}{\partial x_j}
 ```
+
 
 **Using the Newton method**
 

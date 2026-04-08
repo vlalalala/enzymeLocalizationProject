@@ -158,7 +158,7 @@ def define_newton_residual_and_optionally_jacobian(
                     elif j_region == region and j_species == species and j_n == 1:
                         J[i,j] += diff/Delta_r
                     elif j_region == prev_region and j_species == species and j_n == prev_region_last_n:
-                        J[i,j] += +species.permeability_constant ######################################################################I had a minus sign here.
+                        J[i,j] += +species.permeability_constant ###########################SHOULD BE +###########################################I had a minus sign here.
                     # No contributions from reactions (flux considered)
 
         else: # point_type == "r"
@@ -192,7 +192,7 @@ def define_newton_residual_and_optionally_jacobian(
                     elif j_region == region and j_species == species and j_n == n-1:
                         J[i,j] += -diff/Delta_r
                     elif j_region == next_region and j_species == species and j_n == 0:
-                        J[i,j] += species.permeability_constant
+                        J[i,j] += -species.permeability_constant ############################################## added the zero here
 
     if fill_jacobian:
         return F, J
@@ -271,7 +271,7 @@ def adaptive_newton_step(
         # such that for the given norm_NF, t_n is 1
         # -> t_n = sqrt(2*tau/norm_NF) = 1 -> tau = norm_NF/2
         tau_current = norm_NF/2
-    t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) # step size ##################################################################
+    t_n = min(np.sqrt(2 * tau_current / norm_NF), 1) ###################### t_n should be max 1# step size ##################################################################
     du = t_n * NF
     species_concentrations_try = copy.deepcopy(species_concentrations)
     tolerance = kappa * np.finfo(F_vector.dtype).eps # absolute floor (this will never be crossed!)
@@ -307,7 +307,8 @@ def adaptive_newton_step(
             #print(species, flush=True)
             tau_new = tau_current * gamma_dec
             if tau_new < tau_min:
-                raise ValueError("Tau is under the minimum.") # is only called 
+                raise ValueError("Tau is under the minimum.") # is only called
+            print("negative concentrations", flush=True)
             return species_concentrations, tau_new, last_F_norm, t_n, kappa, np.nan
         #relative_change_in_u[i] = du_value / species_concentrations_try[region][n][species]
     #print("The max value is", max(relative_change_in_u.values()), flush=True)
