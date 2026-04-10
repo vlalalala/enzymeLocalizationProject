@@ -14,10 +14,10 @@ conda activate snakemake_env
 # Run Snakemake with the profile
 snakemake \
     --profile config/slurm \
-    --jobs 30 \
-    --keep-going \
+    --jobs 500 \
     --use-conda \
-    --latency-wait 30
+    --latency-wait 120 \
+    --retries 2
 
 # To figure out whether stuff went wrong:
 # sacct -j 36274046 --format=JobID,MaxRSS,AveRSS,State,ExitCode,ReqMem,AllocTRES,MaxVMSize,AveVMSize

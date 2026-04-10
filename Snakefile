@@ -28,7 +28,7 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 """
 snakemake \
   --profile config/slurm \
-  --jobs 40 \
+  --jobs 500 \
   --keep-going \
   --use-conda \
   --latency-wait 120 \
@@ -51,6 +51,7 @@ snakemake \
 ############################################################
 
 df = "data_private/optimization_spontaneousXdecaysToY_1InnerBoundary"
+#df = "data_private/optimization_spontaneousXYZchain_1InnerBoundary"
 
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")

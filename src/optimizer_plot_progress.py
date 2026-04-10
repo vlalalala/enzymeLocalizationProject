@@ -20,7 +20,7 @@ def plot_optimization_progress(
     data,
     enzymes_df,
     n_regions,
-    largest_round_to_plot,
+    n_rounds_to_plot,
     n_trials
 ):
     n_enzymes = len(enzymes_df)
@@ -30,7 +30,7 @@ def plot_optimization_progress(
     #print(data)
     all_fluxes = [
         data[round_idx][trial_idx]["flux_to_maximize"]
-        for round_idx in range(largest_round_to_plot)
+        for round_idx in range(n_rounds_to_plot)
         for trial_idx in range(n_trials)
     ] # all_fluxes is of length N_TRIALS * N_ROUNDS
     #print(all_fluxes)
@@ -39,7 +39,7 @@ def plot_optimization_progress(
         norm = mcolors.Normalize(vmin=min(non_pruned_fluxes), vmax=max(non_pruned_fluxes))
     cmap = cm.viridis
 
-    for round_idx in range(largest_round_to_plot+1):
+    for round_idx in range(n_rounds_to_plot):
         for trial_idx in range(n_trials):
             trial_data = data[round_idx][trial_idx]
             flux = trial_data["flux_to_maximize"]
@@ -52,8 +52,6 @@ def plot_optimization_progress(
             # Row 0 : plot membrane positions
             ###################
             radii = trial_data["inner_membrane_radii"]
-            if round_idx==0 and trial_idx == 4:
-                print(style)
             #print(round_idx, trial_idx, radii, trial_data["pruned"])
             for membrane_idx, radius in enumerate(radii):
                 marker = markers[membrane_idx % len(markers)]
@@ -124,7 +122,7 @@ def plot_optimization_progress(
     ####################################################
     for row in range(num_rows):
         ax[row][0].set_xlabel("round")
-        ax[row][0].set_xticks(range(largest_round_to_plot+1))
+        ax[row][0].set_xticks(range(n_rounds_to_plot))
     ax[0][0].set_ylabel("normalized membrane radius r/R")
     ax[0][0].set_ylim(-0.05, 1.05)
     ax[0][0].set_yticks([0,0.25,0.5,0.75,1])
@@ -145,7 +143,7 @@ def plot_optimization_progress(
     fig.tight_layout()
     fig.savefig(os.path.join(folder_to_solve, "optimization_progress.png"), dpi=600)
 
-def load_existing_data(folder_to_solve, study, n_rounds, n_trials, n_enzymes):
+def load_existing_data(folder_to_solve, study, n_rounds_to_load, n_trials, n_enzymes):
     # Find out total enzyme quantity and relative distance 
     conditions_info = read_yaml_file(os.path.join(folder_to_solve, "parameters_value_conditions.yaml"))
     total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
@@ -165,9 +163,9 @@ def load_existing_data(folder_to_solve, study, n_rounds, n_trials, n_enzymes):
             }
             for trial_idx in range(n_trials)  # inner loop stays inside
         }
-        for round_idx in range(n_rounds)      # outer loop for the outer dict
+        for round_idx in range(n_rounds_to_load)      # outer loop for the outer dict
     }
-    for round_idx in range(n_rounds):
+    for round_idx in range(n_rounds_to_load):
         for trial_idx in range(n_trials):
             trial = next(
                 (t for t in study.trials
@@ -195,6 +193,7 @@ if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     largest_round_to_plot = int(sys.argv[2])
+    # this is the number/name of the last one to plot!, not the index!
 
     storage_path = os.path.join(FOLDER_TO_SOLVE, "optuna_study.db")
     if not os.path.isfile(storage_path):
@@ -218,7 +217,13 @@ if __name__ == "__main__":
     enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
     n_enzymes = len(enzymes_df) # the first row is the header
 
-    data = load_existing_data(FOLDER_TO_SOLVE, study, n_rounds, n_trials, n_enzymes)
+    # if largest_round_to_plot "is the string 5", then n_rounds is actually 6 (since round 0 also counts)
+    data = load_existing_data(
+        FOLDER_TO_SOLVE, study,
+        n_rounds_to_load = largest_round_to_plot+1,
+        n_trials=n_trials,
+        n_enzymes=n_enzymes
+    )
     #print("data_loaded", data)
     geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
     n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
@@ -228,6 +233,6 @@ if __name__ == "__main__":
         data,
         enzymes_df,
         n_regions,
-        largest_round_to_plot,
-        n_trials
+        n_rounds_to_plot = largest_round_to_plot+1,
+        n_trials=n_trials
     )

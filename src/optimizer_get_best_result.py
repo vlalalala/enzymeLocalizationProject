@@ -184,7 +184,7 @@ if __name__ == "__main__":
         enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
         n_enzymes = len(enzymes_df) # the first row is the header
 
-        data = load_existing_data(FOLDER_TO_SOLVE, study, n_rounds, n_trials, n_enzymes)
+        data = load_existing_data(FOLDER_TO_SOLVE, study, round_idx, n_trials, n_enzymes)
         geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
         n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
         #print("loaded_data", data)
@@ -193,7 +193,7 @@ if __name__ == "__main__":
             data,
             enzymes_df,
             n_regions,
-            largest_round_to_plot=round_of_best,
+            n_rounds_to_plot=round_idx,
             n_trials = n_trials
         )
         dump_json(FOLDER_TO_SOLVE, "best_result", result)
