@@ -8,6 +8,7 @@ import argparse
 from pathlib import Path
 from auxiliary_functions import read_yaml_file, dump_in_yaml_file, dump_json
 from optuna.trial import TrialState
+from auxiliary_functions_framework_organization_using_standard_library import DelayedKeyboardInterrupt
 
 def check_or_create_optimization_lock(df, n_trials, n_rounds):
     lock_path = os.path.join(df, "optimization_config.lock.json")
@@ -35,6 +36,7 @@ def params_to_physical(
     relative_delta_r = None
 ):
     n_inner_membranes = n_regions - 1
+    prune = {"prune": False}
     # --- Allocation to different enzymes: (n_enzymes - 1) free params ---
     #softmax([-5, 0, 0]) → [0.007, 0.497, 0.497]  # nearly equal split, one tiny
     #softmax([ 5, 0, 0]) → [0.987, 0.007, 0.007]  # almost all in first type
@@ -80,9 +82,13 @@ def params_to_physical(
     """
     Distribute this volume slack among the different regions
     """
-    z_extra_volume = [params[f"z_extra_volume_{i}"] for i in range(n_regions - 1)]
-    z_extra_volume.append(0.0)
-    volume_slack_distribution = softmax(np.array(z_extra_volume))
+    fraction_extra_volume = [params[f"fraction_extra_volume_{i}"] for i in range(n_regions-1)]
+    last_frac = 1.0 - sum(fraction_extra_volume)
+    if last_frac <= 0:
+        prune["prune"] = True
+        prune.update({"reason": "The volumes to allocate between the regions 1 to N-1 already account to more than 100%"})
+    # Even if it is pruned, continue
+    volume_slack_distribution = np.array(fraction_extra_volume + [last_frac])
     #print("volume_slack_distribution", volume_slack_distribution)
     extra_volume_per_region = (volume_slack_distribution * volume_slack).tolist()
     #print("extra_volume_per_region", extra_volume_per_region)
@@ -120,7 +126,7 @@ def params_to_physical(
     #print("inner_membrane_radii", inner_membrane_radii)
     #print("relative_delta_r", relative_delta_r)
     # Check (only necessary when suggesting the trials. In other cases, do not pass relative_delta_r)
-    prune = {"prune": False}
+    
     if len(inner_membrane_radii) != 0 and relative_delta_r is not None:
         if inner_membrane_radii[0] < 1.5 * relative_delta_r or inner_membrane_radii[-1] > 1 - relative_delta_r * 1.5:
             prune["prune"] = True
@@ -128,8 +134,8 @@ def params_to_physical(
         if not all(b - a >= relative_delta_r * 2 for a, b in zip(inner_membrane_radii[:-1], inner_membrane_radii[1:])):
             prune["prune"] = True
             prune.update({"reason": "A distance between inner membranes is too small"})
-        if not all(0<inner_membrane_radius<1 for inner_membrane_radius in inner_membrane_radii):
-            raise ValueError("An inner_membrane_radius is not between 0 and 1.")
+        #if not all(0<inner_membrane_radius<1 for inner_membrane_radius in inner_membrane_radii):
+        #    raise ValueError("An inner_membrane_radius is not between 0 and 1.")
     return enzyme_allocations, regional_alloc, inner_membrane_radii, prune
 
 def create_files(
@@ -223,35 +229,86 @@ if __name__ == "__main__":
     relative_delta_r = 1/(discretization_info["discretization_parameters"]["min_num_mesh_points"]-1)
     # relative_delta_r is in units of R
     
+    optimization_params = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_optimization.yaml"))
+
     storage = f"sqlite:///{FOLDER_TO_SOLVE}/optuna_study.db"
     # Create study on round 0, load on subsequent rounds
+    # Sampler in order to have reproducibility on suggestions
+    print(optimization_params)
+    if optimization_params["sampler"]["type"] == "TPESampler":
+        sampler = optuna.samplers.TPESampler(
+            seed=optimization_params["sampler"]["seed"]+round_idx,
+            n_startup_trials=optimization_params["sampler"]["sampler_parameters"]["TPESampler"]["n_startup_trials"],
+            gamma=lambda x: int(optimization_params["sampler"]["sampler_parameters"]["TPESampler"]["gamma"] * x)
+        )# gamma is the exploration vs exploitation parameter -> the lower gamma, the more exploitation,
+        # aka sampling close to the current optimal value. Default is 0.25
+    elif optimization_params["sampler"]["type"] == "CmaEsSampler":
+        sampler = optuna.samplers.CmaEsSampler(
+            seed=optimization_params["sampler"]["seed"]+round_idx,
+            sigma0 = optimization_params["sampler"]["sampler_parameters"]["CmaEsSampler"]["sigma0"],
+            restart_strategy = optimization_params["sampler"]["sampler_parameters"]["CmaEsSampler"]["restart_strategy"],
+            n_startup_trials = optimization_params["sampler"]["sampler_parameters"]["CmaEsSampler"]["n_startup_trials"],
+        )
+    # Claude says this is better if only 1 parameter to tune. Need to test...
+    else:
+        raise ValueError("optimization sampler not specified")
+    # If I only do seed=42, all of the trials are exactly the same... :(
     study = optuna.create_study(
         study_name="resource_allocation",
         storage=storage,
         direction="maximize",
-        load_if_exists=True
+        load_if_exists=True,
+        sampler=sampler
     )
-
+    
+    #existing = [
+    #        t for t in study.trials
+    #        if t.user_attrs.get("round") == 0
+    #        and t.user_attrs.get("trial_idx") == 2
+    #    ]
+    #print("previous params: ", existing[0].params)
     # Ask Optuna for a batch of N_TRIALS suggestions
     for trial_idx in range(n_trials):
-        trial = study.ask()  # get a suggested trial without evaluating it
-        # access through study.trials[trial_idx]
-        trial.set_user_attr("round", round_idx)
-        
-        # --- Allocation to different enzymes: (n_enzymes - 1) free params ---
-        if n_enzymes > 0:
-            z_enzymes = [trial.suggest_float(f"z_enzyme_types_{i}", -5, 5)
-                    for i in range(n_enzymes - 1)]
+        existing = [
+            t for t in study.trials
+            if t.user_attrs.get("round") == round_idx
+            and t.user_attrs.get("trial_idx") == trial_idx
+        ]
+        if len(existing) > 1:
+            raise ValueError(f"Something went wrong. More than one trials have round {round_idx} and trial {trial_idx}.")
+        if existing:
+            trial = existing[-1]
+        else:
+            ########## IMPORTANT: if some keyboard interrupt occurs between
+            # study.ask and the last .suggest_float, downstream stuff won't work...
+            # Therefore: DelayedKeyboardInterrupt wrap
+            with DelayedKeyboardInterrupt():
+                trial = study.ask()  # get a suggested trial without evaluating it
+                # access through study.trials[trial_idx]
+                trial.set_user_attr("round", round_idx)
+                trial.set_user_attr("trial_idx", trial_idx)
+                
+                # --- Allocation of total enzyme quantity to different enzymes: (n_enzymes - 1) free params ---
+                if n_enzymes > 0:
+                    z_enzymes = [trial.suggest_float(f"z_enzyme_types_{i}", -5, 5)
+                            for i in range(n_enzymes - 1)]
 
-        # --- Allocation of enzymes to different regions: n_enzymes x (n_regions - 1) free params ---
-        for t in range(n_enzymes):
-            z_regions = [trial.suggest_float(f"z_region_{t}_{r}", -5, 5)
-                        for r in range(n_regions - 1)]
-        
-        # --- Allocation of volume that is left from most packed distribution of enzymes     
-        z_extra_volume = [trial.suggest_float(f"z_extra_volume_{i}", -5, 5)
-              for i in range(n_regions-1)]
-        #print("z_extra_volume:", z_extra_volume)
+                # --- Allocation of enzymes to different regions: n_enzymes x (n_regions - 1) free params ---
+                for t in range(n_enzymes):
+                    z_regions = [trial.suggest_float(f"z_region_{t}_{r}", -5, 5)
+                                for r in range(n_regions - 1)]
+                
+                # --- Allocation of volume that is left from most packed distribution of enzymes     
+                # z_i taken from Uniform(-5,5). After applying the fixed logit 0 and the softmax,
+                # e^-5 = 0.0067 and e^5 = 148
+                # p_i = e^{z_i} / sum_j e^{z_j}
+                # for volume, best to pick fractions of volume freely (without drawing from the distribution
+                # and then applying the softmax), which would require extreme logit values.
+                # The number of free parameters is n_regions-1, since the extra volume should add up to 1
+                fraction_extra_volume = [trial.suggest_float(f"fraction_extra_volume_{i}", 0.0, 1.0)
+                    for i in range(n_regions-1)]
+                #print("z_extra_volume:", z_extra_volume)
+        #print(trial.params, round_idx, trial_idx)
         enzyme_allocations, regional_alloc, inner_membrane_radii, prune = params_to_physical(
             trial.params,
             n_enzymes=n_enzymes,
@@ -261,16 +318,23 @@ if __name__ == "__main__":
             external_radius=external_radius,
             relative_delta_r = relative_delta_r
         )
+        if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "optimization_convergence.txt")):
+            prune["prune"] = True
+            prune.update({"reason": "The optimization procedure has already converged."})
+
         result = {
             "enzyme_allocations": enzyme_allocations,
             "regional_alloc": regional_alloc,
             "inner_membrane_radii": inner_membrane_radii,
             "prune": prune
         }
+    
         if prune["prune"]:
             trial_dir = os.path.join(FOLDER_TO_SOLVE, f"optimization_round_{round_idx}/trial_{trial_idx}")
-            print(f"Infeasable {trial_dir} :  {prune["reason"]}, pruning.")
-            study.tell(trial.number, state=TrialState.PRUNED)
+            #print(f"Infeasable {trial_dir} or system already optimized:  {prune["reason"]}, pruning.")
+            current_trial = study.trials[trial.number]
+            if current_trial.state == TrialState.RUNNING:
+                study.tell(trial.number, state=TrialState.PRUNED)
             # already create output files of rules
             dump_json(trial_dir, "pruned", prune)
             # Define result placeholder for snakemake

@@ -1,6 +1,21 @@
 import os
 import re
 from pathlib import Path
+import signal
+
+class DelayedKeyboardInterrupt:
+    def __enter__(self):
+        self.interrupted = False
+        self.old_handler = signal.signal(signal.SIGINT, self._handler)
+        return self
+
+    def _handler(self, sig, frame):
+        self.interrupted = True
+
+    def __exit__(self, type, value, traceback):
+        signal.signal(signal.SIGINT, self.old_handler)
+        if self.interrupted:
+            raise KeyboardInterrupt
 
 def get_concentrations_files_within_folder(folder):
     """

@@ -89,12 +89,17 @@ def construct_baseline_mesh_points(
 
 if __name__ == "__main__":
     case_directory = sys.argv[1]
+    # if the case is getting pruned anyways, do not check for validity of input
+    pruning = False
+    if os.path.isfile(os.path.join(case_directory, "pruned.json")):
+        pruning = True
     # Import files with user input
     system_geometry_nested_dict = read_yaml_file(os.path.join(case_directory, "parameters_geometry.yaml"))
     discretization_params_dict = read_yaml_file(os.path.join(case_directory, "parameters_discretization.yaml"))
     # Check that user input is valid
-    check_validity_system_geometry_info(system_geometry_nested_dict)
-    check_validity_system_geometry_info(discretization_params_dict)
+    if not pruning:
+        check_validity_system_geometry_info(system_geometry_nested_dict)
+        check_validity_system_geometry_info(discretization_params_dict)
     # Save baseline system geometry
     construct_baseline_mesh_points(
         case_directory,

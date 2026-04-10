@@ -47,11 +47,8 @@ def plot_convergence_progress(
     ax[0].set_xlabel("iteration")
     ax[0].set_yscale('log')
 
-    #y = df["tau"].values
-    #if np.any(np.isfinite(y) & (y > 0)):
-    #    ax[1].set_yscale("log")
-    #else:
-    #    print("Skipping log scale for tau")
+
+    ax[1].set_yscale("log")
     ax[1].set_ylabel("largest relative \n distance to \n numerical limit")
     ax[1].set_xlabel("iteration")
 

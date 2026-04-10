@@ -22,16 +22,17 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 # python src/_create_phase_space.py path_to_new_folder
 
 # Step 4: Run rule all
-# snakemake --use-conda --cores 1 --scheduler greedy
+# snakemake --use-conda --cores 1 --scheduler greedy --latency-wait 120 --retries 2
 # scheduler greedy to schedule short jobs first
 # or
 """
 snakemake \
   --profile config/slurm \
-  --jobs 20 \
+  --jobs 40 \
   --keep-going \
   --use-conda \
-  --latency-wait 30
+  --latency-wait 120 \
+  --retries 2
 """
 # Get the number of jobs running through squeue --me -h | wc -l
 # --keep-going stops snakemake from submitting jobs once one has not worked
@@ -49,33 +50,24 @@ snakemake \
 
 ############################################################
 
-df = "data/test_phase_space"
-df = "examples/simple_decay_without_inner_boundaries"
-df = "examples/simple_decay_with_one_inner_boundary"
-df = "examples/simple_decay_with_two_inner_boundaries"
-df = "data_private/slurm_test2"
-df = "data_private/enzyme_opt"
-df = "data_private/case_02"
+df = "data_private/optimization_spontaneousXdecaysToY_1InnerBoundary"
 
-df = "data_private/case_02_resolve_adaptive"
-df = "data_private/reaction_scaling_test_spontaneous"
-df = "data_private/reaction_scaling_test"
-
-df = "data_private/spontaneousXdecaysToY_2InnerBoundaries"
-df = "data_private/spontaneousXdecaysToYdecaysToZ"
-
-df = "data_private/simple_optuna_test"
-df = "data_private/optimizationTest_spontaneousXdecaysToY_1InnerBoundary_copy"
+if not os.path.isdir(df):
+    raise ValueError(df, "does not exist.")
 
 sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
+
 
 # Different outputs dependent on mode
 # Without optimization
 all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 all_outputs = [os.path.join(f, ".completed_visualization") for f in sim_folders]
+
 # With optimization
-all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
+# all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
+all_outputs = [os.path.join(f, ".modifications_of_best_result_created") for f in sim_folders]
+all_outputs = [os.path.join(f, "optimization_modifications_analysis.json") for f in sim_folders]
 
 rule all:
     input:
@@ -88,17 +80,26 @@ rule all:
 def trial_path(wildcards, filename=""):
     """Returns the correct folder path depending on whether the
     optimal solution should be found or not 
-    (if in optimization mode there are round/trial wildcards)
+    (if in optimization mode there are round/trial wildcards,
+     or modification mode there are check/modification wildcards)
     """
-    try:
+    round_ = getattr(wildcards, "round", None)
+    trial  = getattr(wildcards, "trial", None)
+    mod    = getattr(wildcards, "modification", None)
+
+    if round_ is not None and trial is not None:
         base = (f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/"
-                f"optimization_round_{wildcards.round}/trial_{wildcards.trial}")
-    except AttributeError:
+                f"optimization_round_{round_}/trial_{trial}")
+    elif mod is not None:
+        base = (f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/"
+                f"optimization_check/modification_{mod}")
+    else:
         base = f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}"
+
     return f"{base}/{filename}" if filename else base
 
 N_TRIALS = 20    # parallel solver calls per round
-N_ROUNDS = 3   # optimization rounds
+N_ROUNDS = 20   # optimization rounds
 ROUND_WIDTH = len(str(N_ROUNDS - 1))
 TRIAL_WIDTH = len(str(N_TRIALS - 1))
 #TRIALS = [str(i).zfill(TRIAL_WIDTH) for i in range(N_TRIALS)]
@@ -541,6 +542,7 @@ FILE_NAMES = [
 
 # --- Round 0: suggest from base folder (no previous .done file) ---
 rule suggest_optimization_params_round_0:
+    # snakemake -s Snakefile data_private/optimization_spontaneousXdecaysToY_1InnerBoundary/combined_000001/optimization_round_0/.trial_files_created --cores 1 --use-conda
     wildcard_constraints:
         round = r"0+"  # only zeros: "0" or "00" etc.
     input:
@@ -581,10 +583,6 @@ rule suggest_optimization_params:
     wildcard_constraints:
         round = r"0*[1-9]\d*"  # any number except 0 (with or without leading zeros)
     input:
-        done = lambda wildcards: (
-            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/"
-            f"optimization_round_{int(wildcards.round)-1}.done"
-        ),
         previous_round_best = lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{int(wildcards.round)-1}_best.json"
     output:
         files = expand("{{df}}/{{bn}}_{{cn}}/optimization_round_{{round}}/trial_{trial}/{file_name}",
@@ -611,14 +609,15 @@ rule suggest_optimization_params:
 rule collect_and_update:
     # snakemake -s Snakefile data_private/optuna_test/combined_000001/optimization_round_4.done --cores 1 --use-conda
     input:
-        fluxes = lambda wildcards: expand(
+        [
+        lambda wildcards: expand(
             f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{wildcards.round}/trial_{{trial}}/fluxes.json",
             trial=TRIALS
-        )
+        ),
+        lambda wildcards: f"{wildcards.df}/parameters_optimization.yaml"
+        ]
     output:
-        touch("{df}/{bn}_{cn}/optimization_round_{round}.done")
-    params:
-        product_to_maximize = "Y"
+        "{df}/{bn}_{cn}/optimization_round_{round}_best.json"
     conda:
         "config/environment.yaml"
     threads: 1
@@ -632,25 +631,7 @@ rule collect_and_update:
         python src/optimizer_collect_trial_results.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {wildcards.round} \
-            --product_to_maximize {params.product_to_maximize}
-        """
 
-rule checkpoint_best:
-    input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{wildcards.round}.done"
-    output:
-        "{df}/{bn}_{cn}/optimization_round_{round}_best.json"
-    conda:
-        "config/environment.yaml"
-    priority:
-        100  # run first
-    resources:
-        mem_mb=1000,
-        runtime= 5
-    priority:
-        100  # run first
-    shell:
-        """
         python src/optimizer_get_best_result.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {wildcards.round}
@@ -659,7 +640,7 @@ rule checkpoint_best:
 rule best_result:
     # snakemake -s Snakefile data_private/optuna_test/combined_000001/best_result.json --cores 1 --use-conda
     input:
-        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{ROUNDS[-1]}.done"
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_round_{ROUNDS[-1]}_best.json"
     output:
         ["{df}/{bn}_{cn}/best_result.json",
         "{df}/{bn}_{cn}/optimization_progress.png"
@@ -680,9 +661,143 @@ rule best_result:
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {params.last_round}
 
-        python src/optimizer_plot_progress.py {wildcards.df}/{wildcards.bn}_{wildcards.cn}
+        python src/optimizer_plot_progress.py {wildcards.df}/{wildcards.bn}_{wildcards.cn} {params.last_round}
         """
 
+############################################################
+# CHECK OPTIMIZATION
+############################################################
+# Number of total files to create: not combinatorics!
+# (changing each parameter and adding the options all together)
+
+# Factor of n_inner_membranes * 2: move each membrane to one mesh point to the left and one to the right
+
+# Factor of n_enzymes * 2: multiply the allocation of each enzyme by 0.99 and 1.01
+# (making sure to then normalize total quantity)
+
+# Allocation of enzymes to different regions: n_enzymes * n_regions * 2:
+# multiply the allocation of each enzyme to each region by 0.99 and 1.01 
+# (again, making sure to then normalize the total quantity)
+
+NUMBER_ENZYMES = 0
+NUMBER_INNER_MEMBRANES = 1
+TOTAL_NUMBER_MODIFICATIONS = 2 * (
+    NUMBER_INNER_MEMBRANES
+    + NUMBER_ENZYMES
+    + NUMBER_ENZYMES * (NUMBER_INNER_MEMBRANES + 1)
+)
+
+MODIFICATIONS =  list(range(TOTAL_NUMBER_MODIFICATIONS))
+
+rule create_modifications_of_best_result:
+    # snakemake -s Snakefile data_private/optuna_test/combined_000001/.modifications_of_best_result_created --cores 1 --use-conda
+    input:
+        lambda wildcards: f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/best_result.json"
+    output:
+        touch("{df}/{bn}_{cn}/.modifications_of_best_result_created"),
+        files = expand("{{df}}/{{bn}}_{{cn}}/optimization_check/modification_{modification}/{file_name}",
+                       modification=MODIFICATIONS,
+                       file_name=FILE_NAMES),
+    params:
+        expected_number_modifications = TOTAL_NUMBER_MODIFICATIONS
+    conda:
+        "config/environment.yaml"
+    threads: 1
+    resources:
+        mem_mb=1000,
+        runtime= 3
+    priority:
+        100  # run first
+    shell:
+        """
+        python src/optimizer_create_modifications_to_extremum.py \
+            --folder {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+            --expected_number_modifications {params.expected_number_modifications}
+        """    
+
+rule analyze_results_of_modifications_of_best_result:
+    input:
+        lambda wildcards: expand(
+            f"{wildcards.df}/{wildcards.bn}_{wildcards.cn}/optimization_check/modification_{{modification}}/fluxes.json",
+            modification=MODIFICATIONS
+        )
+    output:
+        "{df}/{bn}_{cn}/optimization_modifications_analysis.json"
+    conda:
+        "config/environment.yaml"
+    threads: 1
+    resources:
+        mem_mb=1000,
+        runtime= 3
+    priority:
+        100  # run first
+    shell:
+        """
+        python src/optimizer_analyze_modifications_to_extremum.py \
+            --folder {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
+        """   
+    
+
+use rule check_reaction_network_info_validity as check_reaction_network_info_validity_within_optimization_modification with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    output:
+        touch("{df}/{bn}_{cn}/optimization_check/modification_{modification}/.validated_reaction_network_input")
+
+use rule check_solver_input_validity as check_solver_input_validity_within_optimization_modification with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    output:
+        touch("{df}/{bn}_{cn}/optimization_check/modification_{modification}/.validated_solver_input")
+
+use rule check_solver_output_validity as check_solver_output_validity_within_optimization_modification with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    output:
+        touch("{df}/{bn}_{cn}/optimization_check/modification_{modification}/.validated_solver_output")
+
+use rule create_system_geometry as create_system_geometry_within_optimization_modification with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    output:
+        "{df}/{bn}_{cn}/optimization_check/modification_{modification}/.system_geometry.json"
+
+use rule create_reaction_network as create_reaction_network_within_optimization_modification with:
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    output:
+        "{df}/{bn}_{cn}/optimization_check/modification_{modification}/.pickled_reaction_network_without_enzyme_concentration"
+
+use rule create_initial_guess as create_initial_guess_within_optimization_modification with:
+    # snakemake -s Snakefile data_private/case_01/combined_000015/optimization_round_0/trial_0/species_initial_guess.json --cores 1 --use-conda
+    output:
+        "{df}/{bn}_{cn}/optimization_check/modification_{modification}/species_initial_guess.json"
+
+use rule cleanup_old_iterations as cleanup_old_iterations_within_optimization_modification with:
+    output:
+        touch("{df}/{bn}_{cn}/optimization_check/modification_{modification}/.validated_iterations")
+
+use rule define_enzyme_concentrations as define_enzyme_concentrations_within_optimization_modification with:
+    # hashlib to keep it shorter: group: lambda wildcards: f"solver_preparation_{trial_path(wildcards).replace("/", "_")}"
+    group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
+    output:
+        [
+            "{df}/{bn}_{cn}/optimization_check/modification_{modification}/.pickled_reaction_network",
+            "{df}/{bn}_{cn}/optimization_check/modification_{modification}/enzyme_concentrations.json"
+        ]
+
+use rule solve_boundary_value_problem_with_mesh_adaptation as solve_boundary_value_problem_with_mesh_adaptation_within_optimization_modification with:
+    # snakemake -s Snakefile data_private/case_01/combined_000015/optimization_round_0/trial_0/.species_steady_state_concentrations.json --cores 1 --use-conda
+    output:
+        [
+        "{df}/{bn}_{cn}/optimization_check/modification_{modification}/.species_steady_state_concentrations.json",
+        "{df}/{bn}_{cn}/optimization_check/modification_{modification}/system_geometry_for_convergence.json",
+        "{df}/{bn}_{cn}/optimization_check/modification_{modification}/.expanded_system_mesh_for_convergence.json",
+        ]
+
+use rule study_bvp_solution as study_bvp_solution_within_optimization_modification with:
+    output:
+        "{df}/{bn}_{cn}/optimization_check/modification_{modification}/fluxes.json"
+
+use rule plot_boundary_value_problem as plot_boundary_value_problem_within_optimization_modification with:
+    # snakemake -s Snakefile data_private/case_01/combined_000015/optimization_round_0/trial_0/.completed_visualization --cores 1 --use-conda
+    output:
+        touch("{df}/{bn}_{cn}/optimization_check/modification_{modification}/.completed_visualization")
 ### To have a specific iteration of the solver plotted, run on terminal ###
 # python src/plot_bvp_solution.py data/test_0 --plot_iteration 40
 ### To have a gif of the iterations of the solver (already before the solver has converged), run on terminal ###

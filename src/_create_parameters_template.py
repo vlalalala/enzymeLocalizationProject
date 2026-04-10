@@ -3,7 +3,7 @@ import shutil
 import os
 from pathlib import Path
 import pandas as pd
-from auxiliary_functions_using_standard_library import load_json
+from auxiliary_functions_using_standard_library import load_json, dump_json_base
 
 def copy_and_rename_files(target_dir, source_dir, old_substr, new_substr):
     """

@@ -18,43 +18,54 @@ markers = ['o', 's', '^', 'D', 'v', 'P', '*', 'X']  # circle, square, triangle, 
 def plot_optimization_progress(
     folder_to_solve,
     data,
-    enzymes_df
+    enzymes_df,
+    n_regions,
+    largest_round_to_plot,
+    n_trials
 ):
     n_enzymes = len(enzymes_df)
     enzyme_names = enzymes_df["name"].tolist()
     num_rows = 1 + n_enzymes + 2
     fig, ax = plt.subplots(num_rows, 2, figsize = (4, 3 * num_rows), gridspec_kw={"width_ratios": [20, 1]})
-
+    #print(data)
     all_fluxes = [
         data[round_idx][trial_idx]["flux_to_maximize"]
-        for round_idx in range(n_rounds)
+        for round_idx in range(largest_round_to_plot)
         for trial_idx in range(n_trials)
     ] # all_fluxes is of length N_TRIALS * N_ROUNDS
+    #print(all_fluxes)
     non_pruned_fluxes = [flux for flux in all_fluxes if flux is not None]
-    norm = mcolors.Normalize(vmin=min(non_pruned_fluxes), vmax=max(non_pruned_fluxes))
+    if len(non_pruned_fluxes)>1:
+        norm = mcolors.Normalize(vmin=min(non_pruned_fluxes), vmax=max(non_pruned_fluxes))
     cmap = cm.viridis
 
-    for round_idx in range(n_rounds):
+    for round_idx in range(largest_round_to_plot+1):
         for trial_idx in range(n_trials):
             trial_data = data[round_idx][trial_idx]
             flux = trial_data["flux_to_maximize"]
             if flux is None:
-                continue
-            color = cmap(norm(flux))
+                style = {'edgecolors': 'black', 'facecolors': 'none', 'linewidths': 1.5}
+            else:
+                color = cmap(norm(flux)) # if flux is not None, then the variable norm exists
+                style = {'facecolors': color}
             ###################
             # Row 0 : plot membrane positions
             ###################
             radii = trial_data["inner_membrane_radii"]
+            if round_idx==0 and trial_idx == 4:
+                print(style)
+            #print(round_idx, trial_idx, radii, trial_data["pruned"])
             for membrane_idx, radius in enumerate(radii):
                 marker = markers[membrane_idx % len(markers)]
                 ax[0][0].scatter(
                     round_idx, radius,
-                    color=color,
+                    #color=color,
                     marker=marker,
                     s=50,
-                    alpha=0.7
+                    alpha=0.4,
+                    **style
                 )
-            
+                
             ###################
             # Row 1 : plot enzyme allocation
             ###################
@@ -113,7 +124,7 @@ def plot_optimization_progress(
     ####################################################
     for row in range(num_rows):
         ax[row][0].set_xlabel("round")
-        ax[row][0].set_xticks(range(n_rounds))
+        ax[row][0].set_xticks(range(largest_round_to_plot+1))
     ax[0][0].set_ylabel("normalized membrane radius r/R")
     ax[0][0].set_ylim(-0.05, 1.05)
     ax[0][0].set_yticks([0,0.25,0.5,0.75,1])
@@ -134,9 +145,57 @@ def plot_optimization_progress(
     fig.tight_layout()
     fig.savefig(os.path.join(folder_to_solve, "optimization_progress.png"), dpi=600)
 
+def load_existing_data(folder_to_solve, study, n_rounds, n_trials, n_enzymes):
+    # Find out total enzyme quantity and relative distance 
+    conditions_info = read_yaml_file(os.path.join(folder_to_solve, "parameters_value_conditions.yaml"))
+    total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
+    enzyme_maximum_concentration =  conditions_info["enzyme_maximum_concentration"]
+    enzyme_maximum_concentration = 1 ####################################################################################  
+    # Find out number of regions and minimum distance between membranes and the origin
+    geometry_info = read_yaml_file(os.path.join(folder_to_solve, "parameters_geometry.yaml"))
+    n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
+    external_radius = geometry_info["geometry_config"]["outer_membrane_radius"]
+    data = {
+        round_idx: {
+            trial_idx: {
+                "flux_to_maximize": None,
+                "inner_membrane_radii": None,
+                "regional_alloc": None,
+                "enzyme_allocations": None
+            }
+            for trial_idx in range(n_trials)  # inner loop stays inside
+        }
+        for round_idx in range(n_rounds)      # outer loop for the outer dict
+    }
+    for round_idx in range(n_rounds):
+        for trial_idx in range(n_trials):
+            trial = next(
+                (t for t in study.trials
+                if t.user_attrs.get("round") == round_idx
+                and t.user_attrs.get("trial_idx") == trial_idx),
+                None
+            )
+            if trial is None:
+                raise ValueError(f"There is something weird going on with round {round_idx}, trial {trial_idx}.")
+            enzyme_allocations, regional_alloc, inner_membrane_radii, _ = params_to_physical(
+                trial.params,
+                n_enzymes=n_enzymes,
+                n_regions=n_regions,
+                total_enzyme_quantity=total_enzyme_quantity,
+                enzyme_maximum_concentration=enzyme_maximum_concentration,
+                external_radius=external_radius
+            )  
+            data[round_idx][trial_idx]["flux_to_maximize"] = trial.value
+            data[round_idx][trial_idx]["inner_membrane_radii"] = inner_membrane_radii
+            data[round_idx][trial_idx]["regional_alloc"] = regional_alloc
+            data[round_idx][trial_idx]["enzyme_allocations"] = enzyme_allocations
+    return data
+
 if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
+    largest_round_to_plot = int(sys.argv[2])
+
     storage_path = os.path.join(FOLDER_TO_SOLVE, "optuna_study.db")
     if not os.path.isfile(storage_path):
         raise FileNotFoundError(f"The file {storage_path} does not exist.")
@@ -152,56 +211,23 @@ if __name__ == "__main__":
         storage=storage
     )
 
-    # Find out number of enzymes
-    enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
-    n_enzymes = len(enzymes_df) # the first row is the header
-    # Find out total enzyme quantity and relative distance 
-    conditions_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_value_conditions.yaml"))
-    total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
-    enzyme_maximum_concentration =  conditions_info["enzyme_maximum_concentration"]
-    enzyme_maximum_concentration = 1 ####################################################################################  
-    # Find out number of regions and minimum distance between membranes and the origin
-    geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
-    n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
-    external_radius = geometry_info["geometry_config"]["outer_membrane_radius"]
-    n_inner_membranes = n_regions - 1
-    
     optimization_config = load_json(os.path.join(Path(FOLDER_TO_SOLVE).parent, "optimization_config.lock.json"))
     n_trials = optimization_config["N_TRIALS"]
     n_rounds = optimization_config["N_ROUNDS"]
+    # Find out number of enzymes
+    enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
+    n_enzymes = len(enzymes_df) # the first row is the header
 
-    ##############
-    # Load existing data
-    ##############
-    data = {
-        round_idx: {
-            trial_idx: {
-                "flux_to_maximize": None,
-                "inner_membrane_radii": None,
-                "regional_alloc": None,
-                "enzyme_allocations": None
-            }
-            for trial_idx in range(n_trials)  # inner loop stays inside
-        }
-        for round_idx in range(n_rounds)      # outer loop for the outer dict
-    }
-    for round_idx in range(n_rounds):
-        for trial_idx in range(n_trials):
-            trial = study.trials[round_idx * n_trials + trial_idx]
-            enzyme_allocations, regional_alloc, inner_membrane_radii, _ = params_to_physical(
-                trial.params,
-                n_enzymes=n_enzymes,
-                n_regions=n_regions,
-                total_enzyme_quantity=total_enzyme_quantity,
-                enzyme_maximum_concentration=enzyme_maximum_concentration,
-                external_radius=external_radius
-            )  
-            data[round_idx][trial_idx]["flux_to_maximize"] = trial.value
-            data[round_idx][trial_idx]["inner_membrane_radii"] = inner_membrane_radii
-            data[round_idx][trial_idx]["regional_alloc"] = regional_alloc
-            data[round_idx][trial_idx]["enzyme_allocations"] = enzyme_allocations
+    data = load_existing_data(FOLDER_TO_SOLVE, study, n_rounds, n_trials, n_enzymes)
+    #print("data_loaded", data)
+    geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
+    n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
+    
     plot_optimization_progress(
         FOLDER_TO_SOLVE,
         data,
-        enzymes_df
+        enzymes_df,
+        n_regions,
+        largest_round_to_plot,
+        n_trials
     )
