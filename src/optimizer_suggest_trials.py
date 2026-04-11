@@ -234,7 +234,6 @@ if __name__ == "__main__":
     storage = f"sqlite:///{FOLDER_TO_SOLVE}/optuna_study.db"
     # Create study on round 0, load on subsequent rounds
     # Sampler in order to have reproducibility on suggestions
-    print(optimization_params)
     if optimization_params["sampler"]["type"] == "TPESampler":
         sampler = optuna.samplers.TPESampler(
             seed=optimization_params["sampler"]["seed"]+round_idx,

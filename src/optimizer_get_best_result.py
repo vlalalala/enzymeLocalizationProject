@@ -9,6 +9,7 @@ from optuna.trial import TrialState
 from pathlib import Path
 from auxiliary_functions_using_standard_library import load_json
 from optimizer_plot_progress import load_existing_data, plot_optimization_progress
+from auxiliary_functions_framework_organization_using_standard_library import DelayedKeyboardInterrupt
 
 def get_best_result_up_until_round_specified(
         folder_to_solve, round_idx, study
@@ -164,41 +165,44 @@ if __name__ == "__main__":
         study_name="resource_allocation",
         storage=storage
     )
-
-    result = get_best_result_up_until_round_specified(FOLDER_TO_SOLVE, round_idx, study)
-        
-    convergence, comparison_round = get_convergence(
-        FOLDER_TO_SOLVE,
-        round_idx,
-        number_of_trials_to_run_before_stopping=optimization_params["convergence_params"]["number_of_trials_to_run_before_stopping"],
-        value_negligible_relative_change=optimization_params["convergence_params"]["value_negligible_relative_change"]
-    )
-
-    if convergence:
-        with open(os.path.join(FOLDER_TO_SOLVE, "optimization_convergence.txt"), "w") as f:
-            f.write(f"Optimization converged! Comparing round {round_idx} to round {comparison_round}.\n")
-        round_of_best = result["trial_round_best"]
-        trial_idx_of_best = result["trial_idx_best"]
-
-        #plot progress up to optimization (so snakemake is happy)
-        enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
-        n_enzymes = len(enzymes_df) # the first row is the header
-
-        data = load_existing_data(FOLDER_TO_SOLVE, study, round_idx, n_trials, n_enzymes)
-        geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
-        n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
-        #print("loaded_data", data)
-        plot_optimization_progress(
+    # since get_best_result_up_until_round_specified creates the .json file with the best
+    # data until then, I want the convergence check to have to happen
+    with DelayedKeyboardInterrupt():
+        result = get_best_result_up_until_round_specified(FOLDER_TO_SOLVE, round_idx, study)
+            
+        convergence, comparison_round = get_convergence(
             FOLDER_TO_SOLVE,
-            data,
-            enzymes_df,
-            n_regions,
-            n_rounds_to_plot=round_idx,
-            n_trials = n_trials
+            round_idx,
+            number_of_trials_to_run_before_stopping=optimization_params["convergence_params"]["number_of_trials_to_run_before_stopping"],
+            value_negligible_relative_change=optimization_params["convergence_params"]["value_negligible_relative_change"]
         )
-        dump_json(FOLDER_TO_SOLVE, "best_result", result)
+        convergence_info_path = os.path.join(FOLDER_TO_SOLVE, "optimization_convergence.txt")
+        # only create the analysis and plot through here if they have not already been done
+        if convergence and not os.path.isfile(convergence_info_path):
+            with open(convergence_info_path, "w") as f:
+                f.write(f"Optimization converged! Comparing round {round_idx} to round {comparison_round}.\n")
+            round_of_best = result["trial_round_best"]
+            trial_idx_of_best = result["trial_idx_best"]
 
-    if round_idx == n_rounds-1:
-        dump_json(FOLDER_TO_SOLVE, "best_result", result)
+            #plot progress up to optimization (so snakemake is happy)
+            enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
+            n_enzymes = len(enzymes_df) # the first row is the header
+
+            data = load_existing_data(FOLDER_TO_SOLVE, study, round_idx, n_trials, n_enzymes)
+            geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
+            n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
+            #print("loaded_data", data)
+            plot_optimization_progress(
+                FOLDER_TO_SOLVE,
+                data,
+                enzymes_df,
+                n_regions,
+                n_rounds_to_plot=round_idx,
+                n_trials = n_trials
+            )
+            dump_json(FOLDER_TO_SOLVE, "best_result", result)
+
+        if round_idx == n_rounds-1:
+            dump_json(FOLDER_TO_SOLVE, "best_result", result)
 
     

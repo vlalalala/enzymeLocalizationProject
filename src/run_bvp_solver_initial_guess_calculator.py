@@ -68,14 +68,27 @@ if __name__ == "__main__":
 
     if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "pruned.json")):
         dump_json(FOLDER_TO_SOLVE, "species_initial_guess", {"pruned": True})
-        print(FOLDER_TO_SOLVE)
         sys.exit(0)
 
-    expanded_system_geometry_dict, expanded_system_mesh_dict = build_system_mesh(
-                SYSTEM_GEOMETRY_DICT, 
-                ORIGINAL_REACTION_NETWORK,
-                0
-            )
+    # This try statement is here for the case in which a modification has been forced
+    # and this is the first point at which it is checked whether the geometry is actually
+    # solvable. Creates the prune file automatically
+    try:
+        expanded_system_geometry_dict, expanded_system_mesh_dict = build_system_mesh(
+                    SYSTEM_GEOMETRY_DICT, 
+                    ORIGINAL_REACTION_NETWORK,
+                    0
+                )
+    except ValueError as e:
+        if ("less than 3 points" in str(e)
+            and os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "info_on_modification.txt"))):
+            pruned_file_dict = {"prune": True, "reason": f"The modification means that a region has less than 3 points ({str(e)})"}
+            dump_json(FOLDER_TO_SOLVE, "pruned", {"pruned": pruned_file_dict})
+            dump_json(FOLDER_TO_SOLVE, "species_initial_guess", {"pruned": True})
+            sys.exit(0)
+        else:
+            raise  # re-raise if it's a different ValueError
+       
     # Inform about the original timescales
     timescales_log_path = os.path.join(FOLDER_TO_SOLVE, f"reaction_timescales.log")
     with open(timescales_log_path, "a") as f, redirect_stdout(f): 

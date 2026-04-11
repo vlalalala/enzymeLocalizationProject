@@ -28,11 +28,12 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 """
 snakemake \
   --profile config/slurm \
-  --jobs 500 \
+  --jobs 50 \
   --keep-going \
   --use-conda \
   --latency-wait 120 \
-  --retries 2
+  --retries 2 \
+  --config fast_mode=true
 """
 # Get the number of jobs running through squeue --me -h | wc -l
 # --keep-going stops snakemake from submitting jobs once one has not worked
@@ -55,7 +56,7 @@ FAST_MODE = config.get("fast_mode", False)
 print(f"Running with FAST_MODE: {FAST_MODE} (type {type(FAST_MODE)}).")
 
 df = "data_private/optimizationSpeedTest_spontaneousXdecaysToY_1InnerBoundary"
-#df = "data_private/optimization_spontaneousXYZchain_1InnerBoundary"
+df = "data_private/optimization_spontaneousXYZchain_1InnerBoundary"
 
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")
@@ -798,6 +799,7 @@ def run_result_input_modifications(wildcards):
         )
 
 rule analyze_results_of_modifications_of_best_result:
+    # snakemake -s Snakefile data_private/optimization_spontaneousXdecaysToY_1InnerBoundary/combined_000001/optimization_modifications_analysis.json --cores 1 --use-conda --config fast_mode=true
     input:
         run_result_input_modifications
     output:
