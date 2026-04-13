@@ -324,4 +324,10 @@ def create_reaction_network(case_folder, csv_file_names):
 if __name__ == "__main__":
     folder_to_check_validity = sys.argv[1]
     reaction_network_info_file_names = load_json("src/_template_reaction_network.json").keys()
+
+    if os.path.isfile(os.path.join(folder_to_check_validity, "pruned.json")):
+        pickle_dump_binary(
+            os.path.join(folder_to_check_validity, ".pickled_reaction_network_without_enzyme_concentration"), pd.DataFrame())
+        sys.exit()
+
     create_reaction_network(folder_to_check_validity, reaction_network_info_file_names)

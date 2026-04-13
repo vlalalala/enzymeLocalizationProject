@@ -9,7 +9,8 @@ from optuna.trial import TrialState
 from pathlib import Path
 from auxiliary_functions_using_standard_library import load_json
 from optimizer_plot_progress import load_existing_data, plot_optimization_progress
-from auxiliary_functions_framework_organization_using_standard_library import DelayedKeyboardInterrupt
+from auxiliary_functions_framework_organization_using_standard_library import DelayedSignals
+import numpy as np
 
 def get_best_result_up_until_round_specified(
         folder_to_solve, round_idx, study
@@ -90,8 +91,12 @@ def get_convergence(
         folder_to_solve,
         round_idx,
         number_of_trials_to_run_before_stopping,
-        value_negligible_relative_change
+        value_negligible_relative_change,
+        n_startup_trials
     ):
+    """
+    Only completed trials count toward n_startup_trials — pruned and failed trials do not count.
+    """
     # First, load all of the data from the best trials up until (and including) round_idx
     best_data = {}
     for round in range(round_idx+1):
@@ -107,6 +112,15 @@ def get_convergence(
         (k for k, v in rounds_number_of_trials_missing_until_round_idx.items() if v >= number_of_trials_to_run_before_stopping),
         default=None)
     
+    # Calculate how much difference/spread in the flux is expected from random trials
+    eligible_trials = [
+        t for t in study.trials
+        if t.state == TrialState.COMPLETE
+        and t.user_attrs.get("round", 0) <= round_idx
+    ]
+    n_startup_trials_values = [trial.value for trial in eligible_trials[:n_startup_trials]]
+    flux_standard_devation_among_startup_trials = np.std(n_startup_trials_values)
+    
     #print(f"The round we are using for comparing the change is round number {last_round_before_at_least_number_of_trials_to_run_before_stopping}. ")
     
     convergence = True
@@ -121,24 +135,45 @@ def get_convergence(
     #
     rounds_best_values = {round: round_data["best_value"] for round, round_data in best_data.items()}
     rounds_best_inner_membrane_positions = {round: round_data["best_inner_membrane_radii"] for round, round_data in best_data.items()}
+    rounds_best_enzyme_allocations = {round: round_data["best_enzyme_allocations"] for round, round_data in best_data.items()}
+    rounds_best_regional_alloc = {round: round_data["best_regional_alloc"] for round, round_data in best_data.items()}
 
     if last_round_before_at_least_number_of_trials_to_run_before_stopping is not None:
+        # Values to compare
         previous_best_data_value = rounds_best_values[last_round_before_at_least_number_of_trials_to_run_before_stopping]
         current_best_data_value = rounds_best_values[round_idx]
+        # Locations of membranes to compare
         previous_best_inner_membrane_positions = sorted(rounds_best_inner_membrane_positions[last_round_before_at_least_number_of_trials_to_run_before_stopping])
         current_best_inner_membrane_positions = sorted(rounds_best_inner_membrane_positions[round_idx])
+        # Allocations of total enzyme quantity to specific enzymes to compare
+        previous_best_enzyme_allocations = rounds_best_enzyme_allocations[last_round_before_at_least_number_of_trials_to_run_before_stopping]
+        current_best_enzyme_allocations = rounds_best_enzyme_allocations[round_idx]
+        # Allocations of enzyme quantities to specific regions to compare
+        previous_best_regional_alloc = rounds_best_regional_alloc[last_round_before_at_least_number_of_trials_to_run_before_stopping]
+        current_best_regional_alloc = rounds_best_regional_alloc[round_idx]
+
+
         # since we are maximizing the flux, current_best_data_value will be equal or larger than previous_best_data_value
-        if (current_best_data_value - previous_best_data_value) / previous_best_data_value > value_negligible_relative_change:
+        #if (current_best_data_value - previous_best_data_value) / previous_best_data_value > value_negligible_relative_change:
+        if current_best_data_value - previous_best_data_value > value_negligible_relative_change * flux_standard_devation_among_startup_trials:
             print("The value has changed too much. Not converged yet.")
             convergence = False
         if previous_best_inner_membrane_positions != current_best_inner_membrane_positions:
             print("The radii are different.")
             convergence = False
-        #######################################################
-        # NEED TO ADD HERE CONVERGENCE REGARDING ENZYME QUANTITY AND ALLOCATION ... NOT SURE
-        #######################################################
-
-
+        # Within enzyme allocations, the elements in the vectors must be similar element-wise
+        # (each element corresponds to the allocation for one enzyme)
+        if current_best_enzyme_allocations is not None:
+            for enzyme_idx, allocation in enumerate(current_best_enzyme_allocations):
+                if abs(allocation - previous_best_enzyme_allocations[enzyme_idx])/allocation > value_negligible_relative_change:
+                    convergence = False
+        # Within the allocation of each enzyme within each region, the elements of the vectors
+        # must be similar element-wise
+        for enzyme_idx, enzyme_info in current_best_regional_alloc:
+            regions = enzyme_info.keys()
+            for region in regions:
+                if abs(enzyme_info[region] - previous_best_regional_alloc[enzyme_idx][region]) / enzyme_info[region] > value_negligible_relative_change:
+                    convergence = False
         
     else:
         convergence = False
@@ -159,6 +194,14 @@ if __name__ == "__main__":
     n_trials = optimization_config["N_TRIALS"]
     n_rounds = optimization_config["N_ROUNDS"]
     optimization_params = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_optimization.yaml"))
+    if (optimization_params["sampler"]["type"] == "TPESampler"
+        and optimization_params["sampler"]["sampler_parameters"]["TPESampler"]["n_startup_trials"] is not None):
+        n_startup_trials = optimization_params["sampler"]["sampler_parameters"]["TPESampler"]["n_startup_trials"]
+    elif (optimization_params["sampler"]["type"] == "CmaEsSampler"
+        and optimization_params["sampler"]["sampler_parameters"]["CmaEsSampler"]["n_startup_trials"] is not None):
+        n_startup_trials = optimization_params["sampler"]["sampler_parameters"]["CmaEsSampler"]["n_startup_trials"]
+    else:
+        n_startup_trials = 20
     
     storage = f"sqlite:///{FOLDER_TO_SOLVE}/optuna_study.db"
     study = optuna.load_study(
@@ -167,14 +210,15 @@ if __name__ == "__main__":
     )
     # since get_best_result_up_until_round_specified creates the .json file with the best
     # data until then, I want the convergence check to have to happen
-    with DelayedKeyboardInterrupt():
+    with DelayedSignals():
         result = get_best_result_up_until_round_specified(FOLDER_TO_SOLVE, round_idx, study)
             
         convergence, comparison_round = get_convergence(
             FOLDER_TO_SOLVE,
             round_idx,
             number_of_trials_to_run_before_stopping=optimization_params["convergence_params"]["number_of_trials_to_run_before_stopping"],
-            value_negligible_relative_change=optimization_params["convergence_params"]["value_negligible_relative_change"]
+            value_negligible_relative_change=optimization_params["convergence_params"]["value_negligible_relative_change"],
+            n_startup_trials=n_startup_trials
         )
         convergence_info_path = os.path.join(FOLDER_TO_SOLVE, "optimization_convergence.txt")
         # only create the analysis and plot through here if they have not already been done

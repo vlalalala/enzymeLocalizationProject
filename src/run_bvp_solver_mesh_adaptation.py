@@ -54,9 +54,9 @@ def find_latest_solution_of_given_interpolation_iteration(
     #latest_newton_iteration, latest_path = max(matching_files, key=lambda x: x[0])
     #return latest_newton_iteration, latest_path
 
-def get_tau_and_residual_and_runtime_from_progress_log(progress_log_path, iteration_number):
+def get_t_n_and_residual_and_runtime_from_progress_log(progress_log_path, iteration_number):
     """
-    Reads tau and F_vector_norm (residual norm) from the CSV progress log.
+    Reads F_vector_norm (residual norm) from the CSV progress log.
     Uses the row with the largest iteration number that is strictly less than
     iteration_number, as a fallback if the exact iteration is not found.
     """
@@ -75,7 +75,7 @@ def get_tau_and_residual_and_runtime_from_progress_log(progress_log_path, iterat
         )
 
     best_row = max(candidate_rows, key=lambda row: int(row["iteration"]))
-    return float(best_row["tau"]), float(best_row["F_vector_norm"]), float(best_row["runtime"].replace(" seconds", ""))
+    return float(best_row["t_n"]), float(best_row["F_vector_norm"]), float(best_row["runtime"].replace(" seconds", ""))
 
 def get_initial_values(
         iterations_folder,
@@ -101,9 +101,9 @@ def get_initial_values(
         initial_species_concentrations = get_dict_with_correct_key_types_from_json_file(
             previous_solution_species_concentrations_dict_with_strings, species_lookup)
         num_iterations_digits = rename_iteration_files(iterations_folder, min_digits=min_num_iterations_digits)
-        initial_tau, initial_residual_norm, initial_runtime = get_tau_and_residual_and_runtime_from_progress_log(progress_log_path, latest_newton_iteration)
+        initial_t_n, initial_residual_norm, initial_runtime = get_t_n_and_residual_and_runtime_from_progress_log(progress_log_path, latest_newton_iteration)
         print(f"Continuing simulation for from iteration {latest_newton_iteration} within {iterations_folder}.")
-        return latest_newton_iteration, initial_species_concentrations, initial_tau, initial_residual_norm, initial_runtime, num_iterations_digits
+        return latest_newton_iteration, initial_species_concentrations, initial_t_n, initial_residual_norm, initial_runtime, num_iterations_digits
     
     # If there are no simulations with the current interpolation
     # iteration, construct the initial concentration out of the
@@ -329,7 +329,7 @@ if __name__ == "__main__":
 
             # Get initial conditions, if these exist with these same parameters from another simulation
             # with the same interpolation iteration or earlier
-            initial_iteration_number, initial_species_concentrations, initial_tau, initial_residual_norm, initial_runtime, num_iterations_digits  = get_initial_values(
+            initial_iteration_number, initial_species_concentrations, initial_t_n, initial_residual_norm, initial_runtime, num_iterations_digits  = get_initial_values(
                 ITERATION_DATA_PATH,
                 interpolation_iteration,
                 SPECIES_LOOKUP,
@@ -355,8 +355,8 @@ if __name__ == "__main__":
                 # make the concentrations file have the keys in the correct format
                 initial_species_concentrations = get_dict_with_correct_key_types_from_json_file(
                     initial_species_concentrations, SPECIES_LOOKUP)
-            if initial_tau is None:
-                initial_tau = np.inf# SOLVER_INPUT_INFO["adaptive_step_parameters"]["tau_max"]
+            if initial_t_n is None:
+                initial_t_n = 1
             if initial_residual_norm is None:
                 initial_residual_norm = np.inf
             if initial_runtime is None:
@@ -381,6 +381,7 @@ if __name__ == "__main__":
                     max_num_newton_iterations=MAX_NUM_NEWTON_ITERATIONS,
                     # simulation initial values
                     initial_iteration_number=initial_iteration_number,
+                    initial_t_n = initial_t_n,
                     initial_species_concentrations=initial_species_concentrations,
                     initial_residual_norm=initial_residual_norm,
                     initial_runtime = initial_runtime,

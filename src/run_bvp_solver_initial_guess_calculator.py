@@ -62,13 +62,14 @@ if __name__ == "__main__":
     SOLVER_OUTPUT_INFO = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_solver_output.yaml"))
     PARAMETER_VALUE_CONDITIONS = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_value_conditions.yaml")) 
     
-    ORIGINAL_REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
-    SPECIES_LOOKUP = {sp.name: sp for sp in ORIGINAL_REACTION_NETWORK.species}
-    CREEPING_REACTION_SIMULATIONS_FOLDER = os.path.join(FOLDER_TO_SOLVE, "creeping_reaction_simulations")
-
+    
     if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "pruned.json")):
         dump_json(FOLDER_TO_SOLVE, "species_initial_guess", {"pruned": True})
         sys.exit(0)
+
+    ORIGINAL_REACTION_NETWORK = pickle_load_binary(os.path.join(FOLDER_TO_SOLVE, ".pickled_reaction_network"))
+    SPECIES_LOOKUP = {sp.name: sp for sp in ORIGINAL_REACTION_NETWORK.species}
+    CREEPING_REACTION_SIMULATIONS_FOLDER = os.path.join(FOLDER_TO_SOLVE, "creeping_reaction_simulations")
 
     # This try statement is here for the case in which a modification has been forced
     # and this is the first point at which it is checked whether the geometry is actually
@@ -153,7 +154,7 @@ if __name__ == "__main__":
         )
 
         # Step 2.3: Figure out whether we can continue an existing simulation
-        initial_iteration_number, initial_species_concentrations, initial_tau, initial_residual_norm, initial_runtime, num_iterations_digits  = get_initial_values(
+        initial_iteration_number, initial_species_concentrations, initial_t_n, initial_residual_norm, initial_runtime, num_iterations_digits  = get_initial_values(
             iteration_data_path,
             0,
             SPECIES_LOOKUP,
@@ -188,8 +189,8 @@ if __name__ == "__main__":
                 initial_species_concentrations = get_dict_with_correct_key_types_from_json_file(
                     initial_species_concentrations, SPECIES_LOOKUP)
 
-        if initial_tau is None:
-            initial_tau = SOLVER_INPUT_INFO["adaptive_step_parameters"]["tau_max"]
+        if initial_t_n is None:
+            initial_t_n = 1
         if initial_residual_norm is None:
             initial_residual_norm = np.inf
         if initial_runtime is None:
@@ -219,6 +220,7 @@ if __name__ == "__main__":
                     max_num_newton_iterations=MAX_NUM_NEWTON_ITERATIONS,
                     # simulation initial values
                     initial_iteration_number=initial_iteration_number,
+                    initial_t_n = initial_t_n,
                     initial_species_concentrations=initial_species_concentrations,
                     initial_residual_norm=initial_residual_norm,
                     initial_runtime = initial_runtime,

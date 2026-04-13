@@ -22,7 +22,7 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 # python src/_create_phase_space.py path_to_new_folder
 
 # Step 4: Run rule all
-# snakemake --use-conda --cores 1 --scheduler greedy --latency-wait 120 --retries 2 --config fast_mode=true
+# snakemake --use-conda --cores 10 --scheduler greedy --latency-wait 120 --retries 2 --config fast_mode=true
 # scheduler greedy to schedule short jobs first
 # or
 """
@@ -142,6 +142,7 @@ reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
 if FAST_MODE:
     rule get_result_from_complete_input:
+        # snakemake -s Snakefile data_private/errorTest_enzymatic_allocation_wrong/combined_000001/.result_computed_fast --cores 1 --use-conda --config fast_mode=true
         input:
             lambda wildcards: trial_path(wildcards, "parameters_solver_input.yaml"),
             lambda wildcards: trial_path(wildcards, "parameters_solver_output.yaml"),

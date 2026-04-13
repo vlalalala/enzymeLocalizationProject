@@ -15,6 +15,8 @@ def correct_allocation_dict(d, num_regions):
         raise ValueError(f"there are not {num_regions} regions in {d}")
     if abs(sum(d.values()) - 1.0) > 1e-8:
         raise ValueError(f"the values in {d} do not sum to 1.")
+    if any(value < 0 or value > 1 for value in d.values()):
+        raise ValueError("At least one of the values are not between 0 and 1.")
     return True
 
 def parse_and_check_allocation(csv_element_string, num_regions):
@@ -94,11 +96,20 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
     If this is done, the dataframes are stored as pickled dataframes
     """
     # Create dataframes from .csv files (checks whether rows are duplicated)
-    dataframes = {
-        name: create_pandas_dataframe_from_csv_file(
-        os.path.join(case_directory, f"{name}.csv"), num_regions)
-        for name in csv_file_names
-    }
+    try:
+        dataframes = {
+            name: create_pandas_dataframe_from_csv_file(
+            os.path.join(case_directory, f"{name}.csv"), num_regions)
+            for name in csv_file_names
+        }
+    except ValueError as e:
+        if ("At least one of the values are not between 0 and 1" in str(e)
+            and os.path.join(case_directory, "pruned.json")):
+            print(str(e))
+            # Creates an empty "dummy" dataframe so that snakemake does not get mad
+            pickle_dump_binary(
+                os.path.join(case_directory, f".pickled_dataframe_enzymatic_reactions"), pd.DataFrame())
+            sys.exit()
     # Step 0
     for dataframe_name, dataframe_object in dataframes.items():
         assert no_empty_cells(dataframe_object), f"dataframe {dataframe_name} has empty cells"

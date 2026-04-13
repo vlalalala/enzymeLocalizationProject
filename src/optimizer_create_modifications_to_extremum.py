@@ -1,12 +1,14 @@
 import argparse
 import os
 from auxiliary_functions_using_standard_library import load_json
+from auxiliary_functions import dump_json
 from pathlib import Path
 import shutil
 import bisect
 from auxiliary_functions import read_yaml_file, dump_in_yaml_file
 import copy
-
+import pandas as pd
+import ast
 
 def get_user_input_file_names(folder):
     file_names = [file
@@ -90,9 +92,134 @@ def create_optimization_combinations_differing_membrane_location(
             optimization_combinations_up_until_now += 1
     return optimization_combinations_up_until_now
 
-#####################
-# need to create modification of enzyme functions
-#####################
+def create_optimization_combinations_differing_allocation_of_total_enzyme_quantity_to_different_enzymes(
+    optimization_check_folder,
+    optimization_combinations_up_until_now
+    ):
+    """
+    Through this function we create modifications of the quantity of each enzyme, maintaining
+    the total quantity
+    """
+    enzymes_df = pd.read_csv(os.path.join(optimization_check_folder, "enzymes.csv"))
+    total_enzyme_quantity = sum(enzymes_df["quantity"])
+    for enzyme_to_modify in enzymes_df["name"].unique():
+        enzyme_quantity_among_the_other_enzymes = (
+            total_enzyme_quantity
+            - enzymes_df.loc[enzymes_df["name"] == enzyme_to_modify, "quantity"])
+        for modification in ["increase", "decrease"]:
+            enzymes_df_to_modify = copy.deepcopy(enzymes_df)
+            if modification == "increase":
+                factor = 1.01
+                change = "increased"
+            else:
+                factor = 0.99
+                change = "decreased"
+            # Modify the value for that enzyme
+            enzymes_df_to_modify.loc[enzymes_df_to_modify["name"] == enzyme_to_modify, "quantity"] *= factor
+            # Now modify the value for the other enzymes so that the total quantity is maintained
+            new_enzyme_quantity_among_the_other_enzymes = (
+                total_enzyme_quantity
+                - enzymes_df_to_modify.loc[enzymes_df_to_modify["name"] == enzyme_to_modify, "quantity"])
+            # The ratio among the other enzymes has to be maintained. Therefore, we change
+            # the quantity of those enzymes by the same ratio, so as to "fill in" the new quantity
+            # that is left for these other enzymes
+            ratio = new_enzyme_quantity_among_the_other_enzymes / enzyme_quantity_among_the_other_enzymes
+            for other_enzyme in enzymes_df_to_modify["name"].unique():
+                if other_enzyme == enzyme_to_modify:
+                    continue
+                enzymes_df_to_modify.loc[enzymes_df_to_modify["name"] == other_enzyme, "quantity"] *= ratio
+            
+            # Once the new enzymes_df is done, copy all of the .csv and .yaml files (except the enzymes one)
+            file_names_to_copy = get_user_input_file_names(optimization_check_folder)
+            file_names_to_copy.remove("enzymes.csv")
+            new_modification_folder = os.path.join(optimization_check_folder, f"modification_{optimization_combinations_up_until_now}")
+            os.makedirs(new_modification_folder, exist_ok=True)
+            copy_file_names(
+                file_names = file_names_to_copy,
+                source=optimization_check_folder,
+                destination=new_modification_folder
+            )
+            # Dump modified enzymes file
+            enzymes_df_to_modify.to_csv(os.path.join(new_modification_folder, "enzymes.csv"), encoding='utf-8-sig', index=False)
+            with open(os.path.join(new_modification_folder, "info_on_modification.txt"), "w") as f:
+                f.write(f"The quantity of enzyme {enzyme_to_modify} was {change}.\n")
+            # In order to keep folder names clear, track how many modification folders have been created
+            optimization_combinations_up_until_now += 1
+
+################
+# Probably need to add code to make it possible for pruning of case due to allocation not between 0 and 1
+# without breaking the code
+#################
+
+def create_optimization_combinations_differing_allocation_of_enzyme_quantities_to_different_regions(
+    optimization_check_folder,
+    optimization_combinations_up_until_now
+    ):
+    """
+    Through this function we create modifications of the quantity of each enzyme, maintaining
+    the total quantity
+    """
+    enzymes_df = pd.read_csv(os.path.join(optimization_check_folder, "enzymes.csv"))
+    for enzyme_to_modify in enzymes_df["name"].unique():
+        allocation_dict = ast.literal_eval(enzymes_df.loc[enzymes_df["name"] == enzyme_to_modify, "allocation"].values[0])
+        for region_to_modify in allocation_dict.keys():
+            for modification in ["increase", "decrease"]:
+                allocation_dict_to_modify = copy.deepcopy(allocation_dict)
+                enzymes_df_to_modify = copy.deepcopy(enzymes_df)
+                if modification == "increase":
+                    factor = 1.01
+                    change = "increased"
+                else:
+                    factor = 0.99
+                    change = "decreased"
+                allocation_dict_to_modify[region_to_modify] *= factor
+                new_allocation_among_other_regions = sum(
+                    [allocation_dict_to_modify[region]
+                     for region in allocation_dict_to_modify.keys()
+                     if region !=region_to_modify])
+                previous_allocation_among_other_regions = 1-allocation_dict[region_to_modify]
+                ratio = new_allocation_among_other_regions / previous_allocation_among_other_regions
+                for other_region in allocation_dict_to_modify.keys():
+                    if other_region == region_to_modify:
+                        continue
+                    allocation_dict_to_modify[other_region] *= ratio
+                # Very important: if any of the values is not between 0 and 1 (0 and 1 inclusive), then state pruned
+                pruned = False
+                pruning_reason = ""
+                for region, value in allocation_dict_to_modify.items():
+                    if value < 0 or value > 1:
+                        pruned = True
+                        pruning_reason = f"Region {region} has a non-valid quantity (i.e. not within [0,1])."
+                # Insert changed dictionary into dataframe
+                enzymes_df_to_modify.loc[enzymes_df_to_modify["name"] == enzyme_to_modify, "allocation"] = str(allocation_dict_to_modify)
+
+                # Once the new allocations dictionary is done, copy all of the .csv and .yaml files (except the enzymes one)
+                file_names_to_copy = get_user_input_file_names(optimization_check_folder)
+                file_names_to_copy.remove("enzymes.csv")
+                new_modification_folder = os.path.join(optimization_check_folder, f"modification_{optimization_combinations_up_until_now}")
+                os.makedirs(new_modification_folder, exist_ok=True)
+                copy_file_names(
+                    file_names = file_names_to_copy,
+                    source=optimization_check_folder,
+                    destination=new_modification_folder
+                )
+                # Dump modified enzymes file
+                enzymes_df_to_modify.to_csv(os.path.join(new_modification_folder, "enzymes.csv"), encoding='utf-8-sig', index=False)
+                if pruned:
+                    dump_json(new_modification_folder, "pruned", {"pruned": True, "reason": pruning_reason})
+                with open(os.path.join(new_modification_folder, "info_on_modification.txt"), "w") as f:
+                    f.write(f"The quantity of enzyme {enzyme_to_modify} in region {region_to_modify} was {change}. {pruning_reason}\n")
+                # In order to keep folder names clear, track how many modification folders have been created
+                optimization_combinations_up_until_now += 1
+                
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":

@@ -3,19 +3,27 @@ import re
 from pathlib import Path
 import signal
 
-class DelayedKeyboardInterrupt:
+class DelayedSignals:
+    # sigint is Ctrl+C, snakemake/slurm send SIGTERM and potentially SIGHUP
+    SIGNALS_TO_DELAY = [signal.SIGINT, signal.SIGTERM, signal.SIGHUP]
+
     def __enter__(self):
-        self.interrupted = False
-        self.old_handler = signal.signal(signal.SIGINT, self._handler)
+        self.interrupted = None
+        self.old_handlers = {}
+        for sig in self.SIGNALS_TO_DELAY:
+            self.old_handlers[sig] = signal.signal(sig, self._handler)
         return self
 
     def _handler(self, sig, frame):
-        self.interrupted = True
+        self.interrupted = sig  # remember which signal came in
 
     def __exit__(self, type, value, traceback):
-        signal.signal(signal.SIGINT, self.old_handler)
-        if self.interrupted:
-            raise KeyboardInterrupt
+        # Restore all original handlers
+        for sig, handler in self.old_handlers.items():
+            signal.signal(sig, handler)
+        # Now raise if we got a signal
+        if self.interrupted is not None:
+            signal.raise_signal(self.interrupted)
 
 def get_concentrations_files_within_folder(folder):
     """

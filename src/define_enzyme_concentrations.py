@@ -5,7 +5,7 @@ from auxiliary_functions_using_standard_library import (
     pickle_load_binary, load_json, pickle_dump_binary)
 from auxiliary_functions import read_yaml_file, dump_json
 from create_reaction_network import System, Collection, EnzymaticReaction, Species, SpontaneousReaction, Enzyme
-
+import pandas as pd
 
 def return_reaction_network_with_total_fixed_quantity_asserted(enzyme_total_fixed_quantity, reaction_network, enzyme_whose_quantity_to_modify):
     """ If enzyme_total_fixed_quantity is None, returns the reaction network inputted
@@ -49,6 +49,15 @@ if __name__ == "__main__":
         os.path.join(folder, ".pickled_reaction_network_without_enzyme_concentration"))
     system_geometry_dict = load_json(os.path.join(folder, ".system_geometry.json"))
     parameter_value_conditions = read_yaml_file(os.path.join(folder, "parameters_value_conditions.yaml")) 
+
+    if os.path.isfile(os.path.join(folder, "pruned.json")):
+        # create dummy files for snakemake
+        pickle_dump_binary(
+            os.path.join(folder, ".pickled_reaction_network"),
+            pd.DataFrame()
+        )
+        dump_json(folder, "enzyme_concentrations", {"pruned": "Enzyme allocation not valid. Pruned."})
+        sys.exit()
 
     # Create final .species_steady_state_concentrations in case the parameter values are not viable
     # with the constraints given

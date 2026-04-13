@@ -8,7 +8,7 @@ import argparse
 from pathlib import Path
 from auxiliary_functions import read_yaml_file, dump_in_yaml_file, dump_json
 from optuna.trial import TrialState
-from auxiliary_functions_framework_organization_using_standard_library import DelayedKeyboardInterrupt
+from auxiliary_functions_framework_organization_using_standard_library import DelayedSignals
 
 def check_or_create_optimization_lock(df, n_trials, n_rounds):
     lock_path = os.path.join(df, "optimization_config.lock.json")
@@ -281,7 +281,7 @@ if __name__ == "__main__":
             ########## IMPORTANT: if some keyboard interrupt occurs between
             # study.ask and the last .suggest_float, downstream stuff won't work...
             # Therefore: DelayedKeyboardInterrupt wrap
-            with DelayedKeyboardInterrupt():
+            with DelayedSignals():
                 trial = study.ask()  # get a suggested trial without evaluating it
                 # access through study.trials[trial_idx]
                 trial.set_user_attr("round", round_idx)

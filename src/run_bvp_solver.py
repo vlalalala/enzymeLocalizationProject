@@ -396,6 +396,7 @@ def solve_newton(
         max_num_newton_iterations,
         # simulation initial values
         initial_iteration_number,
+        initial_t_n,
         initial_species_concentrations,
         initial_residual_norm,
         initial_runtime,
@@ -429,7 +430,7 @@ def solve_newton(
     # Start 
     current_species_concentrations = initial_species_concentrations
     progress_logger = CSVLogger(progress_log_path)
-    t_n = 1
+    t_n = initial_t_n
     last_F_norm = initial_residual_norm
     for iter in tqdm(range(initial_iteration_number, int(max_num_newton_iterations)),
                      file=sys.stderr,

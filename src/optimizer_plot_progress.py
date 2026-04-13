@@ -12,6 +12,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import numpy as np
 from pathlib import Path
+import re
 
 markers = ['o', 's', '^', 'D', 'v', 'P', '*', 'X']  # circle, square, triangle, diamond, etc.
 
@@ -216,6 +217,14 @@ if __name__ == "__main__":
     # Find out number of enzymes
     enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
     n_enzymes = len(enzymes_df) # the first row is the header
+    
+    potential_optimization_convergence_file = os.path.join(FOLDER_TO_SOLVE, "optimization_convergence.txt")
+    if os.path.isfile(potential_optimization_convergence_file):
+        with open(potential_optimization_convergence_file) as f:
+            info = f.read()
+        final_round = int(re.search(r"round (\d+)", info).group(1))
+        largest_round_to_plot -= 1 # largest round to plot is the number associated, so we have to decrease 1
+
 
     # if largest_round_to_plot "is the string 5", then n_rounds is actually 6 (since round 0 also counts)
     data = load_existing_data(
@@ -228,6 +237,8 @@ if __name__ == "__main__":
     geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
     n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
     
+    
+
     plot_optimization_progress(
         FOLDER_TO_SOLVE,
         data,
