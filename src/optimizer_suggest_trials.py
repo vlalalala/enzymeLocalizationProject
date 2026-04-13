@@ -47,6 +47,7 @@ def params_to_physical(
         z_enzymes = [params[f"z_enzyme_types_{i}"] for i in range(n_enzymes - 1)]
         z_enzymes.append(0.0) # last enzyme, removes redundancy when searching space
         enzyme_allocations = (softmax(np.array(z_enzymes)) * total_enzyme_quantity).tolist()
+        #print("enzyme_allocations: ", enzyme_allocations, "total_enzyme_quantity: ", total_enzyme_quantity)
     else:
         enzyme_allocations = None
 
@@ -219,6 +220,10 @@ if __name__ == "__main__":
     # Find out total enzyme quantity and relative distance 
     conditions_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_value_conditions.yaml"))
     total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
+    if total_enzyme_quantity is None:
+        # if the total enzyme quantity is not enforced externally,
+        # it should be the amount that is already given as a total quantity
+        total_enzyme_quantity = enzymes_df["quantity"].sum()
     enzyme_maximum_concentration =  conditions_info["enzyme_maximum_concentration"]  
     # Find out number of regions and minimum distance between membranes and the origin
     geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))

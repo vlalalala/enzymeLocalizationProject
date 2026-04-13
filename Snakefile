@@ -57,6 +57,7 @@ print(f"Running with FAST_MODE: {FAST_MODE} (type {type(FAST_MODE)}).")
 
 df = "data_private/optimizationSpeedTest_spontaneousXdecaysToY_1InnerBoundary"
 df = "data_private/optimization_spontaneousXYZchain_1InnerBoundary"
+df = "data_private/optimization_enzymaticXtoY_spontaneousXtoZ_1InnerBoundary"
 
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")
@@ -751,7 +752,7 @@ rule best_result:
 # multiply the allocation of each enzyme to each region by 0.99 and 1.01 
 # (again, making sure to then normalize the total quantity)
 
-NUMBER_ENZYMES = 0
+NUMBER_ENZYMES = 1
 NUMBER_INNER_MEMBRANES = 1
 TOTAL_NUMBER_MODIFICATIONS = 2 * (
     NUMBER_INNER_MEMBRANES

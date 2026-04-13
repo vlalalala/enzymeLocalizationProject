@@ -110,6 +110,8 @@ def check_validity_reaction_network_info(case_directory: str, csv_file_names: li
             pickle_dump_binary(
                 os.path.join(case_directory, f".pickled_dataframe_enzymatic_reactions"), pd.DataFrame())
             sys.exit()
+        else:
+            raise
     # Step 0
     for dataframe_name, dataframe_object in dataframes.items():
         assert no_empty_cells(dataframe_object), f"dataframe {dataframe_name} has empty cells"

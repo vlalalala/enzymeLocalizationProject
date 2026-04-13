@@ -120,6 +120,19 @@ def create_optimization_combinations_differing_allocation_of_total_enzyme_quanti
             new_enzyme_quantity_among_the_other_enzymes = (
                 total_enzyme_quantity
                 - enzymes_df_to_modify.loc[enzymes_df_to_modify["name"] == enzyme_to_modify, "quantity"])
+            pruned = False
+            pruning_reason = ""
+            #print("new", new_enzyme_quantity_among_the_other_enzymes.item()) # without the .item() it is a Series
+            if (new_enzyme_quantity_among_the_other_enzymes.item() < 0 
+                # aka the modified quantity for the enzyme is larger than the total amount
+                or enzymes_df_to_modify.loc[enzymes_df_to_modify["name"] == enzyme_to_modify, "quantity"].item() < 0
+                # aka the modified quantity of the enzyme is smaller than 0
+                or new_enzyme_quantity_among_the_other_enzymes.item() > 0 and len(enzymes_df) == 1
+                # aka the amount of enzyme was decreased and there are no other enzymes to "pick up" the missing quantity
+                ):
+                pruned = True
+                pruning_reason = f"Enzyme {enzyme_to_modify} has a quantity below 0 or larger than the total enzyme quantity or has a smaller amount than the total enzyme quantity and there is only one enzyme."
+
             # The ratio among the other enzymes has to be maintained. Therefore, we change
             # the quantity of those enzymes by the same ratio, so as to "fill in" the new quantity
             # that is left for these other enzymes
@@ -141,10 +154,13 @@ def create_optimization_combinations_differing_allocation_of_total_enzyme_quanti
             )
             # Dump modified enzymes file
             enzymes_df_to_modify.to_csv(os.path.join(new_modification_folder, "enzymes.csv"), encoding='utf-8-sig', index=False)
+            if pruned:
+                dump_json(new_modification_folder, "pruned", {"pruned": True, "reason": pruning_reason})
             with open(os.path.join(new_modification_folder, "info_on_modification.txt"), "w") as f:
                 f.write(f"The quantity of enzyme {enzyme_to_modify} was {change}.\n")
             # In order to keep folder names clear, track how many modification folders have been created
             optimization_combinations_up_until_now += 1
+    return optimization_combinations_up_until_now
 
 ################
 # Probably need to add code to make it possible for pruning of case due to allocation not between 0 and 1
@@ -172,18 +188,23 @@ def create_optimization_combinations_differing_allocation_of_enzyme_quantities_t
                 else:
                     factor = 0.99
                     change = "decreased"
+
+                # Modify the target region
                 allocation_dict_to_modify[region_to_modify] *= factor
-                new_allocation_among_other_regions = sum(
-                    [allocation_dict_to_modify[region]
-                     for region in allocation_dict_to_modify.keys()
-                     if region !=region_to_modify])
-                previous_allocation_among_other_regions = 1-allocation_dict[region_to_modify]
-                ratio = new_allocation_among_other_regions / previous_allocation_among_other_regions
+
+                # Compute ratio to renormalize the other regions
+                previous_allocation_among_other_regions = 1 - allocation_dict[region_to_modify]
+                target_allocation_among_other_regions = 1 - allocation_dict_to_modify[region_to_modify]
+                ratio = target_allocation_among_other_regions / previous_allocation_among_other_regions
+
+                # Renormalize the other regions
                 for other_region in allocation_dict_to_modify.keys():
                     if other_region == region_to_modify:
                         continue
                     allocation_dict_to_modify[other_region] *= ratio
-                # Very important: if any of the values is not between 0 and 1 (0 and 1 inclusive), then state pruned
+
+                if sum(allocation_dict_to_modify.values()) != 1.0:
+                    raise ValueError(f"The sum is unequal to 1: {sum(allocation_dict_to_modify.values())}")                # Very important: if any of the values is not between 0 and 1 (0 and 1 inclusive), then state pruned
                 pruned = False
                 pruning_reason = ""
                 for region, value in allocation_dict_to_modify.items():
@@ -211,7 +232,7 @@ def create_optimization_combinations_differing_allocation_of_enzyme_quantities_t
                     f.write(f"The quantity of enzyme {enzyme_to_modify} in region {region_to_modify} was {change}. {pruning_reason}\n")
                 # In order to keep folder names clear, track how many modification folders have been created
                 optimization_combinations_up_until_now += 1
-                
+    return optimization_combinations_up_until_now
 
 
 
@@ -239,6 +260,17 @@ if __name__ == "__main__":
         OPTIMIZATION_CHECK_FOLDER,
         optimization_combinations_up_until_now
     )
+
+    optimization_combinations_up_until_now = create_optimization_combinations_differing_allocation_of_total_enzyme_quantity_to_different_enzymes(
+        OPTIMIZATION_CHECK_FOLDER,
+        optimization_combinations_up_until_now
+    )
+
+    optimization_combinations_up_until_now = create_optimization_combinations_differing_allocation_of_enzyme_quantities_to_different_regions(
+        OPTIMIZATION_CHECK_FOLDER,
+        optimization_combinations_up_until_now
+    )
+
     if EXPECTED_NUMBER_MODIFICATIONS != optimization_combinations_up_until_now:
         raise ValueError(f"The expected number of modifications {EXPECTED_NUMBER_MODIFICATIONS} does not match the number of created folders {optimization_combinations_up_until_now}. Stopping snakemake from continuing.")
     

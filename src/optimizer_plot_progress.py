@@ -144,12 +144,11 @@ def plot_optimization_progress(
     fig.tight_layout()
     fig.savefig(os.path.join(folder_to_solve, "optimization_progress.png"), dpi=600)
 
-def load_existing_data(folder_to_solve, study, n_rounds_to_load, n_trials, n_enzymes):
-    # Find out total enzyme quantity and relative distance 
-    conditions_info = read_yaml_file(os.path.join(folder_to_solve, "parameters_value_conditions.yaml"))
-    total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
-    enzyme_maximum_concentration =  conditions_info["enzyme_maximum_concentration"]
-    enzyme_maximum_concentration = 1 ####################################################################################  
+def load_existing_data(
+        folder_to_solve, study, n_rounds_to_load, n_trials, n_enzymes,
+        total_enzyme_quantity, enzyme_maximum_concentration
+    ):
+    #enzyme_maximum_concentration = 1 ####################################################################################  
     # Find out number of regions and minimum distance between membranes and the origin
     geometry_info = read_yaml_file(os.path.join(folder_to_solve, "parameters_geometry.yaml"))
     n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
@@ -223,15 +222,23 @@ if __name__ == "__main__":
         with open(potential_optimization_convergence_file) as f:
             info = f.read()
         final_round = int(re.search(r"round (\d+)", info).group(1))
-        largest_round_to_plot -= 1 # largest round to plot is the number associated, so we have to decrease 1
+        largest_round_to_plot = final_round-1 # largest round to plot is the number associated, so we have to decrease 1
 
+    # Find out total enzyme quantity and relative distance 
+    conditions_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_value_conditions.yaml"))
+    total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
+    if total_enzyme_quantity is None:
+        total_enzyme_quantity = enzymes_df["quantity"].sum()
+    enzyme_maximum_concentration =  conditions_info["enzyme_maximum_concentration"]
 
     # if largest_round_to_plot "is the string 5", then n_rounds is actually 6 (since round 0 also counts)
     data = load_existing_data(
         FOLDER_TO_SOLVE, study,
         n_rounds_to_load = largest_round_to_plot+1,
         n_trials=n_trials,
-        n_enzymes=n_enzymes
+        n_enzymes=n_enzymes,
+        total_enzyme_quantity = total_enzyme_quantity,
+        enzyme_maximum_concentration = enzyme_maximum_concentration
     )
     #print("data_loaded", data)
     geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))

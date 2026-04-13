@@ -26,6 +26,10 @@ def get_best_result_up_until_round_specified(
     # Find out total enzyme quantity and relative distance 
     conditions_info = read_yaml_file(os.path.join(folder_to_solve, "parameters_value_conditions.yaml"))
     total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
+    if total_enzyme_quantity is None:
+        # if the total enzyme quantity is not enforced externally,
+        # it should be the amount that is already given as a total quantity
+        total_enzyme_quantity = enzymes_df["quantity"].sum()
     enzyme_maximum_concentration =  conditions_info["enzyme_maximum_concentration"]  
     # Find out number of regions and size
     geometry_info = read_yaml_file(os.path.join(folder_to_solve, "parameters_geometry.yaml"))
@@ -169,7 +173,7 @@ def get_convergence(
                     convergence = False
         # Within the allocation of each enzyme within each region, the elements of the vectors
         # must be similar element-wise
-        for enzyme_idx, enzyme_info in current_best_regional_alloc:
+        for enzyme_idx, enzyme_info in enumerate(current_best_regional_alloc):
             regions = enzyme_info.keys()
             for region in regions:
                 if abs(enzyme_info[region] - previous_best_regional_alloc[enzyme_idx][region]) / enzyme_info[region] > value_negligible_relative_change:
