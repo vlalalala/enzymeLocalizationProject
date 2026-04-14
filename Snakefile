@@ -40,6 +40,8 @@ snakemake \
 
 # Note: The maximum resident set size (kbytes) was computed with 2500 mesh points, 4 species, 3 enzymes and 6 reactions.
 
+# Reminder: du -sh . for getting current directory size
+
 ############################################################
 # Create environment
 #rule create_environment:
