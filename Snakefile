@@ -752,7 +752,7 @@ rule best_result:
 # multiply the allocation of each enzyme to each region by 0.99 and 1.01 
 # (again, making sure to then normalize the total quantity)
 
-NUMBER_ENZYMES = 1
+NUMBER_ENZYMES = 0
 NUMBER_INNER_MEMBRANES = 1
 TOTAL_NUMBER_MODIFICATIONS = 2 * (
     NUMBER_INNER_MEMBRANES
@@ -805,7 +805,8 @@ rule analyze_results_of_modifications_of_best_result:
     input:
         run_result_input_modifications
     output:
-        "{df}/{bn}_{cn}/optimization_modifications_analysis.json"
+        "{df}/{bn}_{cn}/optimization_modifications_analysis.json",
+        "{df}/{bn}_{cn}/optimization_modifications_summary.json",
     conda:
         "config/environment.yaml"
     threads: 1
@@ -819,13 +820,31 @@ rule analyze_results_of_modifications_of_best_result:
         python src/optimizer_analyze_modifications_to_extremum.py \
             --folder {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
         """   
-    
-#use rule get_result_from_complete_input as get_result_from_complete_input_within_optimization with:
-#        output:
-#            touch("{df}/{bn}_{cn}/optimization_round_{round}/trial_{trial}/.result_computed_fast")
 
-#"""
-
+rule summarize_modifications:
+    # snakemake -s Snakefile data_private/optimization_spontaneousXdecaysToY_1InnerBoundary/modifications_overall_summary.json --cores 1 --use-conda --config fast_mode=true
+    input:
+        lambda wildcards: expand(
+            "{folder}/optimization_modifications_summary.json",
+            folder=sorted(glob.glob(os.path.join(wildcards.df, "combined_*")))
+        )
+    output:
+        "{df}/modifications_overall_summary.json"
+    run:
+        import json
+        flux_increased_folders = []
+        for folder, filepath in zip(sim_folders, input):
+            with open(filepath) as f:
+                data = json.load(f)
+            flux_increase = data["flux increase under modification"]
+            if flux_increase[0] != 0:
+                flux_increased_folders.append(folder)
+        summary = {
+            "number of combinations where the flux increased": len(flux_increased_folders),
+            "indices where the flux increased": flux_increased_folders,
+        }
+        with open(output[0], "w") as f:
+            json.dump(summary, f, indent=4)
 
 
 if FAST_MODE:

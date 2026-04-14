@@ -272,6 +272,7 @@ if __name__ == "__main__":
     )
 
     if EXPECTED_NUMBER_MODIFICATIONS != optimization_combinations_up_until_now:
+        shutil.rmtree(OPTIMIZATION_CHECK_FOLDER)
         raise ValueError(f"The expected number of modifications {EXPECTED_NUMBER_MODIFICATIONS} does not match the number of created folders {optimization_combinations_up_until_now}. Stopping snakemake from continuing.")
     
     

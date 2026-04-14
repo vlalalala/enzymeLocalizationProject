@@ -37,37 +37,69 @@ def get_data(folder):
             if os.path.isfile(json_path):
                 best_results = load_json(json_path)
                 # Get optimized value
-                z_axis_value = best_results["best_inner_membrane_radii"][0]
+                z_axis_value1 = best_results["best_inner_membrane_radii"][0]
+                z_axis_value2 = best_results["best_value"]
             else:
-                z_axis_value = None
-            data[index] = (x_axis_value, y_axis_value, z_axis_value)
+                z_axis_value1 = None
+                z_axis_value2 = None
+            data[index] = (x_axis_value, y_axis_value, z_axis_value1, z_axis_value2)
 
     return data
 
 
 def plot_data(folder):
-    fig, ax = plt.subplots(1, 2, figsize = (4,3), gridspec_kw={'width_ratios': [1, 0.1]})
+    fig, ax = plt.subplots(2, 2, figsize = (4,6), gridspec_kw={'width_ratios': [1, 0.1]})
     data = get_data(folder)
     
-    df = pd.DataFrame(data.values(), columns=['x', 'y', 'z'])
-    # Pivot into a 2D grid
-    z_grid = df.pivot(index='y', columns='x', values='z')
-    x_points = z_grid.columns.values
-    y_points = z_grid.index.values
-    z_points = z_grid.values  # 2D array of shape (len(y), len(x))
-    mesh = ax[0].pcolormesh(x_points, y_points, z_points, cmap='viridis', shading='auto',
+    df = pd.DataFrame(data.values(), columns=['x', 'y', 'membrane_pos', 'flux'])
+    
+    ############
+    # Plot membrane positions
+    ############
+    z_grid_membrane_pos = df.pivot(index='y', columns='x', values='membrane_pos')
+    x_points = z_grid_membrane_pos.columns.values
+    y_points = z_grid_membrane_pos.index.values
+    z_points_membrane_pos = z_grid_membrane_pos.values  # 2D array of shape (len(y), len(x))
+    
+    mesh = ax[0][0].pcolormesh(x_points, y_points, z_points_membrane_pos, cmap='viridis', shading='auto',
                             norm = Normalize(vmin=0, vmax=1)
                             #norm=LogNorm(vmin=np.nanmin(z_points), vmax=np.nanmax(z_points))
     )
-    ax[0].scatter(df['x'], df['y'], color='red', s=10, zorder=5)
-    fig.colorbar(mesh, cax=ax[1], label='optimal r*/R')
+    ax[0][0].scatter(df['x'], df['y'], color='red', s=5, zorder=5)
+    fig.colorbar(mesh, cax=ax[0][1], label='optimal r*/R')
 
     # Set log scale on whichever axes need it
-    ax[0].set_xscale('log')
-    ax[0].set_yscale('log')
-    ax[0].set_xlabel("reaction rate k for X->Y reaction")
-    ax[0].set_ylabel("reaction rate k for Y->Z reaction")
-    ax[1].set_box_aspect(10)
+    ax[0][0].set_xscale('log')
+    ax[0][0].set_yscale('log')
+    ax[0][0].set_xlabel("reaction rate k for X->Y reaction")
+    ax[0][0].set_ylabel("reaction rate k for Y->Z reaction")
+    ax[0][1].set_box_aspect(10)
+    ax[0][0].set_box_aspect(1)
+    
+    ############
+    # Plot fluxes
+    ############
+    z_grid_flux = df.pivot(index='y', columns='x', values='flux')
+    x_points = z_grid_flux.columns.values
+    y_points = z_grid_flux.index.values
+    z_points_flux = z_grid_flux.values  # 2D array of shape (len(y), len(x))
+    
+    mesh = ax[1][0].pcolormesh(x_points, y_points, z_points_flux, cmap='viridis', shading='auto',
+                            #norm = Normalize(vmin=0, vmax=1)
+                            norm=LogNorm(vmin=np.nanmin(z_points_flux), vmax=np.nanmax(z_points_flux))
+    )
+    ax[1][0].scatter(df['x'], df['y'], color='red', s=5, zorder=5)
+    fig.colorbar(mesh, cax=ax[1][1], label='maximum flux')
+
+    # Set log scale on whichever axes need it
+    ax[1][0].set_xscale('log')
+    ax[1][0].set_yscale('log')
+    ax[1][0].set_xlabel("reaction rate k for X->Y reaction")
+    ax[1][0].set_ylabel("reaction rate k for Y->Z reaction")
+    ax[1][1].set_box_aspect(10)
+    ax[1][0].set_box_aspect(1)
+
+
     fig.tight_layout()
     fig.savefig(os.path.join(folder, "optimization_result.png"), dpi = 300)
 

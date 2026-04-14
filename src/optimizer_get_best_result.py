@@ -235,8 +235,16 @@ if __name__ == "__main__":
             #plot progress up to optimization (so snakemake is happy)
             enzymes_df = pd.read_csv(os.path.join(FOLDER_TO_SOLVE, "enzymes.csv"))
             n_enzymes = len(enzymes_df) # the first row is the header
+            conditions_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_value_conditions.yaml"))
+            total_enzyme_quantity = conditions_info["enzyme_total_fixed_quantity"]
+            if total_enzyme_quantity is None:
+                total_enzyme_quantity = enzymes_df["quantity"].sum()
+            enzyme_maximum_concentration =  conditions_info["enzyme_maximum_concentration"]
 
-            data = load_existing_data(FOLDER_TO_SOLVE, study, round_idx, n_trials, n_enzymes)
+            data = load_existing_data(
+                FOLDER_TO_SOLVE, study, round_idx, n_trials, n_enzymes,
+
+            )
             geometry_info = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_geometry.yaml"))
             n_regions = len(geometry_info["geometry_config"]["internal_membrane_relative_radii"])+1
             #print("loaded_data", data)

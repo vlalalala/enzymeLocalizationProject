@@ -23,11 +23,17 @@ def plot_optimization_progress(
     n_regions,
     n_rounds_to_plot,
     n_trials
-):
+):  
+    """
+    Row 0 shows the location of the membranes.
+    Row 1 show the allocation of the total enzyme quantity to each enzyme.
+
+    """
     n_enzymes = len(enzymes_df)
     enzyme_names = enzymes_df["name"].tolist()
-    num_rows = 1 + n_enzymes + 2
+    num_rows = 2 + n_enzymes
     fig, ax = plt.subplots(num_rows, 2, figsize = (4, 3 * num_rows), gridspec_kw={"width_ratios": [20, 1]})
+    
     #print(data)
     all_fluxes = [
         data[round_idx][trial_idx]["flux_to_maximize"]
@@ -66,11 +72,12 @@ def plot_optimization_progress(
                 )
                 
             ###################
-            # Row 1 : plot enzyme allocation
+            # Row 1 : plot enzyme allocation. Do not plot the last enzyme
+            # (as they add up to 1. Less chaos, same amount of information)
             ###################
             enzyme_allocations_list = trial_data["enzyme_allocations"]
             if enzyme_allocations_list is not None: # in case any enzyme has been allocated
-                for enzyme_allocation_idx, enzyme_allocation in enumerate(enzyme_allocations_list):
+                for enzyme_allocation_idx, enzyme_allocation in enumerate(enzyme_allocations_list[:-1]):
                     marker = markers[enzyme_allocation_idx % len(markers)]
                     ax[1][0].scatter(
                         round_idx, enzyme_allocation,
@@ -81,12 +88,15 @@ def plot_optimization_progress(
                     )
 
             #########################
-            # Other rows: 
+            # Other rows: Do not plot region 0 for each enzyme (for each enzyme,
+            # the regional allocation adds up to 1)
             ##########################
             for enzyme_idx in range(n_enzymes):
                 enzyme_regional_alloc = trial_data["regional_alloc"][enzyme_idx]
                 ax[2+enzyme_idx][0].set_title(f"enzyme {enzyme_names[enzyme_idx]}")
                 for region, percentage in enzyme_regional_alloc.items():
+                    if region == 0:
+                        continue
                     marker = markers[region % len(markers)]
                     ax[2+enzyme_idx][0].scatter(
                         round_idx, percentage,
@@ -112,11 +122,12 @@ def plot_optimization_progress(
                 color="k", label=f"enzyme {enzyme_names[enzyme_idx]}")
     ax[1][0].legend(frameon=True)
     
-    # Legend for enzyme -> shape 
-    for region_idx in range(n_regions):
-        ax[2][0].scatter([], [], marker=markers[region_idx % len(markers)],
-                color="k", label=f"region {region_idx}")
-    ax[2][0].legend(frameon=True)
+    # Legend for enzyme -> shape
+    if n_enzymes > 0:
+        for region_idx in range(n_regions):
+            ax[2][0].scatter([], [], marker=markers[region_idx % len(markers)],
+                    color="k", label=f"region {region_idx}")
+        ax[2][0].legend(frameon=True)
 
     ####################################################
     # Add axes labels

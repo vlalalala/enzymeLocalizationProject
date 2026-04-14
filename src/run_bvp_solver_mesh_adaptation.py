@@ -496,18 +496,20 @@ if __name__ == "__main__":
         threshold=max_relative_flux_difference,
     ):
         open(os.path.join(FOLDER_TO_SOLVE, "flux_convergence_without_concentration_convergence"), "w").close()
+        raise ValueError("No concentration convergence. Flux convergence.")
     else:
         open(os.path.join(FOLDER_TO_SOLVE, "no_flux_nor_concentration_convergence"), "w").close()
+        raise ValueError("No concentration convergence. No flux convergence.")
 
     # save anyways
-    save_last_interpolation_iteration_files(
-        FOLDER_TO_SOLVE,
-        fine_system_mesh_dict,
-        fine_species_concentrations,
-        ITERATION_DATA_PATH,
-        interpolation_iteration
-    )
+    #save_last_interpolation_iteration_files(
+    #    FOLDER_TO_SOLVE,
+    #    fine_system_mesh_dict,
+    #    fine_species_concentrations,
+    #    ITERATION_DATA_PATH,
+    #    interpolation_iteration
+    #)
     
-    plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
-    make_newton_iterations_gif(FOLDER_TO_SOLVE, REACTION_NETWORK, SPECIES_LOOKUP)
-    print("Plotted.")
+    #plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+    #make_newton_iterations_gif(FOLDER_TO_SOLVE, REACTION_NETWORK, SPECIES_LOOKUP)
+    #print("Plotted.")

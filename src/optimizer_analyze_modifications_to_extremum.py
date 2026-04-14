@@ -12,6 +12,30 @@ def get_fluxes(optimization_check_folder):
             fluxes[index] = load_json(folder / "fluxes.json")
     return fluxes
 
+def categorize_flux_changes(data: dict) -> dict:
+    decrease = []
+    increase = []
+    same = []
+    null = []
+
+    for key, value in data.items():
+        flux = value[0]
+        if flux is None:
+            null.append(key)
+        elif flux < 0:
+            decrease.append(key)
+        elif flux > 0:
+            increase.append(key)
+        else:
+            same.append(key)
+
+    return {
+        "flux decrease under modification": [len(decrease), decrease],
+        "flux increase under modification": [len(increase), increase],
+        "flux stays the same": [len(same), same],
+        "null flux": [len(null), null]
+    }
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--folder", type=str, required=True)
@@ -26,6 +50,9 @@ if __name__ == "__main__":
     best_result_data = load_json(os.path.join(FOLDER_TO_SOLVE, "best_result.json"))
     original_flux = best_result_data["best_value"]
 
+    ####################
+    # Show comparison
+    ####################
     comparison = {}
     for modification_idx, flux_data in modified_fluxes.items():
         if "pruned" in flux_data.keys():
@@ -38,6 +65,13 @@ if __name__ == "__main__":
         comparison.update({modification_idx: (relative_change_in_flux, info)})
 
     dump_json_base(FOLDER_TO_SOLVE, "optimization_modifications_analysis", comparison)
+
+    ##################
+    # Show summary of comparison
+    ##################
+    categorization = categorize_flux_changes(comparison)
+    dump_json_base(FOLDER_TO_SOLVE, "optimization_modifications_summary", categorization)
+
     
 
 
