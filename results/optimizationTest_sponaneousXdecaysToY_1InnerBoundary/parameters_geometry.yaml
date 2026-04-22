@@ -1,3 +1,0 @@
-geometry_config:
-    internal_membrane_relative_radii: [[0.5 ]]
-    outer_membrane_radius: [1.0e-5]

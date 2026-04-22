@@ -250,6 +250,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     FOLDER_TO_SOLVE = args.folder
     OPTIMIZATION_CHECK_FOLDER = os.path.join(FOLDER_TO_SOLVE, "optimization_check")
+    # here, in case this code is run by snakemake, the optimization check folder should be 
+    # created from scratch. Delete if it already exists
+    if os.path.isdir(OPTIMIZATION_CHECK_FOLDER):
+        shutil.rmtree(OPTIMIZATION_CHECK_FOLDER)
+    
     EXPECTED_NUMBER_MODIFICATIONS = args.expected_number_modifications
     
     copy_best_result_onto_check_folder(FOLDER_TO_SOLVE, OPTIMIZATION_CHECK_FOLDER)

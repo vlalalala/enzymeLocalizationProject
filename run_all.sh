@@ -12,12 +12,16 @@ conda activate snakemake_env
 #/tuph/t30/bigspace/ge42far/enzymeLocalizationProject/.snakemake/conda/9351cb07c9a684c157d036caac2a90f1_
 
 # Run Snakemake with the profile
+
 snakemake \
-    --profile config/slurm \
-    --jobs 500 \
-    --use-conda \
-    --latency-wait 120 \
-    --retries 2
+  --profile config/slurm \
+  --jobs 200 \
+  --keep-going \
+  --use-conda \
+  --latency-wait 120 \
+  --retries 2 \
+  --config fast_mode=true \
+  --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
 
 # To figure out whether stuff went wrong:
 # sacct -j 36274046 --format=JobID,MaxRSS,AveRSS,State,ExitCode,ReqMem,AllocTRES,MaxVMSize,AveVMSize

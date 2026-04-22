@@ -33,6 +33,9 @@ def params_to_physical(
     total_enzyme_quantity,
     enzyme_maximum_concentration,
     external_radius,
+    optimize_membrane_radii,
+    optimize_enzyme_ratios,
+    optimize_enzyme_regional_allocations,
     relative_delta_r = None
 ):
     n_inner_membranes = n_regions - 1
@@ -43,7 +46,7 @@ def params_to_physical(
     #softmax([-5, 5, 0]) → [0.000, 0.993, 0.007]  # extreme concentration difference
     # ranges from -5 to 5 makes it possible to represent allocations
     # from nearly 0% to ~99% for any enzyme
-    if n_enzymes > 0:
+    if n_enzymes > 0 and optimize_enzyme_ratios:
         z_enzymes = [params[f"z_enzyme_types_{i}"] for i in range(n_enzymes - 1)]
         z_enzymes.append(0.0) # last enzyme, removes redundancy when searching space
         enzyme_allocations = (softmax(np.array(z_enzymes)) * total_enzyme_quantity).tolist()
@@ -52,15 +55,18 @@ def params_to_physical(
         enzyme_allocations = None
 
     # --- Allocation of enzymes to different regions: n_enzymes x (n_regions - 1) free params ---
-    regional_alloc = []
-    for t in range(n_enzymes):
-        z_regions = [params[f"z_region_{t}_{r}"] for r in range(n_regions - 1)]
-        z_regions.append(0.0)
-        regional_alloc_list = softmax(np.array(z_regions)).tolist()
-        regional_alloc.append({
-            region: allocation
-            for region, allocation in enumerate(regional_alloc_list)
-        })
+    if optimize_enzyme_regional_allocations:
+        regional_alloc = []
+        for t in range(n_enzymes):
+            z_regions = [params[f"z_region_{t}_{r}"] for r in range(n_regions - 1)]
+            z_regions.append(0.0)
+            regional_alloc_list = softmax(np.array(z_regions)).tolist()
+            regional_alloc.append({
+                region: allocation
+                for region, allocation in enumerate(regional_alloc_list)
+            })
+    else:
+        regional_alloc = None
 
     """
     First thing to check: if the total enzyme amount (sum of all enzyme quantities)
@@ -83,60 +89,65 @@ def params_to_physical(
     """
     Distribute this volume slack among the different regions
     """
-    fraction_extra_volume = [params[f"fraction_extra_volume_{i}"] for i in range(n_regions-1)]
-    last_frac = 1.0 - sum(fraction_extra_volume)
-    if last_frac <= 0:
-        prune["prune"] = True
-        prune.update({"reason": "The volumes to allocate between the regions 1 to N-1 already account to more than 100%"})
-    # Even if it is pruned, continue
-    volume_slack_distribution = np.array(fraction_extra_volume + [last_frac])
-    #print("volume_slack_distribution", volume_slack_distribution)
-    extra_volume_per_region = (volume_slack_distribution * volume_slack).tolist()
-    #print("extra_volume_per_region", extra_volume_per_region)
+    if optimize_membrane_radii:
+        fraction_extra_volume = [params[f"fraction_extra_volume_{i}"] for i in range(n_regions-1)]
+        last_frac = 1.0 - sum(fraction_extra_volume)
+        
+        
+        if last_frac <= 0:
+            prune["prune"] = True
+            prune.update({"reason": "The volumes to allocate between the regions 1 to N-1 already account to more than 100%"})
+        # Even if it is pruned, continue
+        volume_slack_distribution = np.array(fraction_extra_volume + [last_frac])
+        #print("volume_slack_distribution", volume_slack_distribution)
+        extra_volume_per_region = (volume_slack_distribution * volume_slack).tolist()
+        #print("extra_volume_per_region", extra_volume_per_region)
     
-    """
-    Find out the minimum volume for each region
-    """
-    # First calculate the total enzyme amount per region
-    total_enzyme_in_region = [0.0] * n_regions
-    for enzyme_index in range(n_enzymes):
-        for region in range(n_regions):
-            total_enzyme_in_region[region] += enzyme_allocations[enzyme_index] * regional_alloc[enzyme_index][region]
+        """
+        Find out the minimum volume for each region
+        """
+        # First calculate the total enzyme amount per region
+        total_enzyme_in_region = [0.0] * n_regions
+        for enzyme_index in range(n_enzymes):
+            for region in range(n_regions):
+                total_enzyme_in_region[region] += enzyme_allocations[enzyme_index] * regional_alloc[enzyme_index][region]
 
-    # Then compute the minimum volume per region
-    if enzyme_maximum_concentration is not None:
-        minimum_volume_per_region = [
-            total_enzyme_in_region[region] / enzyme_maximum_concentration
-            for region in range(n_regions)
-        ]
-    else:
-        minimum_volume_per_region = [0 for region in range(n_regions)]
-    #print("minimum_volume_per_region", minimum_volume_per_region)
-    """
-    Compute inner membrane radii
-    """
-    inner_membrane_radii = []
-    current_allocated_volume = 0
-    for i in range(n_inner_membranes):
-        current_allocated_volume += minimum_volume_per_region[i] + extra_volume_per_region[i]
-        # (current_allocated_volume*3/(4*np.pi)) ** (1/3) means inner_membrane_radii is in units of meter
-        # dividing by external_radius brings inner_membrane_radii into the range between 0 and 1
-        inner_membrane_radii.append(
-            (current_allocated_volume*3/(4*np.pi)) ** (1/3) / external_radius
-        )
-    #print("inner_membrane_radii", inner_membrane_radii)
-    #print("relative_delta_r", relative_delta_r)
-    # Check (only necessary when suggesting the trials. In other cases, do not pass relative_delta_r)
-    
-    if len(inner_membrane_radii) != 0 and relative_delta_r is not None:
-        if inner_membrane_radii[0] < 1.5 * relative_delta_r or inner_membrane_radii[-1] > 1 - relative_delta_r * 1.5:
-            prune["prune"] = True
-            prune.update({"reason": "The distance between the first or last membrane radii is too close to the limits of 0,1"})
-        if not all(b - a >= relative_delta_r * 2 for a, b in zip(inner_membrane_radii[:-1], inner_membrane_radii[1:])):
-            prune["prune"] = True
-            prune.update({"reason": "A distance between inner membranes is too small"})
+        # Then compute the minimum volume per region
+        if enzyme_maximum_concentration is not None:
+            minimum_volume_per_region = [
+                total_enzyme_in_region[region] / enzyme_maximum_concentration
+                for region in range(n_regions)
+            ]
+        else:
+            minimum_volume_per_region = [0 for region in range(n_regions)]
+        #print("minimum_volume_per_region", minimum_volume_per_region)
+        """
+        Compute inner membrane radii
+        """
+        inner_membrane_radii = []
+        current_allocated_volume = 0
+        for i in range(n_inner_membranes):
+            current_allocated_volume += minimum_volume_per_region[i] + extra_volume_per_region[i]
+            # (current_allocated_volume*3/(4*np.pi)) ** (1/3) means inner_membrane_radii is in units of meter
+            # dividing by external_radius brings inner_membrane_radii into the range between 0 and 1
+            inner_membrane_radii.append(
+                (current_allocated_volume*3/(4*np.pi)) ** (1/3) / external_radius
+            )
+        #print("inner_membrane_radii", inner_membrane_radii)
+        #print("relative_delta_r", relative_delta_r)
+        # Check (only necessary when suggesting the trials. In other cases, do not pass relative_delta_r)
+        
+        if len(inner_membrane_radii) != 0 and relative_delta_r is not None:
+            if inner_membrane_radii[0] < 1.5 * relative_delta_r or inner_membrane_radii[-1] > 1 - relative_delta_r * 1.5:
+                prune["prune"] = True
+                prune.update({"reason": "The distance between the first or last membrane radii is too close to the limits of 0,1"})
+            if not all(b - a >= relative_delta_r * 2 for a, b in zip(inner_membrane_radii[:-1], inner_membrane_radii[1:])):
+                prune["prune"] = True
+                prune.update({"reason": "A distance between inner membranes is too small"})
         #if not all(0<inner_membrane_radius<1 for inner_membrane_radius in inner_membrane_radii):
         #    raise ValueError("An inner_membrane_radius is not between 0 and 1.")
+    else:
+        inner_membrane_radii = None
     return enzyme_allocations, regional_alloc, inner_membrane_radii, prune
 
 def create_files(
@@ -147,6 +158,7 @@ def create_files(
         regional_alloc,
         inner_membrane_radii,
         geometry_info,
+        enzymes_df
     ):
     # Copy species.csv, spontaneous_reactions.csv, enzymatic_reactions.csv,
     # parameters_discretization.yaml, parameters_solver_input.yaml,
@@ -155,7 +167,8 @@ def create_files(
     for file in [
         "species.csv", "spontaneous_reactions.csv", "enzymatic_reactions.csv",
         "parameters_discretization.yaml", "parameters_solver_input.yaml",
-        "parameters_solver_output.yaml", "parameters_value_conditions.yaml"
+        "parameters_solver_output.yaml", "parameters_value_conditions.yaml",
+        "parameters_optimization.yaml"
     ]:  
         src = os.path.join(folder_to_solve, f"{file}")
         dst = os.path.join(folder_to_solve, f"optimization_round_{round_idx}/trial_{trial_idx}/{file}")
@@ -168,27 +181,33 @@ def create_files(
         
     
     # Create a modified parameters_geometry.yaml with the correct membrane radii
-    geometry_info["geometry_config"]["internal_membrane_relative_radii"] = inner_membrane_radii
-    dump_in_yaml_file(os.path.join(
-            folder_to_solve,
-            f"optimization_round_{round_idx}/trial_{trial_idx}/parameters_geometry.yaml"),
-            geometry_info
-    )
-    #print(f"Created {os.path.join(folder_to_solve, f"optimization_round_{round_idx}/trial_{trial_idx}/parameters_geometry.yaml")}")
-    if enzyme_allocations is not None:
-        # Create a modified enzymes.csv with the correct enzyme allocation
-        enzymes_df["quantity"] = enzyme_allocations
-        enzymes_df["allocation"] = regional_alloc
-        enzymes_df.to_csv(
-            os.path.join(
+    if inner_membrane_radii is not None:
+        geometry_info["geometry_config"]["internal_membrane_relative_radii"] = inner_membrane_radii
+        dump_in_yaml_file(os.path.join(
                 folder_to_solve,
-                f"optimization_round_{round_idx}/trial_{trial_idx}/enzymes.csv"),
-            index=False)
-    else:
-        shutil.copy(
-            os.path.join(folder_to_solve, "enzymes.csv"),
-            os.path.join(folder_to_solve, f"optimization_round_{round_idx}/trial_{trial_idx}/enzymes.csv"),
+                f"optimization_round_{round_idx}/trial_{trial_idx}/parameters_geometry.yaml"),
+                geometry_info
         )
+    else:
+        # Just copy parameters geometry if the positions of the inner membranes were not supposed to be changed
+        shutil.copy(
+            os.path.join(folder_to_solve, "parameters_geometry.yaml"),
+            os.path.join(folder_to_solve, f"optimization_round_{round_idx}/trial_{trial_idx}/parameters_geometry.yaml"),
+        )
+    #print(f"Created {os.path.join(folder_to_solve, f"optimization_round_{round_idx}/trial_{trial_idx}/parameters_geometry.yaml")}")
+    
+    # Create a modified enzymes.csv with the correct enzyme allocation
+    if enzyme_allocations is not None:
+        enzymes_df["quantity"] = enzyme_allocations
+    if regional_alloc is not None:
+        # rewrite if the allocation is to be optimized
+        enzymes_df["allocation"] = regional_alloc
+    enzymes_df.to_csv(
+        os.path.join(
+            folder_to_solve,
+            f"optimization_round_{round_idx}/trial_{trial_idx}/enzymes.csv"),
+        index=False)
+    
 
 
 def softmax(z):
@@ -235,7 +254,11 @@ if __name__ == "__main__":
     # relative_delta_r is in units of R
     
     optimization_params = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_optimization.yaml"))
-
+    
+    optimize_membrane_radii = optimization_params["optimize"]["membrane_radii"]
+    optimize_enzyme_ratios = optimization_params["optimize"]["enzyme_ratios"]
+    optimize_enzyme_regional_allocations = optimization_params["optimize"]["enzyme_regional_allocations"]
+    
     storage = f"sqlite:///{FOLDER_TO_SOLVE}/optuna_study.db"
     # Create study on round 0, load on subsequent rounds
     # Sampler in order to have reproducibility on suggestions
@@ -293,14 +316,15 @@ if __name__ == "__main__":
                 trial.set_user_attr("trial_idx", trial_idx)
                 
                 # --- Allocation of total enzyme quantity to different enzymes: (n_enzymes - 1) free params ---
-                if n_enzymes > 0:
+                if n_enzymes > 0 and optimize_enzyme_ratios:
                     z_enzymes = [trial.suggest_float(f"z_enzyme_types_{i}", -5, 5)
                             for i in range(n_enzymes - 1)]
 
                 # --- Allocation of enzymes to different regions: n_enzymes x (n_regions - 1) free params ---
-                for t in range(n_enzymes):
-                    z_regions = [trial.suggest_float(f"z_region_{t}_{r}", -5, 5)
-                                for r in range(n_regions - 1)]
+                if optimize_enzyme_regional_allocations:
+                    for t in range(n_enzymes):
+                        z_regions = [trial.suggest_float(f"z_region_{t}_{r}", -5, 5)
+                                    for r in range(n_regions - 1)]
                 
                 # --- Allocation of volume that is left from most packed distribution of enzymes     
                 # z_i taken from Uniform(-5,5). After applying the fixed logit 0 and the softmax,
@@ -309,8 +333,9 @@ if __name__ == "__main__":
                 # for volume, best to pick fractions of volume freely (without drawing from the distribution
                 # and then applying the softmax), which would require extreme logit values.
                 # The number of free parameters is n_regions-1, since the extra volume should add up to 1
-                fraction_extra_volume = [trial.suggest_float(f"fraction_extra_volume_{i}", 0.0, 1.0)
-                    for i in range(n_regions-1)]
+                if optimize_membrane_radii:
+                    fraction_extra_volume = [trial.suggest_float(f"fraction_extra_volume_{i}", 0.0, 1.0)
+                        for i in range(n_regions-1)]
                 #print("z_extra_volume:", z_extra_volume)
         #print(trial.params, round_idx, trial_idx)
         enzyme_allocations, regional_alloc, inner_membrane_radii, prune = params_to_physical(
@@ -320,8 +345,14 @@ if __name__ == "__main__":
             total_enzyme_quantity=total_enzyme_quantity,
             enzyme_maximum_concentration=enzyme_maximum_concentration,
             external_radius=external_radius,
+            optimize_membrane_radii=optimize_membrane_radii,
+            optimize_enzyme_ratios=optimize_enzyme_ratios,
+            optimize_enzyme_regional_allocations=optimize_enzyme_regional_allocations,
             relative_delta_r = relative_delta_r
         )
+
+
+
         if os.path.isfile(os.path.join(FOLDER_TO_SOLVE, "optimization_convergence.txt")):
             prune["prune"] = True
             prune.update({"reason": "The optimization procedure has already converged."})
@@ -355,8 +386,10 @@ if __name__ == "__main__":
             enzyme_allocations=enzyme_allocations,
             regional_alloc=regional_alloc,
             inner_membrane_radii=inner_membrane_radii,
-            geometry_info=geometry_info
+            geometry_info=geometry_info,
+            enzymes_df=enzymes_df
         )
+        
     
     print(f"Created trial files for {os.path.join(FOLDER_TO_SOLVE, f"optimization_round_{round_idx}")}")
 

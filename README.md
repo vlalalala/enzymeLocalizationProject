@@ -547,6 +547,31 @@ https://bionumbers.hms.harvard.edu/search.aspx?trm=diffusion+coefficient
 - Diffusion coefficient of l-Trp estimated as $D = 6.6\cdot 10^{-6} cm^{2} s^{-1} = 6.6\cdot 10^{-10} m^{2} s^{-1}$ (estimated from https://pmc.ncbi.nlm.nih.gov/articles/PMC16526/).
 - Diffusion coefficient in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated as $D=1000 \mu m^2s^{-1} = 1.0 \cdot 10^{-9} m^2 s^{-1}$
 
+**Decay constants**
+
+The decay rates can be calculated from the half-lives of substances
+```math
+k = \frac{2}{t_{1/2}}
+```
+- For fast-signaling molecules:
+    Half-life: $10^{-3}-10^2 s$, k between 1e-2 and 1e3 1/s
+    Check references given by ChatGPT:
+    Stryer et al., Biochemistry (signal transduction kinetics chapters)
+    Purves et al., Neuroscience (synaptic clearance kinetics)
+    Berridge (2006), Cell Calcium signaling dynamics
+- Enzyme produced metabolites
+    Half-life 1s-10^4 s; k from 1e-4 to 1 1/s
+    Check references given by ChatGPT:
+    Berg, Tymoczko, Stryer — Biochemistry
+    Heinrich & Schuster (1996), The Regulation of Cellular Systems
+    Noe et al. (2013), metabolic flux modeling in cells
+- Protein degradation
+    Half-life 10min - 48h; k from 1e-6 to 1e-3 1/s
+    Check references given by ChagGPT:
+    Schwanhäusser et al., Nature (2011) — global protein half-lives in mammalian cells
+    Eden et al., Nature (2011)
+    Cambridge Systems Biology textbook (Klipp et al.)
+
 
 **Maximal enzyme concentration**
 - Maximal enzyme concentration in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated as $25 mM = 25 \cdot 10^{-3}M = 25 mol/m^3$.
@@ -554,6 +579,8 @@ https://bionumbers.hms.harvard.edu/search.aspx?trm=diffusion+coefficient
 
 **Enzyme kinetic parameters**
 - Characteristics of VioA following https://pubs.acs.org/doi/pdf/10.1021/acsomega.3c08233?ref=article_openPDF: $k_\mathrm{M} = 125 \mu M = 125\cdot 10^{-3}mM = 125 \cdot 10^{-3} mol/m^3$ and $k_\mathrm{cat} = 0.75 s^{-1}$
+- Full range of Typical K_m values is between 1e-7 and 1e-1
+- Most enzymes between 1e-6 and 1e-3
 
 **External concentration**
 - External concentration following https://www.cell.com/biophysj/fulltext/S0006-3495(16)34263-1?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0006349516342631%3Fshowall%3Dtrue : 
@@ -567,12 +594,23 @@ l-Trp we're assuming $s_0 = 25 \mu M = 25\cdot 10^{-6}M = 25\cdot 10^{-3}mol/m^3
 
 **Vesicle size**
 - Radius of $1\mu m$.
+(Note:Half the volume is in inner 79% of radius)
 
 The specified values are all to be given in SI units (including concentrations)!
 
 **Enzyme quantity**
 keep in mind that $q_\mathrm{max} = c_\mathrm{max} * 4/3 * \pi * R**3$, which for $R = 1^{-6}m$ and $c_\mathrm{max}=25 \cdot 10^{-3}mol/m^3$ leads to $q_\mathrm{max} = 1.05\cdot 10^{-19}mol$
 
+## Metabolic control theory
+- Cells tend to tune K_m relative to substrate concentration
+
+- Near-phisiology matching: K_m approx substrate concentration -> maximizes sensitivity to concentration changes
+- Low K_m (enzyme saturated): "buffering behavior" (constant flux)
+- High K_m (enzyme acts as a sensor or only active at high substrate load)
+
+Books:
+- Heinrich & Rapoport (1974)
+- Fell (1997), Understanding the Control of Metabolism
 
 ## Cases for which we know the analytical solution
 

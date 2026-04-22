@@ -12,6 +12,10 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 
 ############################################################
 
+localrules: all, suggest_optimization_params_round_0, suggest_optimization_params, create_modifications_of_best_result, summarize_modifications, collect_and_update, analyze_results_of_modifications_of_best_result
+
+############################################################
+
 # Step 1: Create a new folder
 # python src/_create_parameters_template.py path_to_new_folder
 
@@ -22,44 +26,54 @@ from src.auxiliary_functions_using_standard_library import as_list, load_json
 # python src/_create_phase_space.py path_to_new_folder
 
 # Step 4: Run rule all
-# snakemake --use-conda --cores 10 --scheduler greedy --latency-wait 120 --retries 2 --config fast_mode=true
+# snakemake --use-conda --cores 12 --scheduler greedy --latency-wait 120 --retries 2 --config fast_mode=true --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
 # scheduler greedy to schedule short jobs first
+
+# snakemake -s Snakefile data_private/optimization_enzymaticXtoY_spontaneousYtoZ_1InnerBoundary/combined_000001/optimization_round_1/.trial_files_created --cores 1 --use-conda --profile config/slurm --jobs 500 --conda-prefix /space/ge42far/conda_envs/enzymeLocalization --config fast_mode=true
 # or
 """
 snakemake \
   --profile config/slurm \
-  --jobs 50 \
+  --jobs 500 \
   --keep-going \
   --use-conda \
   --latency-wait 120 \
   --retries 2 \
-  --config fast_mode=true
+  --config fast_mode=true \
+  --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
 """
+
+# --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
+
 # Get the number of jobs running through squeue --me -h | wc -l
 # --keep-going stops snakemake from submitting jobs once one has not worked
 
 # Note: The maximum resident set size (kbytes) was computed with 2500 mesh points, 4 species, 3 enzymes and 6 reactions.
 
 # Reminder: du -sh . for getting current directory size
+# Remider: find . -type f | wc -l for getting number of files in curret directory (recursive)
+# Reminder: use conda clean --all to remove unused cached packages and temporary files 
+# Also: conda clean --all --force-pkgs-dirs
 
-############################################################
-# Create environment
-#rule create_environment:
-#    # snakemake -s Snakefile config/.environment_with_snakemake_created --cores 1 --use-conda
-#    output:
-#        touch("config/.environment_with_snakemake_created")
-#    conda:
-#        "config/environment_with_snakemake.yaml"
+# If /pkgs already in /bigspace:
+# ls | grep -v '\.conda$' | grep -v '\.tar\.bz2$' | xargs rm -rf
+# cd /space/ge42far/miniconda3/pkgs/
 
-############################################################
+# Info: to count the nmber of files in the miniconda installation, run
+# for dir in /space/miniconda3/*/; do
+#    count=$(find "$dir" | wc -l)
+#    echo "$count  $dir"
+# done
+
+# Time environment activation
+# time conda activate /space/ge42far/conda_envs/enzymeLocalization/d6e1e1f6d7962f4d6538700d39126b70_
+
 
 FAST_MODE = config.get("fast_mode", False)
 
-print(f"Running with FAST_MODE: {FAST_MODE} (type {type(FAST_MODE)}).")
-
 df = "data_private/optimizationSpeedTest_spontaneousXdecaysToY_1InnerBoundary"
-df = "data_private/optimization_spontaneousXYZchain_1InnerBoundary"
-df = "data_private/optimization_enzymaticXtoY_spontaneousXtoZ_1InnerBoundary"
+df = "data_private/optimization_spontaneousXYZchain_1InnerBoundary_2"
+df = "data_private/optimization_enzymaticXtoY_spontaneousYtoZ_1InnerBoundary_stepByStep_2"
 
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")
@@ -72,11 +86,15 @@ sim_folders = sorted(glob.glob(os.path.join(df, "combined_*")))
 all_outputs = [os.path.join(f, ".validated_iterations") for f in sim_folders]
 all_outputs = [os.path.join(f, ".species_steady_state_concentrations.json") for f in sim_folders]
 all_outputs = [os.path.join(f, ".completed_visualization") for f in sim_folders]
+all_outputs = [os.path.join(f, ".result_computed_fast") for f in sim_folders]
+
 
 # With optimization
 # all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
-all_outputs = [os.path.join(f, ".modifications_of_best_result_created") for f in sim_folders]
+#all_outputs = [os.path.join(f, ".modifications_of_best_result_created") for f in sim_folders]
 all_outputs = [os.path.join(f, "optimization_modifications_analysis.json") for f in sim_folders]
+# Complete optimization
+#all_outputs = os.path.join(df, "modifications_overall_summary.json")
 
 rule all:
     input:
@@ -136,6 +154,29 @@ wildcard_constraints:
 #    df    = r"(?!.*optimization).*"  # negative lookahead: no "optimization" anywhere in df
 
 
+###########
+# Minimal rule
+###########
+
+rule benchmark_activation:
+    # snakemake -s Snakefile /space/ge42far/benchmark_test.txt --jobs 1 --latency-wait 60 --use-conda --profile config/slurm --conda-prefix /space/ge42far/conda_envs/enzymeLocalization --config fast_mode=true
+    # snakemake -s Snakefile config/benchmark_test.txt --jobs 1 --latency-wait 60 --use-conda --profile config/slurm --conda-prefix /space/ge42far/conda_envs/enzymeLocalization --config fast_mode=true
+    output: 
+        "config/benchmark_test.txt"
+        #"/space/ge42far/benchmark_test.txt"
+    benchmark:
+        "config/benchmarks/activation_test.txt"
+        #"/space/ge42far/benchmarks/activation_test.txt"
+    conda:
+        "config/environment.yaml"
+    shell:
+        """
+        echo "ACTIVATE DONE: $(date '+%Y-%m-%d %H:%M:%S.%3N')"
+        python -c "import numpy; print('numpy OK')"
+        echo "PYTHON DONE: $(date '+%Y-%m-%d %H:%M:%S.%3N')"
+        touch {output}
+        """
+
 ############################################
 # RULES FOR CHECKING VALIDITY OF USER INPUT
 ############################################
@@ -164,7 +205,7 @@ if FAST_MODE:
             max_num_creeping_reaction_simulations          = lambda wildcards: int(config.get("max_num_creeping_reaction_simulations", 3)),
             override_creeping_reaction_simulations         = True,
             max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 1000)),
-            max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 3)),
+            max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 8)),
             max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-2),
             max_relative_flux_difference                   = lambda wildcards: config.get("max_relative_flux_difference", 1.0e-2),
             min_relative_concentration_difference_considered_relevant = lambda wildcards: config.get("min_relative_concentration_difference_considered_relevant", 1.0e-2)
@@ -179,6 +220,7 @@ if FAST_MODE:
             "config/environment.yaml"
         shell:
             """
+            date
             python src/check_solver_validity.py {params.folder} parameters_solver_input
             python src/check_solver_validity.py {params.folder} parameters_solver_output
             python src/check_reaction_network_validity.py {params.folder}
@@ -639,6 +681,7 @@ rule suggest_optimization_params_round_0:
         101  # run first
     shell:
         """
+        date
         python src/optimizer_suggest_trials.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round 0 \
@@ -664,9 +707,10 @@ rule suggest_optimization_params:
     threads: 1
     resources:
         mem_mb=1000,
-        runtime= 5
+        runtime= 10
     shell:
         """
+        date
         python src/optimizer_suggest_trials.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {wildcards.round} \
@@ -698,11 +742,12 @@ rule collect_and_update:
     threads: 1
     resources:
         mem_mb=1000,
-        runtime= 5
+        runtime= 10
     priority:
         100  # run first
     shell:
         """
+        date
         python src/optimizer_collect_trial_results.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {wildcards.round} \
@@ -727,11 +772,12 @@ rule best_result:
     threads: 1
     resources:
         mem_mb=1000,
-        runtime= 3
+        runtime= 10
     priority:
         100  # run first
     shell:
         """
+        date
         python src/optimizer_get_best_result.py \
             --folder_to_solve {wildcards.df}/{wildcards.bn}_{wildcards.cn} \
             --round {params.last_round}
@@ -754,7 +800,7 @@ rule best_result:
 # multiply the allocation of each enzyme to each region by 0.99 and 1.01 
 # (again, making sure to then normalize the total quantity)
 
-NUMBER_ENZYMES = 0
+NUMBER_ENZYMES = 1
 NUMBER_INNER_MEMBRANES = 1
 TOTAL_NUMBER_MODIFICATIONS = 2 * (
     NUMBER_INNER_MEMBRANES
@@ -780,7 +826,7 @@ rule create_modifications_of_best_result:
     threads: 1
     resources:
         mem_mb=1000,
-        runtime= 3
+        runtime= 10
     priority:
         100  # run first
     shell:
@@ -814,7 +860,7 @@ rule analyze_results_of_modifications_of_best_result:
     threads: 1
     resources:
         mem_mb=1000,
-        runtime= 3
+        runtime= 10
     priority:
         100  # run first
     shell:

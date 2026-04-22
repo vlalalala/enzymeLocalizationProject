@@ -125,7 +125,7 @@ def plot_optimization_progress(
     # Legend for enzyme -> shape
     if n_enzymes > 0:
         for region_idx in range(n_regions):
-            ax[2][0].scatter([], [], marker=markers[region_idx % len(markers)],
+            ax[2][0].scatter([], [], marker=markers[region_idx % len(markers)][1:], # skip region 0
                     color="k", label=f"region {region_idx}")
         ax[2][0].legend(frameon=True)
 
@@ -176,6 +176,12 @@ def load_existing_data(
         }
         for round_idx in range(n_rounds_to_load)      # outer loop for the outer dict
     }
+    optimization_params = read_yaml_file(os.path.join(FOLDER_TO_SOLVE, "parameters_optimization.yaml"))
+    
+    optimize_membrane_radii = optimization_params["optimize"]["membrane_radii"]
+    optimize_enzyme_ratios = optimization_params["optimize"]["enzyme_ratios"]
+    optimize_enzyme_regional_allocations = optimization_params["optimize"]["enzyme_regional_allocations"]
+
     for round_idx in range(n_rounds_to_load):
         for trial_idx in range(n_trials):
             trial = next(
@@ -192,7 +198,10 @@ def load_existing_data(
                 n_regions=n_regions,
                 total_enzyme_quantity=total_enzyme_quantity,
                 enzyme_maximum_concentration=enzyme_maximum_concentration,
-                external_radius=external_radius
+                external_radius=external_radius,
+                optimize_membrane_radii=optimize_membrane_radii,
+                optimize_enzyme_ratios=optimize_enzyme_ratios,
+                optimize_enzyme_regional_allocations=optimize_enzyme_regional_allocations
             )  
             data[round_idx][trial_idx]["flux_to_maximize"] = trial.value
             data[round_idx][trial_idx]["inner_membrane_radii"] = inner_membrane_radii

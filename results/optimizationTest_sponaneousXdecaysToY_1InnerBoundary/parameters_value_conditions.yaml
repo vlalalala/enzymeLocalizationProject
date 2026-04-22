@@ -1,3 +1,0 @@
-enzyme_total_fixed_quantity: [null] # mol or None
-enzyme_whose_quantity_to_modify_when_total_fixed_quantity: [null]
-enzyme_maximum_concentration : [null] # mol/m**3

@@ -43,3 +43,5 @@ notes/*
 examples/slurm_test/
 data_private/
 logs/
+.to_download/
+results_/

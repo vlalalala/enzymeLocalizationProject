@@ -12,6 +12,11 @@ sampler:
             n_startup_trials: [25]
         GridSampler:
             search_space: [null]
+optimize:
+    membrane_radii: [true]
+    enzyme_ratios: [true]
+    enzyme_regional_allocations: [true]
+
 
 convergence_params:
     number_of_trials_to_run_before_stopping: [100]

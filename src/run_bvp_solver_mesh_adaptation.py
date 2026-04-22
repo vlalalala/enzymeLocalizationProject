@@ -496,10 +496,10 @@ if __name__ == "__main__":
         threshold=max_relative_flux_difference,
     ):
         open(os.path.join(FOLDER_TO_SOLVE, "flux_convergence_without_concentration_convergence"), "w").close()
-        raise ValueError("No concentration convergence. Flux convergence.")
+        raise ValueError(f"No concentration convergence. Flux convergence. Folder: {FOLDER_TO_SOLVE}.")
     else:
         open(os.path.join(FOLDER_TO_SOLVE, "no_flux_nor_concentration_convergence"), "w").close()
-        raise ValueError("No concentration convergence. No flux convergence.")
+        raise ValueError(f"No concentration convergence. No flux convergence. Folder: {FOLDER_TO_SOLVE}.")
 
     # save anyways
     #save_last_interpolation_iteration_files(

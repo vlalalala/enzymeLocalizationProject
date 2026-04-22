@@ -45,6 +45,12 @@ def get_best_result_up_until_round_specified(
     if not eligible_trials:
         raise ValueError(f"No completed trials found up to round {round_idx}")
     
+    optimization_params = read_yaml_file(os.path.join(folder_to_solve, "parameters_optimization.yaml"))
+    optimize_membrane_radii = optimization_params["optimize"]["membrane_radii"]
+    optimize_enzyme_ratios = optimization_params["optimize"]["enzyme_ratios"]
+    optimize_enzyme_regional_allocations = optimization_params["optimize"]["enzyme_regional_allocations"]
+    
+    
     best = max(eligible_trials, key=lambda t: t.value)
     best_enzyme_allocations, best_regional_alloc, best_inner_membrane_radii, _ = params_to_physical(
         best.params,
@@ -52,7 +58,10 @@ def get_best_result_up_until_round_specified(
         n_regions=n_regions,
         total_enzyme_quantity=total_enzyme_quantity,
         enzyme_maximum_concentration=enzyme_maximum_concentration,
-        external_radius=external_radius
+        external_radius=external_radius,
+        optimize_membrane_radii=optimize_membrane_radii,
+        optimize_enzyme_ratios=optimize_enzyme_ratios,
+        optimize_enzyme_regional_allocations=optimize_enzyme_regional_allocations
     )
 
     result = {

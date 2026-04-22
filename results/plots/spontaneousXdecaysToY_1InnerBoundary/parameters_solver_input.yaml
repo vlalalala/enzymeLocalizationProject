@@ -1,7 +1,0 @@
-adaptive_step_parameters:
-  t_n_min: 0.01
-  gamma_inc: 1.5
-  gamma_dec: 0.5
-initial_concentration_guess_parameters:
-  wanted_maximum_initial_ratio_diffusion_to_fastest_reaction_timescales: 0.1
-  gamma_inc: 1.5
