@@ -460,7 +460,10 @@ if __name__ == "__main__":
                     interpolation_iteration
                 )
                 print("Converged! Saved. Plotting.")
-                plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+                try:
+                    plot_convergence_progress(FOLDER_TO_SOLVE, REACTION_NETWORK)
+                except:
+                    print("failed to create convergence progress plot")
                 make_newton_iterations_gif(FOLDER_TO_SOLVE, REACTION_NETWORK, SPECIES_LOOKUP)
                 print("Plotted.")
                 sys.exit()

@@ -45,3 +45,6 @@ data_private/
 logs/
 .to_download/
 results_/
+numerics_tests/
+optimization_cases/
+data/*/options*

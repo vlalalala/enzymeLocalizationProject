@@ -48,7 +48,7 @@ def plot_steady_state_concentrations(
 
     fig, ax = plt.subplots(1,1, figsize = (5,3))
     for x_value in x_values:
-        ax.axvline(x_value/max(x_values), ymin = 0.95, ymax = 1, color="k")
+        ax.axvline(x_value/max(x_values), ymin = 0.95, ymax = 1, color="k", lw = 0.1)
     for species in reaction_network.species:
         curve, = ax.plot(np.array(x_values)/max(x_values), y_values[species], label=species.name, alpha = 0.6)
         color = curve.get_color()

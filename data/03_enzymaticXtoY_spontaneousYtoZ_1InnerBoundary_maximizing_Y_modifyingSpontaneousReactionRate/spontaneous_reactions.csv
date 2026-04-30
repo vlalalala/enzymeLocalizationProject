@@ -1,0 +1,2 @@
+start_species,end_species,ratio_endtostart_species,k
+[Y],[Z],"[""1:1""]",[logspace:-6:3:9]

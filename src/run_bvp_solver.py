@@ -301,7 +301,7 @@ def adaptive_newton_step(
             if t_n_new < t_n_min:
                 raise ValueError("t_n is under the minimum.") # is only called
             #print("negative concentrations", flush=True)
-            return species_concentrations, t_n_new, last_F_norm, t_n, kappa, np.nan
+            return species_concentrations, t_n_new, last_F_norm, kappa, np.nan
         #relative_change_in_u[i] = du_value / species_concentrations_try[region][n][species]
     #print("The max value is", max(relative_change_in_u.values()), flush=True)
     #if max(relative_change_in_u.values()) < 10 and current_iteration>10:
@@ -456,6 +456,8 @@ def solve_newton(
                 print(f"The numerical limit was found in iteration {iter}", flush=True)
             elif "t_n is under the minimum" in str(e):
                 print(f"t_n reached the minimum in iteration {iter}", flush=True)
+            else:
+                raise
             break
 
         # Save result if needed

@@ -26,7 +26,7 @@ localrules: all, suggest_optimization_params_round_0, suggest_optimization_param
 # python src/_create_phase_space.py path_to_new_folder
 
 # Step 4: Run rule all
-# snakemake --use-conda --cores 12 --scheduler greedy --latency-wait 120 --retries 2 --config fast_mode=true --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
+# snakemake --use-conda --cores 1 --scheduler greedy --latency-wait 120 --retries 2 --config fast_mode=true --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
 # scheduler greedy to schedule short jobs first
 
 # snakemake -s Snakefile data_private/optimization_enzymaticXtoY_spontaneousYtoZ_1InnerBoundary/combined_000001/optimization_round_1/.trial_files_created --cores 1 --use-conda --profile config/slurm --jobs 500 --conda-prefix /space/ge42far/conda_envs/enzymeLocalization --config fast_mode=true
@@ -34,11 +34,11 @@ localrules: all, suggest_optimization_params_round_0, suggest_optimization_param
 """
 snakemake \
   --profile config/slurm \
-  --jobs 500 \
+  --jobs 50 \
   --keep-going \
   --use-conda \
   --latency-wait 120 \
-  --retries 2 \
+  --retries 0 \
   --config fast_mode=true \
   --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
 """
@@ -74,6 +74,35 @@ FAST_MODE = config.get("fast_mode", False)
 df = "data_private/optimizationSpeedTest_spontaneousXdecaysToY_1InnerBoundary"
 df = "data_private/optimization_spontaneousXYZchain_1InnerBoundary_2"
 df = "data_private/optimization_enzymaticXtoY_spontaneousYtoZ_1InnerBoundary_stepByStep_2"
+df = "data_private/simple_enzymaticXtoY_1InnerBoundary"
+df = "data_private/simple_enzymaticXtoY_1InnerBoundary"
+df = "data_private/simple_enzymaticXtoY_spontaneousYtoZ_1InnerBoundary"
+df = "data_private/simple_enzymaticXtoY_enzymaticYtoZ_1InnerBoundary"
+df = "data_private/01_spontaneousXtoY_1InnerBoundary_modifyingInnerRadius"
+df = "data/01b_spontaneousXtoY_1InnerBoundary_modifyingYPermeability"
+df = "data/02_enzymaticXtoY_1InnerBoundary_modifyingPositionOfEnzymeRegion"
+df = "data/03b_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion"
+df = "data/04_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion"
+df = "data/04_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion_AInside"
+df = "data/04a_enzymaticXtoY_enzymaticYtoZ_3_innerBoundaries_modifyingPositionOf1EnzymeRegion_AOutside"
+df = "data/04_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion_AInside"
+df = "data/04c_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion_modifyingKm_AInside"
+df = "data/04d_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion_modifyingKm_AOutside"
+df = "data/04d_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion_modifyingpermeability_AOutside"
+df = "data/04f_enzymaticXtoY_enzymaticYtoZ_1InnerBoundary_modifyingEnzymeAllocations_modifyingExternalRadii"
+df = "data/04g_enzymaticXtoY_enzymaticYtoZ_4InnerBoundaries_modifyingEnzymeAllocations_modifyingExternalRadii"
+df = "data/04h_enzymaticXtoY_enzymaticYtoZ_4InnerBoundaries_modifyingEnzymeAllocations_modifyingPermeability"
+df = "data/02c_enzymaticXtoY_2InnerBoundaries_modifyingXPermeability"
+df = "data/02d_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm"
+df = "data/02e_enzymaticXtoY_2InnerBoundaries_modifyingKm"
+df = "data/02a_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation"
+df = "data/02f_enzymaticXtoY_1InnerBoundary_modifyingEnzymeAllocation"
+df = "data/02g_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius"
+df = "data/02A_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation"
+df = "data/02h_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingExternalRadius"
+df = "data/02A2_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation"
+df = "data/02i_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingDiffusionConstant"
+df = "data/02j_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
 
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")
@@ -92,7 +121,7 @@ all_outputs = [os.path.join(f, ".result_computed_fast") for f in sim_folders]
 # With optimization
 # all_outputs = [os.path.join(f, "best_result.json") for f in sim_folders]
 #all_outputs = [os.path.join(f, ".modifications_of_best_result_created") for f in sim_folders]
-all_outputs = [os.path.join(f, "optimization_modifications_analysis.json") for f in sim_folders]
+#all_outputs = [os.path.join(f, "optimization_modifications_analysis.json") for f in sim_folders]
 # Complete optimization
 #all_outputs = os.path.join(df, "modifications_overall_summary.json")
 
@@ -206,7 +235,7 @@ if FAST_MODE:
             override_creeping_reaction_simulations         = True,
             max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 1000)),
             max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 8)),
-            max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-2),
+            max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-1), #######################################################
             max_relative_flux_difference                   = lambda wildcards: config.get("max_relative_flux_difference", 1.0e-2),
             min_relative_concentration_difference_considered_relevant = lambda wildcards: config.get("min_relative_concentration_difference_considered_relevant", 1.0e-2)
         threads: 1

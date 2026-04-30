@@ -70,17 +70,21 @@ def parse_value(raw):
                 # append the individual elements from the range values to the complete list
                 for final_element in final_elements_from_item:
                     complete_values_list.append(final_element)
-            elif item.startswith("linspace:"):
-                _, start, stop, num = item.split(":")
+            elif item.startswith("linspace"):
+                is_list_mode = item.startswith("linspace_list:")
+                if is_list_mode:
+                    _, start, stop, num = item.split(":")
+                else:
+                    _, start, stop, num = item.split(":")
                 if not is_int_value(num):
                     raise ValueError(f"The number of array elements given through {item} is not valid.")
-                final_elements_from_item = list(
-                    float(x) for x in np.linspace(float(start), float(stop), int(num)))
+                values = [float(x) for x in np.linspace(float(start), float(stop), int(num))]
+                if is_list_mode:
+                    values = [[v] for v in values]
                 if string_encodes_list:
-                    complete_values_list.append(final_elements_from_item)
-                    continue
-                for x in final_elements_from_item:
-                    complete_values_list.append(x)
+                    complete_values_list.append(values)
+                else:
+                    complete_values_list.extend(values)
             elif item.startswith("logspace:"):
                 _, start, stop, num = item.split(":")
                 if not is_int_value(num):
@@ -92,6 +96,35 @@ def parse_value(raw):
                     continue
                 for x in final_elements_from_item:
                     complete_values_list.append(x)
+            elif item.startswith("dictlinspace:"):
+                """k1 is key 1, k2 is key 2, start is the initial value corresponding to k1,
+                stop is the final value corresponding to k2, num is the number of elements in the list.
+                Additional keys (k3, k4, ...) are assigned value 0.
+
+                dictlinspace:0:1:2:3:0.0:1.0:5 → keys 0 and 1 get x/1-x, keys 2 and 3 get 0.0
+                """
+                parts = item.split(":")
+                # parts[0] = "dictlinspace", parts[1] = k1, parts[2] = k2,
+                # parts[-3] = start, parts[-2] = stop, parts[-1] = num
+                # parts[3:-3] = optional extra keys with value 0
+                if len(parts) < 6:
+                    raise ValueError(f"Invalid dictlinspace item: {item}")
+                k1, k2 = parts[1], parts[2]
+                extra_keys = parts[3:-3]
+                start, stop, num = parts[-3], parts[-2], parts[-1]
+                if not is_int_value(num):
+                    raise ValueError(f"Invalid num in {item}")
+                values = np.linspace(float(start), float(stop), int(num))
+                dicts = []
+                for v in values:
+                    d = {int(k1): float(v), int(k2): float(1 - v)}
+                    for ek in extra_keys:
+                        d[int(ek)] = 0.0
+                    dicts.append(d)
+                if string_encodes_list:
+                    complete_values_list.append(dicts)
+                else:
+                    complete_values_list.extend(dicts)
             else:
                 complete_values_list.append(item)
         else:
@@ -111,7 +144,7 @@ def write_one_csv_per_combination(
     output_dir: str,
     max_files=None,
     single_option_columns=None,   # e.g. ["id", "name", "fixed_param"]
-):
+):  
     single_option_columns = set(single_option_columns or [])
 
     df = pd.read_csv(input_csv, dtype=str)
@@ -223,7 +256,7 @@ if __name__ == "__main__":
                 os.path.join(folder_with_parameter_ranges, f"options_{name}"),
                 single_option_columns=["name", "enzyme", "start_species", "end_species"]
             )
-        if extension == '.yaml':
+        elif extension == '.yaml':
             write_one_yaml_file_per_combination(
                 os.path.join(folder_with_parameter_ranges, filename),
                 os.path.join(folder_with_parameter_ranges, f"options_{name}"),

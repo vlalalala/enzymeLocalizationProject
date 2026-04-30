@@ -548,6 +548,7 @@ https://bionumbers.hms.harvard.edu/search.aspx?trm=diffusion+coefficient
 - Diffusion coefficient in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated as $D=1000 \mu m^2s^{-1} = 1.0 \cdot 10^{-9} m^2 s^{-1}$
 
 **Decay constants**
+Between 10^{-6} and 10^{3}.
 
 The decay rates can be calculated from the half-lives of substances
 ```math
@@ -580,7 +581,8 @@ k = \frac{2}{t_{1/2}}
 **Enzyme kinetic parameters**
 - Characteristics of VioA following https://pubs.acs.org/doi/pdf/10.1021/acsomega.3c08233?ref=article_openPDF: $k_\mathrm{M} = 125 \mu M = 125\cdot 10^{-3}mM = 125 \cdot 10^{-3} mol/m^3$ and $k_\mathrm{cat} = 0.75 s^{-1}$
 - Full range of Typical K_m values is between 1e-7 and 1e-1
-- Most enzymes between 1e-6 and 1e-3
+- Most enzymes have a K_m between 1e-6 and 1e-3
+- Kcat is usually between 1 and 1e4
 
 **External concentration**
 - External concentration following https://www.cell.com/biophysj/fulltext/S0006-3495(16)34263-1?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0006349516342631%3Fshowall%3Dtrue : 
@@ -616,6 +618,12 @@ Books:
 
 **No reaction**: concentration equal to external concentration (trivial; convergence condition based on comparing reaction flux vs boundary flux not viable)
 
+```math
+D \nabla^2 c(r) = D \frac{1}{r^2} \frac{\partial}{\partial r} \left( r^2 \frac{\partial c(r)}{\partial r}\right) = 0
+```
+If $c(r)=C$, we get $0=0$.
+
+
 **Simple case of decay of compound X into compound Y, with no inner boundaries**: 
 
 The reaction-diffusion equation in spherical coordinates is given by
@@ -636,6 +644,51 @@ The condition at the outer membrane $c^\prime(R) = p/D \cdot (c_\mathrm{ext} - c
 A = -\frac{\dfrac{p}{D}\,c_{\mathrm{ext}}\,R^2}
 {e^{\lambda R}\left(\lambda R - 1 + \dfrac{pR}{D}\right)
 + e^{-\lambda R}\left(\lambda R + 1 - \dfrac{pR}{D}\right)}
+```
+
+
+**Comparison with case given non-spherical, purely 1D diffusion**
+Dropping the spherical symmetry, the steady-state reaction-diffusion equation on a line is
+```math
+D \frac{d^2 c}{d x^2} - k\cdot c = 0
+```
+The solution to that is
+```math
+c(x) = A\cosh\!\left(\frac{x}{\ell}\right) + B\sinh\!\left(\frac{x}{\ell}\right)
+```
+with $l = \sqrt{D/k}$.
+
+$c'(0) = 0$ leads to
+```math
+    c'(x) = \frac{A}{\ell}\sinh\!\left(\frac{x}{\ell}\right) + \frac{B}{\ell}\cosh\!\left(\frac{x}{\ell}\right),
+```
+such that $B=0$.
+
+$c'(R) = \frac{p}{D}\bigl(c_{\mathrm{ext}} - c(R)\bigr)$ leads to 
+
+Substituting $c(x) = A\cosh(x/\ell)$:
+```math
+    \frac{A}{\ell}\sinh\!\left(\frac{R}{\ell}\right)
+    = \frac{p}{D}\!\left[c_{\mathrm{ext}} - A\cosh\!\left(\frac{R}{\ell}\right)\right]
+```
+```math
+A\left[\frac{1}{\ell}\sinh\!\left(\frac{R}{\ell}\right)
+          + \frac{p}{D}\cosh\!\left(\frac{R}{\ell}\right)\right]
+    = \frac{p}{D}\,c_{\mathrm{ext}},
+```
+which yields
+```math
+    A = \frac{\dfrac{p}{D}\,c_{\mathrm{ext}}}
+             {\dfrac{1}{\ell}\sinh\!\left(\dfrac{R}{\ell}\right)
+              + \dfrac{p}{D}\cosh\!\left(\dfrac{R}{\ell}\right)}.
+```
+The full analytical solution is
+```math
+    c(x) =
+    \frac{\dfrac{p}{D}\,c_{\mathrm{ext}}}
+         {\dfrac{1}{\ell}\sinh\!\left(\dfrac{R}{\ell}\right)
+          + \dfrac{p}{D}\cosh\!\left(\dfrac{R}{\ell}\right)}
+    \cdot \cosh\!\left(\frac{x}{\ell}\right).
 ```
 
 **Simple case of decay of compound X into compound Y, with one inner boundary at $R^*$**:
