@@ -28,13 +28,14 @@ localrules: all, suggest_optimization_params_round_0, suggest_optimization_param
 # Step 4: Run rule all
 # snakemake --use-conda --cores 1 --scheduler greedy --latency-wait 120 --retries 2 --config fast_mode=true --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
 # scheduler greedy to schedule short jobs first
+# snakemake --use-conda --cores 1 --config fast_mode=true --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
 
 # snakemake -s Snakefile data_private/optimization_enzymaticXtoY_spontaneousYtoZ_1InnerBoundary/combined_000001/optimization_round_1/.trial_files_created --cores 1 --use-conda --profile config/slurm --jobs 500 --conda-prefix /space/ge42far/conda_envs/enzymeLocalization --config fast_mode=true
 # or
 """
 snakemake \
   --profile config/slurm \
-  --jobs 50 \
+  --jobs 45 \
   --keep-going \
   --use-conda \
   --latency-wait 120 \
@@ -81,7 +82,6 @@ df = "data_private/simple_enzymaticXtoY_enzymaticYtoZ_1InnerBoundary"
 df = "data_private/01_spontaneousXtoY_1InnerBoundary_modifyingInnerRadius"
 df = "data/01b_spontaneousXtoY_1InnerBoundary_modifyingYPermeability"
 df = "data/02_enzymaticXtoY_1InnerBoundary_modifyingPositionOfEnzymeRegion"
-df = "data/03b_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion"
 df = "data/04_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion"
 df = "data/04_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingPositionOf1EnzymeRegion_AInside"
 df = "data/04a_enzymaticXtoY_enzymaticYtoZ_3_innerBoundaries_modifyingPositionOf1EnzymeRegion_AOutside"
@@ -103,7 +103,23 @@ df = "data/02h_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingExtern
 df = "data/02A2_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation"
 df = "data/02i_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingDiffusionConstant"
 df = "data/02j_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
-
+df = "data/05_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion"
+df = "data/05a_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_modifyingKm"
+df = "data/05b_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_modifyingK"
+df = "data/05c_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_modifyingK_modifyingKm"
+df = "data/06_enzymaticWtoX_enzymaticXtoY_enzymaticYtoZ_1InnerBoundary_modifyingDistribution"
+df = "data/06a_enzymaticWtoX_enzymaticXtoY_enzymaticYtoZ_1InnerBoundary_modifyingAllocation2ndEnzyme"
+df = "data/05d_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_lowPermeability"
+df = "data/05e_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_lowPermeability"
+df = "data/05f_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_lowPermeability"
+df = "data/05g_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_lowPermeability"
+df = "data/05h_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_lowPermeability"
+df = "data/05i_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_lowPermeability"
+df = "data/06b_enzymaticWtoX_enzymaticXtoY_enzymaticYtoZ_3InnerBoundaries_modifyingOrder"
+df = "data/03b_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingReactionRate"
+df = "data/03c_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
+df = "data/02k_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
+df = "data/02l_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")
 
@@ -240,7 +256,7 @@ if FAST_MODE:
             min_relative_concentration_difference_considered_relevant = lambda wildcards: config.get("min_relative_concentration_difference_considered_relevant", 1.0e-2)
         threads: 1
         resources:
-            mem_mb=1000,
+            mem_mb=5000,
             runtime=10 # runtime resource for whole group
         group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
         priority:

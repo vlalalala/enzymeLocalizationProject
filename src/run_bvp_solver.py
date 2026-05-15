@@ -298,7 +298,7 @@ def adaptive_newton_step(
         if species_concentrations_try[region][n][species] < 0:
             #print(species, flush=True)
             t_n_new = t_n * gamma_dec
-            if t_n_new < t_n_min:
+            if t_n_new < t_n_min and current_iteration > 10:
                 raise ValueError("t_n is under the minimum.") # is only called
             #print("negative concentrations", flush=True)
             return species_concentrations, t_n_new, last_F_norm, kappa, np.nan
@@ -329,7 +329,7 @@ def adaptive_newton_step(
     else:
         t_n_new = t_n * gamma_dec
         #print(f"did not decrease norm! with step size t_n = {t_n}", flush=True)
-        if t_n_new < t_n_min:
+        if t_n_new < t_n_min and current_iteration > 10:
            raise ValueError("t_n is under the minimum.")
         return species_concentrations, t_n_new, F_norm_new, kappa, max(relative_change_in_u.values()) #########################################
 

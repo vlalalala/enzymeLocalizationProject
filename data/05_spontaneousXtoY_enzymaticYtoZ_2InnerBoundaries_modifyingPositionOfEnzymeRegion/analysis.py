@@ -22,7 +22,7 @@ def get_data(folder):
             x_axis_value = geometry["geometry_config"]["internal_membrane_relative_radii"][0]
             spontaneous_reactions_df = pd.read_csv(os.path.join(combined_folder, "spontaneous_reactions.csv"))
             color_value = spontaneous_reactions_df.loc[
-                (spontaneous_reactions_df["start_species"] == "Y"),
+                (spontaneous_reactions_df["start_species"] == "X"),
                 "k"].item()
             fluxes_file = os.path.join(combined_folder, "fluxes.json")
             if os.path.isfile(fluxes_file):
@@ -34,28 +34,20 @@ def get_data(folder):
 
 
 def plot_data(folder):
-    fig, ax = plt.subplots(2, 1, figsize = (4,6))
+    fig, ax = plt.subplots(1, 1, figsize = (4,3))
     data = get_data(folder)
     df = pd.DataFrame(data.values(), columns=['x', 'flux', 'k'])
     for k_val, group in df.groupby('k'):
-        group = group.sort_values("x")
-        ax[0].plot(
+        ax.scatter(
             group["x"],
             group["flux"],
             label=str(k_val),
+            norm=LogNorm()
         )
-        min_x = min(group["x"])
-        flux_at_min_x = group.loc[group['x'] == min_x, 'flux'].item()
-        ax[1].plot(
-            group["x"],
-            group["flux"]/flux_at_min_x)
-
-    ax[0].legend(title="k")
-    ax[0].set_xlabel("relative radius of most inner membrane r*/R")
-    ax[0].set_ylabel("flux")
-    ax[1].set_xlabel("relative radius of most inner membrane r*/R")
-    ax[1].set_ylabel("flux/flux at innermost")
-    ax[0].set_yscale("log")
+    ax.legend(title="k")
+    ax.set_xlabel("relative radius of most inner membrane r*/R")
+    ax.set_ylabel("flux")
+    ax.legend()
     fig.tight_layout()
     fig.savefig(os.path.join(folder, "result.png"), dpi = 300)
 
@@ -63,4 +55,4 @@ if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     plot_data(FOLDER_TO_SOLVE)
-    # python data/03b_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingReactionRate/analysis.py data/03b_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingReactionRate
+    # python data/05_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion/analysis.py data/05_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion

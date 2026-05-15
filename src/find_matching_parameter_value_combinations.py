@@ -90,7 +90,14 @@ def csv_file_matches_criteria(csv_path: str | Path, conditions: dict) -> bool:
                 if required_column not in df.columns:
                     return False
                 # Check that ALL selected rows satisfy the requirement
-                if not df.loc[mask, required_column].eq(str(required_value)).all():
+                N = 5  # number of leading characters to compare
+                if not (
+                    df.loc[mask, required_column]
+                    .astype(str)
+                    .str[:N]
+                    .eq(str(required_value)[:N])
+                    .all()
+                ):
                     return False
     return True
 
@@ -129,6 +136,8 @@ def filter_combined_folders_csv_criteria(
             result.append(folder)
     return result
 
+######################################################################################
+# Main function to use
 def filter_combined_folders(
     combined_root: str | Path,
     criteria_yaml,
@@ -141,7 +150,7 @@ def filter_combined_folders(
         combined_root, criteria_yaml
     )
     return list(set(csv_matches) & set(yaml_matches))
-
+#########################################################################################
 # %%
 ####################### obsolete ####################################
 def get_options_dict(folder: str | Path, file_ext=".yaml"):
