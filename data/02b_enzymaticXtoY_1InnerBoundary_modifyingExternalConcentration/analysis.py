@@ -11,6 +11,10 @@ from matplotlib.colors import Normalize
 from auxiliary_functions import read_yaml_file
 import ast
 from pathlib import Path
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "Helvetica"
+})
 
 def calculate_average_concentration_of_X_in_inner_compartment(combined_folder):
     system_geometry = load_json(os.path.join(combined_folder, "system_geometry_for_convergence.json"))

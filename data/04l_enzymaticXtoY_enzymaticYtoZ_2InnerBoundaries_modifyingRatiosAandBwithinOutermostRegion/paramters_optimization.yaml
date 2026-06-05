@@ -1,0 +1,18 @@
+species_to_maximize: ["Y"]
+sampler:
+    type: ["TPESampler"]
+    seed: [42]
+    sampler_parameters:
+        TPESampler:
+            n_startup_trials: [25]
+            gamma: [0.25]
+        CmaEsSampler:
+            sigma0: [null]
+            restart_strategy: [null]
+            n_startup_trials: [25]
+        GridSampler:
+            search_space: [null]
+
+convergence_params:
+    number_of_trials_to_run_before_stopping: [100]
+    value_negligible_relative_change: [0.01]

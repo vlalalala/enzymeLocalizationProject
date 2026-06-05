@@ -547,6 +547,7 @@ https://bionumbers.hms.harvard.edu/search.aspx?trm=diffusion+coefficient
 - Diffusion coefficient of l-Trp estimated as $D = 6.6\cdot 10^{-6} cm^{2} s^{-1} = 6.6\cdot 10^{-10} m^{2} s^{-1}$ (estimated from https://pmc.ncbi.nlm.nih.gov/articles/PMC16526/).
 - Diffusion coefficient in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated as $D=1000 \mu m^2s^{-1} = 1.0 \cdot 10^{-9} m^2 s^{-1}$
 
+
 **Decay constants**
 Between 10^{-6} and 10^{3}.
 
@@ -594,6 +595,7 @@ l-Trp we're assuming $s_0 = 25 \mu M = 25\cdot 10^{-6}M = 25\cdot 10^{-3}mol/m^3
 **Permeability constant**
 - Maximal enzyme concentration in "Optimal Compartmentalization Strategies for Metabolic Microcompartments" (Hinzpeter et al) estimated in the Supplementary Material. They use $p = 90 \mu M s^{-1} = 90\cdot 10^{-6}M s^{-1} = 90\cdot 10^{-3} mol s^{-1}$ for some and a fifth of that for others.
 
+- From Getting Across the Cell Membrane: An Overview for Small Molecules, Peptides, and Proteins: ranges from 1e+1 cm/s to 1e-14 cm/s -> Study between 1e-1 m/s 1e-16 m/s (values are typically given in cm/s)
 **Vesicle size**
 - Radius of $1\mu m$.
 (Note:Half the volume is in inner 79% of radius)
@@ -638,6 +640,10 @@ c(r) = \frac{A\mathrm{exp}(-\lambda r) + B\mathrm{exp}(\lambda r)}{r}
 with $\lambda = \sqrt{k/D}$.
 
 The condition for internal reflexion $c^\prime(0) = 0$ leads to $A = -B$.
+This simplifies to
+```math
+c(r) = \frac{A\left(e^{-\lambda r} - e^{\lambda r}\right)}{r} = \frac{-2A\sinh(\lambda r)}{r}
+```
 
 The condition at the outer membrane $c^\prime(R) = p/D \cdot (c_\mathrm{ext} - c(R))$ means 
 ```math
@@ -645,6 +651,76 @@ A = -\frac{\dfrac{p}{D}\,c_{\mathrm{ext}}\,R^2}
 {e^{\lambda R}\left(\lambda R - 1 + \dfrac{pR}{D}\right)
 + e^{-\lambda R}\left(\lambda R + 1 - \dfrac{pR}{D}\right)}
 ```
+
+
+For the decay product $p$
+```math
+    D_p \nabla^2 p + kc(r) = 0
+```
+In spherical coordinates:
+```math
+    \frac{D_p}{r^2} \frac{d}{dr} \left( r^2 \frac{d p_s}{dr} \right) = -kc(r)
+```
+
+so the equation for $p_s$ becomes
+```math
+    \frac{1}{r^2} \frac{d}{dr} \left( r^2 \frac{d p_s}{dr} \right) = \frac{2Ak\sinh(\lambda r)}{D_p\, r}
+```
+
+
+We seek a particular solution of the form $p_s^{(p)}(r) = f(r)/r$. Substituting and using
+$\lambda^2 = k/D$, one finds:
+```math
+    p_s^{(p)}(r) = \frac{2AD}{D_p} \cdot \frac{\sinh(\lambda r)}{r}
+```
+The homogeneous equation $\nabla^2 p_s = 0$ in spherical symmetry has solutions $1/r$ and $1$.
+Regularity at $r=0$ excludes $1/r$, so the general solution is:
+```math
+    p_s(r) = \frac{2AD}{D_p} \cdot \frac{\sinh(\lambda r)}{r} + C_2
+```
+
+
+At $r = R$, the permeability boundary condition for the product reads:
+```math
+    p_s'(R) = \frac{p_{\mathrm{mem}}}{D_p}\left(c_{\mathrm{ext},p} - p_s(R)\right)
+```
+We compute $p_s'(r)$:
+```math
+    p_s'(r) = \frac{2AD}{D_p} \cdot \frac{\lambda r \cosh(\lambda r) - \sinh(\lambda r)}{r^2}
+```
+Evaluating at $r = R$:
+```math
+    p_s'(R) = \frac{2AD}{D_p} \cdot \frac{\lambda R \cosh(\lambda R) - \sinh(\lambda R)}{R^2}
+```
+and:
+```math
+    p_s(R) = \frac{2AD}{D_p} \cdot \frac{\sinh(\lambda R)}{R} + C_2
+```
+Substituting into the boundary condition:
+\begin{equation}
+    \frac{2AD}{D_p} \cdot \frac{\lambda R \cosh(\lambda R) - \sinh(\lambda R)}{R^2}
+    = \frac{p_{\mathrm{mem}}}{D_p}
+    \left(
+        c_{\mathrm{ext},p} - \frac{2AD}{D_p} \cdot \frac{\sinh(\lambda R)}{R} - C_2
+    \right)
+\end{equation}
+Solving for $C_2$:
+\begin{equation}
+\boxed{
+    C_2 = c_{\mathrm{ext},p}
+    - \frac{2AD}{D_p}\cdot\frac{\sinh(\lambda R)}{R}
+    - \frac{2AD}{p_{\mathrm{mem}} R^2}
+    \left(\lambda R \cosh(\lambda R) - \sinh(\lambda R)\right)
+}
+\end{equation}
+so that the full solution is:
+\begin{equation}
+    p_s(r) = \frac{2AD}{D_p} \cdot \frac{\sinh(\lambda r)}{r}
+    + c_{\mathrm{ext},p}
+    - \frac{2AD}{D_p}\cdot\frac{\sinh(\lambda R)}{R}
+    - \frac{2AD}{p_{\mathrm{mem}} R^2}
+    \left(\lambda R \cosh(\lambda R) - \sinh(\lambda R)\right)
+\end{equation}
 
 
 **Comparison with case given non-spherical, purely 1D diffusion**

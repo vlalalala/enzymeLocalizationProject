@@ -1,0 +1,4 @@
+name,diffusion_constant,external_concentration,permeability_constant
+[X],[1e-9],[logspace:-4:1:6],[90e-5]
+[Y],[1e-9],[0],[90e-5]
+[Z],[1e-9],[0],[90e-5]

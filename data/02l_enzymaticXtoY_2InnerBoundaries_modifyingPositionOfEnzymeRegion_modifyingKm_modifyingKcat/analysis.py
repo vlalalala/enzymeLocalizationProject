@@ -33,6 +33,7 @@ def get_data(folder):
                     flux = None
             except:
                 flux = None
+            
             enzymatic_reactions_df = pd.read_csv(os.path.join(combined_folder, "enzymatic_reactions.csv"))
             michaelis_menten_constant = enzymatic_reactions_df.loc[
                 (enzymatic_reactions_df["enzyme"] == "A"),
@@ -40,6 +41,8 @@ def get_data(folder):
             catalytic_rate = enzymatic_reactions_df.loc[
                 (enzymatic_reactions_df["enzyme"] == "A"),
                 "k_cat"].item()
+            if flux is None:
+                print(index, inner_radius, outer_inner_radius, catalytic_rate, michaelis_menten_constant )
             data[index] = (#index,
                            inner_radius, outer_inner_radius, flux,
                            #k,
@@ -149,6 +152,7 @@ if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     plot_data(FOLDER_TO_SOLVE)
-    plot_steady_states(FOLDER_TO_SOLVE)
+    #plot_steady_states(FOLDER_TO_SOLVE)
     # python data/02l_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat/analysis.py data/02l_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat
 
+# The smaller Km, the steeper the fall in the concentration of the reactant is within the shell where there is enzyme.

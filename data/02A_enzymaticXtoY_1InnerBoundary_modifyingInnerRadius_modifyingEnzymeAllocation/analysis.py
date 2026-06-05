@@ -53,7 +53,7 @@ def plot_data(folder):
                             #norm = Normalize(vmin=0, vmax=1)
                             #norm=LogNorm(vmin=np.nanmin(z_points), vmax=np.nanmax(z_points))
     )
-    ax[0][0].scatter(df['x'], df['y'], color='red', s=5, zorder=5)
+    #ax[0][0].scatter(df['x'], df['y'], color='red', s=5, zorder=5)
     #for _, point in df.iterrows():
     #    ax[0].annotate(f"{point['index'].lstrip('0')}", (point['x'], point['y']))
 

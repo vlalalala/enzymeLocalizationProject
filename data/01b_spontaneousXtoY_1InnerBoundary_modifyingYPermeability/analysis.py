@@ -10,7 +10,10 @@ from matplotlib.colors import LogNorm
 from matplotlib.colors import Normalize
 from auxiliary_functions import read_yaml_file
 import ast
-
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "Helvetica"
+})
 
 def get_data(folder):
     data = {}
@@ -41,8 +44,9 @@ def plot_data(folder):
 
     ax.scatter(df["x"], df["flux"])
 
-    ax.set_xlabel("permeability of species Y")
-    ax.set_ylabel("flux")
+    ax.set_xlabel(r"permeability of species Y $p_Y$ / m$\cdot$s$^{-1}$")
+    ax.set_ylabel(r"flux of species Y $j_Y$ / mol $\cdot$ $\mathrm{s}^{-1}$")
+
     ax.set_xscale("log")
     
     fig.tight_layout()
@@ -52,3 +56,4 @@ if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     plot_data(FOLDER_TO_SOLVE)
+    # python data/01b

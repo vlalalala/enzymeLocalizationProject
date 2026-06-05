@@ -113,4 +113,4 @@ if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     plot_data(FOLDER_TO_SOLVE)
-    # python data/05b_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_modifyingK/analysis.py data/05b_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_modifyingK
+    # python data/05d_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_lowPermeability/analysis.py data/05d_spontaneousXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKcat_lowPermeability

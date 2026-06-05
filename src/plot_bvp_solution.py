@@ -182,6 +182,60 @@ def make_newton_iterations_gif(
     with open(max_y_filename, "w") as f:
         f.write(str(max_y))
 
+def calculate_analytical_solution_1_spontaneous_reaction_1_region(k, D, R, p, ext):
+    """Returns a lambda function
+    D is diffusion coefficient for reactant, p is permeability constant of reactant,
+    ext is external concentration of reactant
+    """
+    s_lambda = np.sqrt(k / D)
+    A = - ((p / D * ext * R**2)
+        / (
+            np.exp(s_lambda * R)*(s_lambda * R - 1 + (p * R)/D)
+            + np.exp(-s_lambda * R) * (s_lambda * R + 1 - (p * R)/D) 
+            )
+    )
+    c = lambda r: 1/r * A *(np.exp(-s_lambda*r)-np.exp(s_lambda*r))
+    return c
+
+def calculate_analytical_solution_1_spontaneous_reaction_2_regions(k, D, R, p, ext, r_inner):
+    X_lambda = np.sqrt(k / D)
+    s = np.sinh(X_lambda * r_inner)
+    c = np.cosh(X_lambda * r_inner)
+    beta = p / D
+    alpha = p * R / D
+    
+    rho = np.exp(-2 * X_lambda * r_inner) * (
+        D * (r_inner**2 * X_lambda**2 * c + r_inner * X_lambda * (c - s) - s)
+        + p * r_inner**2 * X_lambda * (s + c)
+    ) / (
+        D * (r_inner**2 * X_lambda**2 * c - r_inner * X_lambda * (s + c) + s)
+        + p * r_inner**2 * X_lambda * (s - c)
+    )
+
+    A = (beta * ext * R**2)/(
+        np.exp(-X_lambda * R)*(alpha - X_lambda * R - 1) + rho * np.exp(X_lambda * R)*(alpha + X_lambda*R -1)
+    )
+    
+    B = rho * A
+
+    S = (
+        beta * r_inner * (A * np.exp(-X_lambda * r_inner) + B * np.exp(X_lambda * r_inner))
+    ) / (
+        X_lambda * r_inner * np.cosh(X_lambda * r_inner)
+        - np.sinh(X_lambda * r_inner)
+        + beta * r_inner * np.sinh(X_lambda * r_inner)
+    )
+
+    
+    c_1 = lambda r : S * np.sinh(X_lambda * r) / r
+    c_2 = lambda r : (A * np.exp(-X_lambda * r) + B * np.exp(X_lambda * r))/r
+    c = lambda r: np.where(
+        r < r_inner,
+        c_1(r),
+        c_2(r)
+    )
+    return c
+
 
 def add_theory_curve_to_ax(
         fig,
@@ -197,10 +251,21 @@ def add_theory_curve_to_ax(
         and len(reaction_network.enzymatic_reactions) == 0
         and num_regions == 1
     ):  
+        s_reaction = reaction_network.spontaneous_reactions[0]
+        s = s_reaction.start_species
+        external_radius = membrane_radii[-1]
+        c = calculate_analytical_solution_1_spontaneous_reaction_1_region(
+            k = s_reaction.k,
+            D = s.diffusion_constant,
+            R = external_radius,
+            p = s.permeability_constant,
+            ext = s.external_concentration
+        )
+        """
         print("Plotting analytical solution")
         s_reaction = reaction_network.spontaneous_reactions[0]
         s = s_reaction.start_species
-        s_lambda = np.sqrt(s_reaction.k / s.diffusion_constant)
+        s_lambda = np.sqrt(s_reaction.k / sion_constant)
         external_radius = membrane_radii[-1]
         A = - ((s.permeability_constant / s.diffusion_constant * s.external_concentration * external_radius**2)
             / (
@@ -209,6 +274,7 @@ def add_theory_curve_to_ax(
               )
         )
         c = lambda r: 1/r * A *(np.exp(-s_lambda*r)-np.exp(s_lambda*r))
+        """
         r_to_plot = np.linspace(external_radius*0.01, external_radius, num = 100)
         ax.plot([r/external_radius for r in r_to_plot], [c(r) for r in r_to_plot], linestyle= "--",
                 label = f"analytical solution for {s.name}", 
@@ -224,9 +290,19 @@ def add_theory_curve_to_ax(
         and len(reaction_network.enzymatic_reactions) == 0
         and num_regions == 2
     ):  
-        print("Plotting analytical solution")
         reaction = reaction_network.spontaneous_reactions[0]
         X = reaction.start_species
+        external_radius = membrane_radii[-1]
+        c = calculate_analytical_solution_1_spontaneous_reaction_2_regions(
+            k = reaction.k,
+            D = X.diffusion_constant,
+            R = external_radius,
+            p = X.permeability_constant,
+            ext = X.external_concentration,
+            r_inner = membrane_radii[0]
+        )
+        print("Plotting analytical solution")
+        """
         X_lambda = np.sqrt(reaction.k / X.diffusion_constant)
         r_inner = membrane_radii[0]
         external_radius = membrane_radii[-1]
@@ -261,6 +337,7 @@ def add_theory_curve_to_ax(
         c_1 = lambda r : S * np.sinh(X_lambda * r) / r
         c_2 = lambda r : (A * np.exp(-X_lambda * r) + B * np.exp(X_lambda * r))/r
         c = [c_1, c_2]
+        """
         for region_idx in [0,1]:
             max_radius = membrane_radii_with_0[region_idx+1]
             min_radius = membrane_radii_with_0[region_idx]
@@ -272,7 +349,9 @@ def add_theory_curve_to_ax(
             else:
                 label = None
             ax.plot([r/external_radius for r in r_to_plot],
-                [c[region_idx](r) for r in r_to_plot], linestyle= "--",
+                [c(r) for r in r_to_plot],
+                #[c[region_idx](r) for r in r_to_plot],
+                linestyle= "--",
                 label = label, zorder = 100, 
                 linewidth = 1,
                 color = "k",

@@ -19,35 +19,40 @@ def get_data(folder):
         if match:
             index = match.group(1)  # keeps it as a string, preserving leading zeros
             geometry = read_yaml_file(os.path.join(combined_folder, "parameters_geometry.yaml"))
-            x_axis_value = geometry["geometry_config"]["internal_membrane_relative_radii"][0]
+            inner_radius = geometry["geometry_config"]["internal_membrane_relative_radii"][0]
             spontaneous_reactions_df = pd.read_csv(os.path.join(combined_folder, "spontaneous_reactions.csv"))
-            color_value = spontaneous_reactions_df.loc[
+            k = spontaneous_reactions_df.loc[
                 (spontaneous_reactions_df["start_species"] == "X"),
                 "k"].item()
             fluxes_file = os.path.join(combined_folder, "fluxes.json")
             if os.path.isfile(fluxes_file):
-                y_axis_value = load_json(fluxes_file)["Z"]
+                flux = load_json(fluxes_file)["Z"]
             else:
-                y_axis_value = None
-            data[index] = (x_axis_value, y_axis_value, color_value)
+                flux = None
+            data[index] = (inner_radius, flux, k)
     return data
 
 
 def plot_data(folder):
-    fig, ax = plt.subplots(1, 1, figsize = (4,3))
+    fig, ax = plt.subplots(2, 1, figsize = (4,3))
     data = get_data(folder)
-    df = pd.DataFrame(data.values(), columns=['x', 'flux', 'k'])
+    df = pd.DataFrame(data.values(), columns=['inner_radius', 'flux', 'k'])
+    smallest_inner_radius = np.min(df["inner_radius"])
     for k_val, group in df.groupby('k'):
-        ax.scatter(
-            group["x"],
+        group = group.sort_values("inner_radius")
+        ax[0].plot(
+            group["inner_radius"],
             group["flux"],
-            label=str(k_val),
-            norm=LogNorm()
+            label=str(k_val)
         )
-    ax.legend(title="k")
-    ax.set_xlabel("relative radius of most inner membrane r*/R")
-    ax.set_ylabel("flux")
-    ax.legend()
+        flux_for_innermost_inner_radius = group.loc[df["inner_radius"]==smallest_inner_radius, 'flux'].item()
+        ax[1].scatter(group["inner_radius"], group["flux"]/flux_for_innermost_inner_radius, alpha = 0.5)
+        ax[1].plot(group["inner_radius"], group["flux"]/flux_for_innermost_inner_radius)
+    ax[0].legend(title="k")
+    ax[0].set_xlabel("relative radius of most inner membrane r*/R")
+    ax[0].set_ylabel("flux")
+    ax[0].legend(title = "k")
+    ax[1].axhline(1, c = "k", alpha = 0.2, ls = ":")
     fig.tight_layout()
     fig.savefig(os.path.join(folder, "result.png"), dpi = 300)
 

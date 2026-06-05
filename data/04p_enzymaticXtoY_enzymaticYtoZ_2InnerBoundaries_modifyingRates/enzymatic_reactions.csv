@@ -1,0 +1,3 @@
+start_species,end_species,ratio_endtostart_species,enzyme,k_cat,k_M,hill
+[X],[Y],"[""1:1""]",[A],[logspace:-1:1:3],[0.025],[1]
+[Y],[Z],"[""1:1""]",[B],[logspace:-1:1:3],[0.025],[1]

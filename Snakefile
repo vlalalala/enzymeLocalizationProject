@@ -35,7 +35,7 @@ localrules: all, suggest_optimization_params_round_0, suggest_optimization_param
 """
 snakemake \
   --profile config/slurm \
-  --jobs 45 \
+  --jobs 50 \
   --keep-going \
   --use-conda \
   --latency-wait 120 \
@@ -120,6 +120,28 @@ df = "data/03b_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modify
 df = "data/03c_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
 df = "data/02k_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
 df = "data/02l_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
+df = "data/02m_sameAs2lButZoomedIn"
+df = "data/01c_spontaneousXtoY_2InnerBoundaries_modifyingPositionOfRegion"
+df = "data/05j_sameAs05ButLargerRangeUpwardsSpontaneous"
+df = "data/05k_sameAs05jButSmallerPermeability"
+df = "data/03c_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat"
+df = "data/03d_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat_lowerPermeability"
+df = "data/07_spontaneousXtoY_spontaneousYtoZ_1InnerBoundary_modifyingPermeabilityOfY"
+df = "data/01d_spontaneousXtoY_1InnerBoundary_modifyingInnerRadius_modifyingXPermeability"
+df = "data/04i_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRatiosAandBwithinOutermostRegion"
+df = "data/04j_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRatiosAandBwithinOutermostRegion"
+#df = "data/04k_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRatiosAandBwithinOutermostRegion"
+#df = "data/04l_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRatiosAandBwithinOutermostRegion"
+df = "data/04n_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRatiosAandBwithinOutermostRegion"
+df = "data/01e_spontaneousXtoY_0InnerBoundaries_modifyingOuterRadius"
+df = "data/02A3_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation_modifyingExternalConcetration"
+df = "data/02A4_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation_saturatedEnzyme"
+df = "data/04o_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRates"
+df = "data/04p_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRates"
+df = "data/04q_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRates"
+df = "data/00_spontaneous_reaction_test"
+df = "data/01a2_spontaneousXtoY_1InnerBoundary_modifyingXPermeability"
+
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")
 
@@ -251,13 +273,13 @@ if FAST_MODE:
             override_creeping_reaction_simulations         = True,
             max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 1000)),
             max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 8)),
-            max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-1), #######################################################
+            max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 5.0e-1), #######################################################
             max_relative_flux_difference                   = lambda wildcards: config.get("max_relative_flux_difference", 1.0e-2),
             min_relative_concentration_difference_considered_relevant = lambda wildcards: config.get("min_relative_concentration_difference_considered_relevant", 1.0e-2)
         threads: 1
         resources:
             mem_mb=5000,
-            runtime=10 # runtime resource for whole group
+            runtime=15 # runtime resource for whole group
         group: lambda wildcards: f"sp_{hashlib.md5(trial_path(wildcards).encode()).hexdigest()[:8]}"
         priority:
             100  # run first

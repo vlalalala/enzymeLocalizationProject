@@ -1,0 +1,2 @@
+start_species,end_species,ratio_endtostart_species,enzyme,k_cat,k_M,hill
+[X],[Y],"[""1:1""]",[A],[1],[0.025],[1]

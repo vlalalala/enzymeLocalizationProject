@@ -9,6 +9,10 @@ from matplotlib.colors import LogNorm
 from matplotlib.colors import Normalize
 from auxiliary_functions import read_yaml_file
 import ast
+import numpy as np
+from find_matching_parameter_value_combinations import filter_combined_folders
+import matplotlib.image as mpimg
+from pathlib import Path
 
 def get_data(folder):
     data = {}
@@ -19,6 +23,7 @@ def get_data(folder):
             index = match.group(1)  # keeps it as a string, preserving leading zeros
             geometry = read_yaml_file(os.path.join(combined_folder, "parameters_geometry.yaml"))
             inner_radius = geometry["geometry_config"]["internal_membrane_relative_radii"][0]
+            outer_inner_radius = geometry["geometry_config"]["internal_membrane_relative_radii"][1]
             spontaneous_reactions_df = pd.read_csv(os.path.join(combined_folder, "spontaneous_reactions.csv"))
             #k = spontaneous_reactions_df.loc[
             #    (spontaneous_reactions_df["start_species"] == "Y"),
@@ -38,36 +43,37 @@ def get_data(folder):
             catalytic_rate = enzymatic_reactions_df.loc[
                 (enzymatic_reactions_df["enzyme"] == "A"),
                 "k_cat"].item()
-            data[index] = (inner_radius, flux,
+            data[index] = (inner_radius, outer_inner_radius,flux,
                            #k,
                            michaelis_menten_constant, catalytic_rate)
     return data
 
 def find_optimal_radius(df):
-    """Returns a dataframe with columns Km, Kcat, k, best_inner_radius"""
-    #try:
+    """Returns a dataframe with columns Km, Kcat, best_inner_radius"""
+
+    def pick_radius(g):
+        # if any missing inner_radius in this group → invalidate group
+        if g['inner_radius'].isna().any():
+            return None
+
+        # otherwise pick inner_radius at max flux
+        return g.loc[g['flux'].idxmax(), 'inner_radius']
+
     best_radius = (
-            df.groupby(['Km', 'Kcat',
-                        #'k'
-                        ])
-            .apply(lambda g: g.loc[g['flux'].idxmax(), 'inner_radius'])
-            .reset_index(name='best_inner_radius')
-        )
-    #except:
-    #    best_radius = pd.DataFrame(columns=[
-    #        'Km', 'Kcat',
-    #        #'k',
-    #        'best_inner_radius'])
+        df.groupby(['Km', 'Kcat'])
+        .apply(pick_radius)
+        .reset_index(name='best_inner_radius')
+    )
+
     return best_radius
 
 def plot_data(folder):
     data = get_data(folder)
     df = pd.DataFrame(data.values(), columns=[
-        'inner_radius', 'flux',
+        'inner_radius', "outer_inner_radius",'flux',
         #'k',
         "Km", "Kcat"])
     best_radius_df = find_optimal_radius(df)
-    print(best_radius_df)
     fig, ax = plt.subplots(1, 2, figsize = (4,3 * 1), gridspec_kw={'width_ratios': [1, 0.1]})
 
     pivot = best_radius_df.pivot(index='Km', columns='Kcat', values='best_inner_radius')
@@ -99,8 +105,50 @@ def plot_data(folder):
     fig.tight_layout()
     fig.savefig(os.path.join(folder, "result.png"), dpi = 300)
 
+def plot_steady_states(folder):
+    data = get_data(folder)
+    df = pd.DataFrame(data.values(), columns=[
+        'inner_radius', "outer_inner_radius", 'flux',
+        "Km", "Kcat"])
+    # one file per Km
+    Kcat = np.sort(df["Kcat"].unique())
+    inner_radii = np.sort(df["inner_radius"].unique())
+    Km = np.sort(df["Km"].unique())
+    for Km_value in Km:
+        fig, ax = plt.subplots(len(Kcat), len(inner_radii), figsize = (4*len(inner_radii), 3*len(Kcat)))
+        fig.suptitle(f"Km = {Km_value}")
+        for Kcat_idx, Kcat_value in enumerate(Kcat):
+            for inner_radius_idx, inner_radius in enumerate(inner_radii):
+                current_df = df[(df["Kcat"]==Kcat_value)&(df["inner_radius"]==inner_radius)&(df['Km']==Km_value)]
+                outer_inner_radius = list(current_df["outer_inner_radius"])[0]
+                combinations = filter_combined_folders(
+                    combined_root=folder,
+                    criteria_yaml={
+                        "options_parameters_geometry": {
+                            "geometry_config": {
+                                "internal_membrane_relative_radii": [inner_radius, outer_inner_radius]
+                            }
+                        }
+                    },
+                    criteria_csv=
+                        {
+                            "options_enzymatic_reactions": {"enzyme": {"A": {"k_cat": f"{Kcat_value}", "k_M": f"{Km_value}"}}}
+                        }
+                )
+                if len(combinations)!=1:
+                    raise ValueError(combinations)
+                combination = combinations[0]#only one available
+                file_to_plot = combination / "solver_iteration_data" / "interpolation_iteration_nr_0_final_concentrations.png"
+                if os.path.isfile(file_to_plot):
+                    img = mpimg.imread(str(file_to_plot))
+                ax[Kcat_idx][inner_radius_idx].imshow(img)
+                ax[Kcat_idx][inner_radius_idx].axis("off")
+                ax[Kcat_idx][inner_radius_idx].set_title(f"Kcat = {Kcat_value}, \n inner radius = {inner_radius} \n {Path(combination).name}")
+        fig.savefig(os.path.join(folder, f"complete_steadyStates_Km_{Km_value}.png"), dpi = 300)
+
 if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     plot_data(FOLDER_TO_SOLVE)
+    #plot_steady_states(FOLDER_TO_SOLVE)
     # python data/03c_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat/analysis.py data/03c_enzymaticXtoY_spontaneousYtoZ_2InnerBoundaries_maximizingZ_modifyingPositionOfEnzymeRegion_modifyingKm_modifyingKcat

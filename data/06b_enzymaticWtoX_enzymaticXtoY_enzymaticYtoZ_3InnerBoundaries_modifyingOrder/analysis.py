@@ -112,3 +112,5 @@ if __name__ == "__main__":
 
 # ABC is better than BAC if the catalytic rate of B is much larger than the catalytic rate of A
 # BAC is better than ABC if the catalytic rate of A is much larger than the catalytic rate of B
+
+# CBA is always better than CAB
