@@ -605,6 +605,67 @@ The specified values are all to be given in SI units (including concentrations)!
 **Enzyme quantity**
 keep in mind that $q_\mathrm{max} = c_\mathrm{max} * 4/3 * \pi * R**3$, which for $R = 1^{-6}m$ and $c_\mathrm{max}=25 \cdot 10^{-3}mol/m^3$ leads to $q_\mathrm{max} = 1.05\cdot 10^{-19}mol$
 
+## Calculating depletion times (used Claude)
+The equation
+```math
+-\frac{dS}{dt} = \frac{V_{max} \cdot S}{K_m + S}
+```
+has no closed-form solution for $S(t)$, but characteristic times for the depletion can be derived
+```math
+\int_{S_0}^{S_f} \frac{K_m + S}{V_{max} \cdot S} \, dS = -t_{depletion}
+```
+```math
+t_{depletion} = \frac{1}{V_{max}} \left[ K_m \ln\!\left(\frac{S_0}{S_f}\right) + (S_0 - S_f) \right]
+```
+where $S_f$ is the final substrate concentration, or a threshold if depletion is not complete.
+
+**1st order regime** ($S_0 \ll K_m$)
+```math
+-\frac{dS}{dt} \approx \frac{V_{max}}{K_m} S = k_{app}\, S
+```
+The characteristic time is the time constant of the exponential decay:
+```math
+\tau = \frac{K_m}{V_{max}}
+```
+The substrate reaches approximately 63\% depletion in one $\tau$.
+
+**Saturation regime** ($S_0 \gg K_m$)
+```math
+-\frac{dS}{dt} \approx V_{max}
+```
+so the characteristic depletion time is 
+```math
+\tau = \frac{S_0}{V_{max}}
+```
+
+## Calculating depletion length (Claude)
+We have
+```math
+D \nabla^2 S = \frac{V_{max} \cdot S}{K_m + S}
+```
+
+In the 1st order regime, the equation linearizes to 
+```math
+\frac{D}{r^2} \frac{d}{dr}\left(r^2 \frac{dS}{dr}\right) = \frac{V_{max}}{K_m}\, S
+```
+which has the exact solution
+```math
+S(r) = S_0 \frac{R}{r} \exp\!\left(-\frac{r - R}{\lambda}\right)
+```
+where the characteristic penetration depth is
+```math
+\lambda = \sqrt{\frac{D \cdot K_m}{V_{max}}}
+```
+
+In the regime of enzyme saturation, we get
+```math
+D\,\nabla^2 S = V_{max}
+```
+The depletion radius scales as
+```math
+r_{depletion} \sim \sqrt{\frac{6\,D\,S_0}{V_{max}}}
+```
+
 ## Metabolic control theory
 - Cells tend to tune K_m relative to substrate concentration
 

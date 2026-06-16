@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../src'))
 from auxiliary_functions_using_standard_library import load_json
+from wrong_solve_linear_reactions_analytically import SystemParams, solve, evaluate_solution
 import re
 import pandas as pd
 import numpy as np
@@ -14,37 +15,12 @@ from find_matching_parameter_value_combinations import filter_combined_folders
 import matplotlib.image as mpimg
 from pathlib import Path
 
-def calculate_average_concentration_of_X_weighted_by_enzyme_allocation(combined_folder):
-    system_geometry = load_json(os.path.join(combined_folder, "system_geometry_for_convergence.json"))
-    concentrations = load_json(os.path.join(combined_folder, ".species_steady_state_concentrations.json"))
-    enzymes_df = pd.read_csv(os.path.join(combined_folder, "enzymes.csv"))
-    enzyme_allocation = ast.literal_eval(enzymes_df.loc[enzymes_df['name'] == "A", 'allocation'].iloc[0])
-    average_concentration = 0
-    for region_idx in range(2):
-        radii_in_region = system_geometry["geometry_config"]["mesh_points_in_regions"][region_idx]
-        X_concentrations_in_region = []
-        for radius_idx in range(len(radii_in_region)):
-            X_concentrations_in_region.append(concentrations[region_idx][radius_idx]["X"])
-        concentration = 0
-        for i in range(len(radii_in_region) - 1):
-            r0 = radii_in_region[i]
-            r1 = radii_in_region[i+1]
-            c0 = X_concentrations_in_region[i]
-            c1 = X_concentrations_in_region[i+1]
-            
-            # Volume-weighted average concentration in shell (assuming linear c(r))
-            c_avg = (c0 * (3*r0**2 + 2*r0*r1 + r1**2) + c1 * (r0**2 + 2*r0*r1 + 3*r1**2)) \
-                    / (4 * (r0**2 + r0*r1 + r1**2))
-            
-            shell_volume = r1**3 - r0**3  # 4π/3 cancels with denominator
-            concentration += c_avg * shell_volume
+"""
+Analytically
 
-        concentration /= (radii_in_region[-1]**3 - radii_in_region[0]**3)
-        average_concentration += concentration * enzyme_allocation[region_idx]
+"""
 
-    return average_concentration
-
-def get_data(folder):
+def get_analytical_data(folder):
     data = {}
     for folder_name in os.listdir(folder):
         match = re.match(r'^combined_(\d{6})$', folder_name)
@@ -53,14 +29,42 @@ def get_data(folder):
             index = match.group(1)  # keeps it as a string, preserving leading zeros
             geometry = read_yaml_file(os.path.join(combined_folder, "parameters_geometry.yaml"))
             internal_relative_radius = geometry["geometry_config"]["internal_membrane_relative_radii"][0]
+            external_radius = geometry["geometry_config"]["outer_membrane_radius"]
+
             species_df = pd.read_csv(os.path.join(combined_folder, "species.csv"))
             X_external_concentration = species_df.loc[
                 (species_df["name"] == "X"),
                 "external_concentration"].item()
+            Y_external_concentration = species_df.loc[
+                (species_df["name"] == "Y"),
+                "external_concentration"].item()
+            X_diffusion = species_df.loc[
+                (species_df["name"] == "X"),
+                "diffusion_constant"].item()
+            Y_diffusion = species_df.loc[
+                (species_df["name"] == "Y"),
+                "diffusion_constant"].item()
+            
+            ##### Create file with enzyme concentrations
             enzymes_df = pd.read_csv(os.path.join(combined_folder, "enzymes.csv"))
+
             allocation_str = enzymes_df.loc[(enzymes_df["name"] == "A"), "allocation"].item()
             allocation = ast.literal_eval(allocation_str)
             allocation_in_external = allocation[1]
+
+            ##### Compute analytical solution
+            params = SystemParams(
+                radii = np.array([internal_relative_radius,1])*external_radius,   # R_1, R_2, R_3
+                D     = np.array([1.0, 1.0])*6.6e-11,          # D_1, D_2
+                k     = np.array([[1.0],               # k_1^(1)
+                                [1.0]]),            # k_1^(3)
+                p     = np.array([1.0, 1.0])*25e-6,          # internal permeabilities
+                p_ext = np.array([1.0, 1.0])*25e-6,          # outer boundary permeabilities
+                X_ext = np.array([1.0, 0.0])*90e-8,          # X_1=1, X_2=0 outside
+            )
+
+
+
             fluxes_file = os.path.join(combined_folder, "fluxes.json")
             if os.path.isfile(fluxes_file):
                 Y_flux = load_json(fluxes_file)["Y"]

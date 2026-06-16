@@ -14,10 +14,17 @@ from find_matching_parameter_value_combinations import filter_combined_folders
 import matplotlib.image as mpimg
 from pathlib import Path
 
+
 def calculate_average_concentration_of_X_weighted_by_enzyme_allocation(combined_folder):
-    system_geometry = load_json(os.path.join(combined_folder, "system_geometry_for_convergence.json"))
-    concentrations = load_json(os.path.join(combined_folder, ".species_steady_state_concentrations.json"))
-    enzymes_df = pd.read_csv(os.path.join(combined_folder, "enzymes.csv"))
+    system_geometry_file = os.path.join(combined_folder, "system_geometry_for_convergence.json")
+    if not os.path.isfile(system_geometry_file):
+        return None
+    try:
+        system_geometry = load_json(system_geometry_file)
+        concentrations = load_json(os.path.join(combined_folder, ".species_steady_state_concentrations.json"))
+        enzymes_df = pd.read_csv(os.path.join(combined_folder, "enzymes.csv"))
+    except:
+        return None
     enzyme_allocation = ast.literal_eval(enzymes_df.loc[enzymes_df['name'] == "A", 'allocation'].iloc[0])
     average_concentration = 0
     for region_idx in range(2):
@@ -70,12 +77,11 @@ def get_data(folder):
             data[index] = (internal_relative_radius, allocation_in_external, Y_flux, X_external_concentration,index, average_X_concentration_weighted)
     return data
 
+
 def plot_steady_states(folder):
     data = get_data(folder)
     df = pd.DataFrame(data.values(),
-                      columns=['internal_relative_radius', 'allocation_in_external',
-                               'flux', 'X_external_concentration', 'index',
-                               'average_X_concentration_weighted'])
+                      columns=['internal_relative_radius', 'allocation_in_external', 'flux', 'X_external_concentration', 'index'])
     # one file per X_external_concentration
     inner_radii = np.sort(df["internal_relative_radius"].unique())
     allocation_in_external = np.sort(df["allocation_in_external"].unique())
@@ -127,13 +133,11 @@ def plot_steady_states(folder):
 
 def plot_data(folder):
     data = get_data(folder)
-    df = pd.DataFrame(data.values(),
-                      columns=['x', 'y', 'flux',
-                               'X_external_concentration', 'index',
-                               'average_X_concentration_weighted']
-    )
+    print(data)
+
+    df = pd.DataFrame(data.values(), columns=['x', 'y', 'flux', 'X_external_concentration', 'index'])
     external_concentrations = sorted(df["X_external_concentration"].unique())
-    fig, ax = plt.subplots(len(external_concentrations), 2, figsize = (5,6*len(external_concentrations)), gridspec_kw={'width_ratios': [1, 0.1]})
+    fig, ax = plt.subplots(1, 2, figsize = (5,6*len(external_concentrations)), gridspec_kw={'width_ratios': [1, 0.1]})
     
     ############
     # Plot fluxes
@@ -145,7 +149,7 @@ def plot_data(folder):
         y_points = z_grid.index.values
         z_points = z_grid.values  # 2D array of shape (len(y), len(x))
     
-        mesh0 = ax[external_concentration_idx][0].pcolormesh(x_points, y_points, z_points, cmap='viridis', shading='auto',
+        mesh0 = ax[0].pcolormesh(x_points, y_points, z_points, cmap='viridis', shading='auto',
                                 #norm = Normalize(vmin=0, vmax=1)
                                 #norm=LogNorm(vmin=np.nanmin(z_points), vmax=np.nanmax(z_points))
         )
@@ -153,14 +157,14 @@ def plot_data(folder):
         #for _, point in df.iterrows():
         #    ax[0].annotate(f"{point['index'].lstrip('0')}", (point['x'], point['y']))
 
-        fig.colorbar(mesh0, cax=ax[external_concentration_idx][1], label='flux')
+        fig.colorbar(mesh0, cax=ax[1], label='flux')
 
         # Set log scale on whichever axes need it
-        ax[external_concentration_idx][0].set_xlabel("relative radius of inner membrane r*/R")
-        ax[external_concentration_idx][0].set_ylabel("proportion of enzyme \n in outermost region")
-        ax[external_concentration_idx][1].set_box_aspect(10)
-        ax[external_concentration_idx][0].set_box_aspect(1)
-        ax[external_concentration_idx][0].set_title(f"X_ext = {external_concentration} mol")
+        ax[0].set_xlabel("relative radius of inner membrane r*/R")
+        ax[0].set_ylabel("proportion of enzyme \n in outermost region")
+        ax[1].set_box_aspect(10)
+        ax[0].set_box_aspect(1)
+        ax[0].set_title(f"X_ext = {external_concentration} mol")
     
     fig.tight_layout()
     fig.savefig(os.path.join(folder, "fluxes.png"), dpi = 300)
@@ -229,22 +233,19 @@ def plot_data_with_concentration_weighted(folder):
     fig.tight_layout()
     fig.savefig(os.path.join(folder, "fluxes2.png"), dpi = 300)
 
+
 if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     #plot_steady_states(FOLDER_TO_SOLVE)
-    # plot_data(FOLDER_TO_SOLVE)
-    #plot_data_with_concentration_weighted(FOLDER_TO_SOLVE)
-    # python data/02A3_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation_modifyingExternalConcetration/analysis.py data/02A3_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation_modifyingExternalConcetration
-    #"""
-    print(filter_combined_folders(
-        combined_root=FOLDER_TO_SOLVE,
-        criteria_yaml={},
-        criteria_csv=
-            {
-                #"options_species": {"name": {"X": {"external_concentration": "10.0"}}},
-                "options_species": {"name": {"X": {"external_concentration": "0.1"}}},
-                #"options_enzymes": {"name": {"A": {"allocation": "{0:"+ str(1-allocation) +", 1:"+str(allocation)+"}"}}},
-            }
-    ))
-    #"""
+    plot_data_with_concentration_weighted(FOLDER_TO_SOLVE)
+    # python data/02A5_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation_modifyingExternalConcentration/analysis.py data/02A5_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation_modifyingExternalConcentration
+    #print(filter_combined_folders(
+    #    combined_root=FOLDER_TO_SOLVE,
+    #    criteria_yaml={},
+    #    criteria_csv=
+    #        {
+    #            "options_species": {"name": {"X": {"external_concentration": "10.0"}}},
+    #            #"options_enzymes": {"name": {"A": {"allocation": "{0:"+ str(1-allocation) +", 1:"+str(allocation)+"}"}}},
+    #        }
+    #))

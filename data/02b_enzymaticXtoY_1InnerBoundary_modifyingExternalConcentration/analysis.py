@@ -74,21 +74,22 @@ def get_data(folder):
 
 
 def plot_data(folder):
-    fig, ax = plt.subplots(3, 1, figsize = (4,6))
+    fig, ax = plt.subplots(3, 1, figsize = (3.5,8))
     data = get_data(folder)
     
     df = pd.DataFrame(data.values(), columns=['x', 'flux', 'X_conc_at_0', 'flux_per_X'])
-    
-    ax[0].scatter(df["x"], df["flux"])
-    ax[1].scatter(df["x"], df["X_conc_at_0"])
-    ax[1].axvline(0.025)
-    ax[2].scatter(df["x"], df["flux_per_X"])
+    df = df.sort_values("x")
+    ax[0].plot(df["x"], df["flux"])
+    ax[1].plot(df["x"], df["X_conc_at_0"])
+    ax[1].axvline(0.025, label = "MM constant", ls = ":")
+    ax[2].plot(df["x"], df["flux_per_X"])
+    ax[1].legend()
 
     # Set log scale on whichever axes need it
-    ax[2].set_xlabel("X ext / mol m^{-3}")
-    ax[0].set_ylabel("flux")
-    ax[1].set_ylabel('average concentration of X \n in innermost region')
-    ax[2].set_ylabel('flux / X_ext')
+    ax[2].set_xlabel(r"external concentration of X / mol $\cdot$ m$^{-3}$")
+    ax[0].set_ylabel(r"flux of Y / mol $\cdot$ s$^{-1}$")
+    ax[1].set_ylabel(r'average concentration of X'+ "\n"+ r'in innermost region /'+ "\n"+ r"mol $\cdot$ m$^{-3}$")
+    ax[2].set_ylabel(r'flux of Y divided by'+ "\n"+ r'external concentration of X')
     ax[0].set_box_aspect(1)
     ax[1].set_box_aspect(1)
     ax[2].set_box_aspect(1)
@@ -99,9 +100,10 @@ def plot_data(folder):
     ax[1].set_yscale("log")
 
     fig.tight_layout()
-    fig.savefig(os.path.join(folder, "fluxes.png"), dpi = 300)
+    fig.savefig(os.path.join(folder, "fluxes.png"), dpi = 300)#, bbox_inches="tight")
 
 if __name__ == "__main__":
     # Load all the passed information
     FOLDER_TO_SOLVE = sys.argv[1]
     plot_data(FOLDER_TO_SOLVE)
+    # python data/02b_enzymaticXtoY_1InnerBoundary_modifyingExternalConcentration/analysis.py data/02b_enzymaticXtoY_1InnerBoundary_modifyingExternalConcentration

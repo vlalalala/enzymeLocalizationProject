@@ -10,6 +10,10 @@ from matplotlib.colors import LogNorm
 from matplotlib.colors import Normalize
 from auxiliary_functions import read_yaml_file
 import ast
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "Helvetica"
+})
 
 def calculate_average_concentration_of_X_in_inner_compartment_with_enzyme_A(combined_folder):
     system_geometry_file = os.path.join(combined_folder, "system_geometry_for_convergence.json")
@@ -71,16 +75,18 @@ def plot_data(folder):
     K_m_values = np.sort(df["michaelis_menten_constant"].unique())
     min_internal_radius = np.min(df['internal_radius'].unique())
     for _, Km in enumerate(K_m_values):
+        print(Km, type(Km))
         df_current = df[df["michaelis_menten_constant"]==Km]
-        ax[0][0].scatter(df_current["internal_radius"], df_current["flux"], label=Km)
-        ax[1][0].set_xlabel("relative radius of most \n inner membrane r*/R")
-        ax[0][0].set_ylabel("flux")
-        ax[1][0].scatter(df_current["internal_radius"], df_current["concentration"])
-        ax[1][0].set_ylabel("average X concentration \n in volume with enzyme")
+        df_current = df_current.sort_values("internal_radius")
+        ax[0][0].plot(df_current["internal_radius"], df_current["flux"], label="{:.2e}".format(float(Km)))
+        ax[1][0].set_xlabel("relative radius of most \n inner membrane " + r"$r_1/R$")
+        ax[0][0].set_ylabel("flux of Y /" + r"$\mathrm{mol}\cdot \mathrm{s}^{-1}$")
+        ax[1][0].plot(df_current["internal_radius"], df_current["concentration"])
+        ax[1][0].set_ylabel("average X concentration \n in volume with enzyme / " + r"$\mathrm{mol}\cdot \mathrm{m}^{-3}$")
         flux_when_internal_radius_is_smallest = df_current.loc[df_current['internal_radius'] == min_internal_radius, 'flux'].item()
-        ax[0][1].scatter(df_current["internal_radius"], df_current["flux"]/flux_when_internal_radius_is_smallest)
+        ax[0][1].plot(df_current["internal_radius"], df_current["flux"]/flux_when_internal_radius_is_smallest)
         ax[0][1].set_xlabel("relative radius of most \n inner membrane r*/R")
-        ax[0][1].set_ylabel("flux / flux found with smallest radius")
+        ax[0][1].set_ylabel("flux divided by flux found with smallest radius")
         ax[1][1].axis("off")
 
     ax[0][0].legend(title="Km")

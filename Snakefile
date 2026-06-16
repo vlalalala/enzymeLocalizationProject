@@ -35,7 +35,7 @@ localrules: all, suggest_optimization_params_round_0, suggest_optimization_param
 """
 snakemake \
   --profile config/slurm \
-  --jobs 50 \
+  --jobs 10 \
   --keep-going \
   --use-conda \
   --latency-wait 120 \
@@ -141,6 +141,9 @@ df = "data/04p_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRates"
 df = "data/04q_enzymaticXtoY_enzymaticYtoZ_2InnerBoundaries_modifyingRates"
 df = "data/00_spontaneous_reaction_test"
 df = "data/01a2_spontaneousXtoY_1InnerBoundary_modifyingXPermeability"
+df = "data/02A5_enzymaticXtoY_1InnerBoundary_modifyingInnerRadius_modifyingEnzymeAllocation_modifyingExternalConcentration"
+df = "data/02m_enzymaticXtoY_2InnerBoundaries_modifyingPositionOfEnzymeRegion_modifyingExternalConcentration"
+df = "data/00b_comparison_numerical_solution_to_analytical_linear_solutions"
 
 if not os.path.isdir(df):
     raise ValueError(df, "does not exist.")
@@ -253,7 +256,7 @@ reaction_network_info_dict = load_json("src/_template_reaction_network.json")
 
 if FAST_MODE:
     rule get_result_from_complete_input:
-        # snakemake -s Snakefile data_private/errorTest_enzymatic_allocation_wrong/combined_000001/.result_computed_fast --cores 1 --use-conda --config fast_mode=true
+        # snakemake -s Snakefile data/00b_comparison_numerical_solution_to_analytical_linear_solutions/combined_000009/.result_computed_fast --cores 1 --use-conda --config fast_mode=true --conda-prefix /space/ge42far/conda_envs/enzymeLocalization
         input:
             lambda wildcards: trial_path(wildcards, "parameters_solver_input.yaml"),
             lambda wildcards: trial_path(wildcards, "parameters_solver_output.yaml"),
@@ -273,7 +276,7 @@ if FAST_MODE:
             override_creeping_reaction_simulations         = True,
             max_num_Newton_iterations                      = lambda wildcards: int(config.get("max_num_Newton_iterations", 1000)),
             max_num_interpolation_times                    = lambda wildcards: int(config.get("max_num_interpolation_times", 8)),
-            max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 5.0e-1), #######################################################
+            max_relative_species_concentrations_difference = lambda wildcards: config.get("max_relative_species_concentrations_difference", 1.0e-2), #######################################################
             max_relative_flux_difference                   = lambda wildcards: config.get("max_relative_flux_difference", 1.0e-2),
             min_relative_concentration_difference_considered_relevant = lambda wildcards: config.get("min_relative_concentration_difference_considered_relevant", 1.0e-2)
         threads: 1

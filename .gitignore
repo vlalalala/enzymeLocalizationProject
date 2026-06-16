@@ -48,3 +48,4 @@ results_/
 numerics_tests/
 optimization_cases/
 data/*/options*
+src/wrong_*
